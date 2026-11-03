@@ -7,9 +7,25 @@
 ```bash
 cd wrongbook
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp key.env.example key.env       # 填入你的 DEEPSEEK_API_KEY（或直接 export）
 ./run.sh                         # 打开 http://127.0.0.1:8899
 ```
+
+## AI 引擎与 API Key（注入式，v1.0.2）
+
+发布包内**不含任何 key**。两种配置方式，任选其一（同时存在时网页配置优先）：
+
+1. **网页设置（推荐给使用者）**：页面右上角「⚙ 设置」→ 选引擎
+   （DeepSeek / 智谱GLM 二选一）→ 粘贴自己的 API Key →「测试连接」→ 保存。
+   仅存本机 `data/ai_config.json`（已 gitignore，不随代码发布/上传）；
+   key 在界面里只显示掩码（`sk-4****77e5`），永不明文回传
+2. **环境变量注入（部署/开发者）**：`export DEEPSEEK_API_KEY=…` / `GLM_API_KEY=…`，
+   或写进 `key.env`（开发者便利文件，已 gitignore；run.sh 自动加载）
+
+引擎说明：DeepSeek 文字/识图同为 `deepseek-flash`（原生多模态）；
+智谱 GLM 默认 `glm-5.3-flash`（原生多模态，看图/解题同一个模型，
+输入 ¥0.8 / 输出 ¥2.8 每百万 tokens，约为旗舰的 1/10；视觉字段可改
+免费老模型 `glm-4.6v-flash` 或提速 `glm-5.3-flashx`），模型名均可在设置弹窗里改。
+首次启动未配置 key 时页面会自动弹出设置向导。
 
 ## 使用流程
 
@@ -26,6 +42,7 @@ cp key.env.example key.env       # 填入你的 DEEPSEEK_API_KEY（或直接 exp
 | 文件 | 职责 |
 |---|---|
 | `app.py` | Flask 服务 + API |
+| `ai_config.py` | AI 引擎注入式配置（DeepSeek/GLM 二选一；网页设置 > 环境变量；掩码回显） |
 | `reviewflow.py` | 排版机：多题转录 + 自动抓图（图形默认原图，SVG 按需生成）+ 草稿单 |
 | `pipeline.py` | 入库质量链 / 相似题 / 出卷（复用父项目 geocheck·verify_answers·export_paper） |
 | `wordexport.py` | Word 导出（LaTeX→matplotlib→PNG 嵌入 docx） |

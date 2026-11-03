@@ -92,7 +92,7 @@ class TestIngestDedup(unittest.TestCase):
         _temp_store()
         _seed_bank([{"id": "q001", "question": {"text": Q1}}])
         self._orig_make = pipeline.make_client
-        pipeline.make_client = lambda provider="deepseek": (object(), "fake-model")
+        pipeline.make_client = lambda provider=None, model=None, vision=False: (object(), "fake-model")
 
     def tearDown(self):
         pipeline.make_client = self._orig_make

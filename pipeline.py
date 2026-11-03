@@ -114,7 +114,7 @@ def resolve_figure_spec(q, text, vectorize=None, client=None, model=None):
     return spec
 
 
-def ingest_selected(sheet, provider="deepseek"):
+def ingest_selected(sheet, provider=None):
     """人审提交：sheet 中 selected=True 的题逐个走质量链入库。
     返回 {results: [{no, id?|skipped?, report[]}], sheet_id}
 
@@ -125,7 +125,7 @@ def ingest_selected(sheet, provider="deepseek"):
     一张照片可分多次提交，每次只处理当次勾选的题；所有题都有处置结果后
     草稿单才标记 processed，否则保持 pending（剩余题仍可再勾选再提交）。
     """
-    client, model = make_client(provider)
+    client, model = make_client(provider, vision=True)   # 链内可能补向量化（视觉调用）
     results = []
     skipped_ids = []
     for q in sheet["questions"]:
@@ -251,7 +251,7 @@ def _answer_match(a, b):
 
 # ---------- F2 相似题 ----------
 
-def gen_similar(qid, count=2, provider="deepseek"):
+def gen_similar(qid, count=2, provider=None):
     record = store.get(qid)
     if not record:
         raise RuntimeError("题目不存在: " + qid)
@@ -310,7 +310,7 @@ PAPER_PROMPT = """你是资深命题教师。根据学生的错题画像命制�
 
 
 def gen_paper(chapters=None, kps=None, difficulty_mix=None, count=8,
-              mode="variant", provider="deepseek", out_dir=None):
+              mode="variant", provider=None, out_dir=None):
     """错题画像 → 针对卷 json + export_paper PDF。返回 {pdf, md, n}"""
     from stats import dashboard
     db = store.load()

@@ -113,4 +113,5 @@ def dashboard(chapter=None, difficulty=None, kp=None, reason=None,
         "zero_practice": sum(1 for q in active if not q.get("practice")),
         "ready_to_master": [q["id"] for q in active if streak(q) >= 3],
         "practice_overview": practice_rows,
+        "all_ids": [q["id"] for q in _all],   # 全量题 id（含已归档）：前端勾选集剪枝用
     }

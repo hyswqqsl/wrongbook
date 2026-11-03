@@ -5,3 +5,5 @@ __pycache__/
 data/photos/
 data/crops/
 out/
+# 注入式 API Key：网页设置落盘 / 开发者便利文件，均不入库
+data/ai_config.json

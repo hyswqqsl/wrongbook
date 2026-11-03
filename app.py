@@ -8,6 +8,7 @@ from common import ROOT  # noqa
 from flask import Flask, request, jsonify, send_file, send_from_directory
 import store, stats
 import figureflow
+import ai_config
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=os.path.join(BASE, "static"), static_url_path="/static")
@@ -59,6 +60,39 @@ def api_stats():
         date_from=a.get("from") or None,
         date_to=a.get("to") or None,
         include_mastered=a.get("mastered") in ("1", "true")))
+
+
+# ---------- AI 引擎设置（注入式 key：网页配置 > 环境变量；key 永不明文回传） ----------
+
+@app.get("/api/ai-config")
+def api_ai_config_get():
+    """引擎配置视图（掩码）：{provider, ready, providers:{deepseek/glm:{has_key,key_masked,models...}}}"""
+    try:
+        return jsonify(ai_config.describe())
+    except Exception as e:
+        return _err(e)
+
+
+@app.post("/api/ai-config")
+def api_ai_config_post():
+    """保存配置 {provider?, keys?:{deepseek?,glm?}, models?:{...}}；key 传空串 = 清除"""
+    try:
+        body = request.get_json(force=True, silent=True) or {}
+        ai_config.save_patch(body)
+        return jsonify(ai_config.describe())
+    except Exception as e:
+        return _err(e)
+
+
+@app.post("/api/ai-config/test")
+def api_ai_config_test():
+    """连通性测试 {provider, key?, model?, vision?}（测试值不落盘）→ {ok, model|error}"""
+    try:
+        b = request.get_json(force=True, silent=True) or {}
+        return jsonify(ai_config.test_provider(b.get("provider"), b.get("key"),
+                                               b.get("model"), bool(b.get("vision"))))
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:300]})
 
 
 # ---------- 排版机（草稿单） ----------

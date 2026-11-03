@@ -78,6 +78,14 @@ table.tb th{color:var(--sub);font-weight:500}
 /* 题目详情弹窗 */
 #qmodal{position:fixed;inset:0;background:rgba(20,25,40,.55);z-index:90;display:flex;align-items:center;justify-content:center}
 .qm-box{background:#fff;border-radius:14px;padding:20px 26px;width:min(780px,94vw);max-height:88vh;overflow:auto;box-shadow:0 10px 50px rgba(0,0,0,.3)}
+/* AI 引擎设置弹窗 */
+#aimodal{position:fixed;inset:0;background:rgba(20,25,40,.55);z-index:95;display:flex;align-items:center;justify-content:center}
+.ai-box{background:#fff;border-radius:14px;padding:20px 26px;width:min(600px,94vw);max-height:88vh;overflow:auto;box-shadow:0 10px 50px rgba(0,0,0,.3)}
+.ai-box h3{margin:0;font-size:17px}
+.ai-prov{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0}
+.ai-prov.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
+.ai-prov input[type=password],.ai-prov input[type=text]{width:100%;font:inherit;border:1px solid var(--line);border-radius:6px;padding:6px 9px;margin-top:6px}
+.ai-krow{display:flex;gap:8px;margin-top:6px;font-size:13px;align-items:center}
 .qm-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .qm-head b{font-size:16px}
 .qm-head button{margin-left:auto}
@@ -130,6 +138,7 @@ details.kptree[open] summary{color:var(--ink)}
     <span class="small">用户</span>
     <select id="user-sel" onchange="switchUser(this.value)" style="padding:5px 8px;border:1px solid var(--line);border-radius:6px;font:inherit"></select>
     <button class="sec" style="font-size:13px;padding:5px 10px" onclick="addUser()">＋ 新用户</button>
+    <button class="sec" id="ai-badge" style="font-size:13px;padding:5px 10px" onclick="openAiConfig()" title="AI 引擎与 API Key 设置">⚙ 设置</button>
   </div>
 </header>
 <main>
@@ -164,6 +173,7 @@ details.kptree[open] summary{color:var(--ink)}
 </main>
 <div id="overlay" class="hidden"><div class="ov-box"><div class="spinner"></div><div id="ov-text">处理中…</div></div></div>
 <div id="qmodal" class="hidden"></div>
+<div id="aimodal" class="hidden"></div>
 <div id="result-banner" class="hidden"></div>
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -442,6 +452,12 @@ async function loadDash(){
     kp:df.kp||'',reason:df.reason||'',mastered:df.mastered?'1':''}).toString();
   const d=await (await fetch('/api/stats'+qs)).json();
   window._dashFacets=d.facets||{};
+  {   // 勾选集剪枝：清掉已不存在的题（删题后残留），否则“看不见勾选却能开始做题”
+    const alive=new Set(d.all_ids||[]);
+    let pruned=false;
+    [...dashSelected].forEach(id=>{if(!alive.has(id)){dashSelected.delete(id);pruned=true;}});
+    if(pruned)saveSel();
+  }
   const bar=(title,dict)=>{const tot=Object.values(dict).reduce((a,b)=>a+b,0)||1;
     return `<div class="bars"><div class="small" style="margin:6px 0 2px">${title}</div>`+
     Object.entries(dict).map(([k,v])=>`<div class="bar-row"><label>${esc(k)}</label><div class="bar-track"><div class="bar-fill" style="width:${v/tot*100}%"></div></div><span>${v}</span></div>`).join('')+`</div>`;};
@@ -502,9 +518,9 @@ async function loadDash(){
   updateSelCount();
   tex($('#tab-dash'));   // 题目列公式渲染
 }
-const dashSelected=new Set((()=>{   // 勾选集：localStorage 持久，跨标签页/搜索/切页保留
-  try{return JSON.parse(localStorage.getItem('dash_selected')||'[]')}catch(e){return[]}})());
-function saveSel(){try{localStorage.setItem('dash_selected',JSON.stringify([...dashSelected]))}catch(e){}}
+const dashSelected=new Set((()=>{   // 勾选集：sessionStorage 持久（跨搜索/切页保留；关浏览器后清零，
+  try{return JSON.parse(sessionStorage.getItem('dash_selected')||'[]')}catch(e){return[]}})());   // 避免上次会话残留导致“没勾选也能开始做题”
+function saveSel(){try{sessionStorage.setItem('dash_selected',JSON.stringify([...dashSelected]))}catch(e){}}
 function toggleAllRows(cb){
   $$('.row-sel').forEach(x=>{x.checked=cb.checked;cb.checked?dashSelected.add(x.value):dashSelected.delete(x.value);});
   saveSel();updateSelCount();
@@ -959,6 +975,88 @@ function setKp(sid,no,ch,sec,kp,el){
   det.open=false;
 }
 
+/* ---------- AI 引擎设置（注入式 key：仅存服务端 data/ai_config.json，前端只见掩码） ---------- */
+let AI_CFG=null, AI_SEL=null;
+async function loadAiConfig(){
+  try{
+    AI_CFG=await (await fetch('/api/ai-config')).json();
+    updateAiBadge();
+    if(!AI_CFG.ready&&!sessionStorage.getItem('ai-cfg-opened')){   // 首次使用：自动弹设置
+      sessionStorage.setItem('ai-cfg-opened','1');
+      openAiConfig('首次使用请先配置 AI 引擎：任选一家，填入你的 API Key（仅存本机，不上传）');
+    }
+  }catch(e){}
+}
+function updateAiBadge(){
+  const b=$('#ai-badge'); if(!b||!AI_CFG)return;
+  if(AI_CFG.ready){b.textContent='⚙ '+AI_CFG.providers[AI_CFG.provider].label;b.style.color='';b.style.borderColor='';}
+  else{b.textContent='⚙ 设置 · 未配置引擎';b.style.color='var(--amber)';b.style.borderColor='var(--amber)';}
+}
+function openAiConfig(notice){
+  if(!AI_CFG)return;
+  AI_SEL=AI_CFG.provider||'deepseek';
+  $('#aimodal').classList.remove('hidden');
+  renderAiModal(notice);
+}
+function closeAiConfig(){$('#aimodal').classList.add('hidden');}
+function aiPick(pid,e){   // 整卡片可点选中；输入框/按钮/链接不重渲染（防丢已输内容）
+  if(['INPUT','BUTTON','A','TEXTAREA','SELECT','LABEL'].includes(e.target.tagName))return;
+  AI_SEL=pid;renderAiModal();
+}
+function renderAiModal(notice){
+  const P=AI_CFG.providers;
+  $('#aimodal').innerHTML=`<div class="ai-box">
+    <div class="qm-head"><h3>⚙ AI 引擎设置</h3><button class="sec" onclick="closeAiConfig()">关闭</button></div>
+    ${notice?`<div class="small" style="margin-bottom:6px">${esc(notice)}</div>`:''}
+    ${Object.entries(P).map(([pid,p])=>`
+      <div class="ai-prov ${AI_SEL===pid?'on':''}" onclick="aiPick('${pid}',event)">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b>${esc(p.label)}</b>
+          ${p.has_key?`<span class="tag t-pass">已配置 ${esc(p.key_masked)}（${p.key_source==='env'?'环境变量':'本机配置'}）</span>`
+                     :`<span class="tag t-review">未配置</span>`}
+          ${AI_CFG.provider===pid?'<span class="tag t-easy">当前使用</span>':''}
+          <a href="${p.apply_url}" target="_blank" class="small" style="margin-left:auto" onclick="event.stopPropagation()">申请 Key ↗</a>
+        </div>
+        <div class="small">${esc(p.note)}</div>
+        ${AI_SEL===pid?`
+          <input type="password" id="ai-key-${pid}" autocomplete="off"
+                 placeholder="${p.has_key?'留空 = 不修改已存 Key':'粘贴 API Key（环境变量名 '+esc(p.key_env)+'）'}">
+          <div class="ai-krow"><span style="width:64px;color:var(--sub)">文本模型</span>
+            <input type="text" id="ai-tm-${pid}" value="${esc(p.text_model)}" placeholder="${esc(p.default_text_model)}"></div>
+          <div class="ai-krow"><span style="width:64px;color:var(--sub)">视觉模型</span>
+            <input type="text" id="ai-vm-${pid}" value="${esc(p.vision_model)}" placeholder="${esc(p.default_vision_model)}"></div>
+          <div class="ai-krow"><span class="small">转录/图形向量化走视觉模型</span>
+            <button class="sec" style="margin-left:auto" onclick="event.stopPropagation();testAiConfig('${pid}')">测试连接</button></div>
+          <div id="ai-test-${pid}" class="small" style="margin-top:4px;white-space:pre-wrap"></div>`:''}
+      </div>`).join('')}
+    <div style="display:flex;gap:10px;margin-top:12px;align-items:center">
+      <span class="small">Key 仅保存在服务端本机 data/ai_config.json，不会随代码发布或上传</span>
+      <button class="pri" style="margin-left:auto" onclick="saveAiConfig()">保存</button>
+    </div>
+  </div>`;
+}
+async function testAiConfig(pid){   // 文本+视觉各一次最小真实调用；测试值不落盘
+  const box=$('#ai-test-'+pid); if(!box)return;
+  const key=($('#ai-key-'+pid).value||'').trim(), tm=($('#ai-tm-'+pid).value||'').trim(), vm=($('#ai-vm-'+pid).value||'').trim();
+  box.textContent='测试中…（文本 + 视觉各一次最小调用，约 2~5 秒）';
+  const post=b=>fetch('/api/ai-config/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json());
+  const r1=await post({provider:pid,key:key||null,model:tm||null});
+  const r2=await post({provider:pid,key:key||null,model:vm||null,vision:true});
+  box.innerHTML=(r1.ok?'✅ 文本模型 '+esc(r1.model):'❌ 文本：'+esc(r1.error))+'<br>'
+               +(r2.ok?'✅ 视觉模型 '+esc(r2.model):'❌ 视觉：'+esc(r2.error));
+}
+async function saveAiConfig(){
+  const pid=AI_SEL, keys={}, models={};
+  const k=$('#ai-key-'+pid); if(k&&k.value.trim())keys[pid]=k.value.trim();   // 留空=不改
+  models[pid]={text:($('#ai-tm-'+pid).value||'').trim(),vision:($('#ai-vm-'+pid).value||'').trim()};
+  const j=await (await fetch('/api/ai-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:pid,keys,models})})).json();
+  if(j.error)return alert('❌ '+j.error);
+  AI_CFG=j;updateAiBadge();closeAiConfig();
+}
+$('#aimodal').onclick=e=>{   // 仅「关闭/保存」按钮可关；点遮罩不关（防误触丢未保存的 key）
+  if(e.target.id==='aimodal'){/* 刻意无操作 */}
+};
+
 /* ---------- 用户切换（v0.7：按用户隔离题库/草稿单/照片） ---------- */
 async function loadUsers(){
   try{
@@ -981,6 +1079,7 @@ async function addUser(){
 loadUsers();
 loadKB();
 loadDash();
+loadAiConfig();
 if(location.hash==='#quiz'){
   const qb=$$('nav button').find(x=>x.dataset.tab==='quiz');
   if(qb)qb.click();   // 新标签页会话直达刷题（loadQuiz 读取会话队列）

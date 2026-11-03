@@ -22,13 +22,20 @@ TYPE_CN = {"single": "单选", "multiple": "多选", "fill": "填空", "short": 
 CN_TYPE = {v: k for k, v in TYPE_CN.items()}
 
 
-def make_client(provider="deepseek", model=None):
-    """国内直连客户端；清代理环境变量（经验：Clash 代理会拦截国内 API）"""
-    import openai
+def make_client(provider=None, model=None, vision=False):
+    """引擎客户端（注入式：data/ai_config.json > 环境变量，见 ai_config.py）。
+    provider 缺省 = 用户配置的引擎（DeepSeek/智谱GLM 二选一）；
+    vision=True 选用视觉模型（转录/图形向量化；GLM 文本与视觉是两个模型）。"""
+    import ai_config
+    provider = provider or ai_config.active_provider()
+    if not provider:
+        raise RuntimeError("未配置 AI 引擎：请点页面右上角「⚙ 设置」填入 API Key"
+                           "（支持 DeepSeek / 智谱GLM），或设环境变量 DEEPSEEK_API_KEY / GLM_API_KEY")
+    if provider not in PROVIDERS:
+        raise RuntimeError("未知引擎 provider={0}".format(provider))
     p = PROVIDERS[provider]
     for k in PROXY_KEYS:
-        os.environ.pop(k, None)
-    key = os.environ.get(p["key_env"])
-    if not key:
-        raise RuntimeError("请先 export {0}=你的key".format(p["key_env"]))
-    return openai.OpenAI(api_key=key, base_url=p["base_url"]), model or p["model"]
+        os.environ.pop(k, None)   # 经验：Clash 代理会拦截国内 API
+    _, key, resolved_model = ai_config.require(provider, vision=vision)
+    import openai
+    return openai.OpenAI(api_key=key, base_url=p["base_url"]), model or resolved_model

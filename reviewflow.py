@@ -383,11 +383,12 @@ def classify_questions(client, model, questions, tree=None):
     return out
 
 
-def transcribe_photo(photo_bytes, source_note="", provider="deepseek"):
-    """照片 → 草稿单（多题转录 + 几何题矢量图形 + 落盘）。返回草稿单 dict。"""
+def transcribe_photo(photo_bytes, source_note="", provider=None):
+    """照片 → 草稿单（多题转录 + 几何题矢量图形 + 落盘）。返回草稿单 dict。
+    视觉调用：provider 缺省用配置引擎；GLM 自动切视觉模型 glm-4.6v-flash。"""
     import figureflow
     uri, (W, H) = preprocess(photo_bytes)
-    client, model = make_client(provider)
+    client, model = make_client(provider, vision=True)
     data = ask_json_vision(client, model, TRANSCRIBE_PROMPT, uri)
 
     questions_raw = data.get("questions") or []

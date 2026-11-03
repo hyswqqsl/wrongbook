@@ -82,7 +82,7 @@ def vectorize_figure(client=None, model=None, question=None, crop_path=None, rou
         raise ValueError("question 不能为空")
     if client is None:
         from common import make_client
-        client, model = make_client("deepseek")
+        client, model = make_client(vision=True)   # gen_spec 可能发送裁剪图，须视觉模型
     if not wants_figure({"question": question}):
         return None, ["非配图题，跳过向量化"]
     errs = []
