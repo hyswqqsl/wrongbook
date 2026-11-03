@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI错题本 · 数学</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
 <script defer src="/static/vendor/katex/katex.min.js"></script>
 <script defer src="/static/vendor/katex/auto-render.min.js"></script>
@@ -131,8 +132,6 @@ details.kptree[open] summary{color:var(--ink)}
   <nav>
     <button data-tab="ingest" class="on">录入（排版机）</button>
     <button data-tab="dash">工作台</button>
-    <button data-tab="quiz">刷题</button>
-    <button data-tab="paper">出卷</button>
   </nav>
   <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
     <span class="small">用户</span>
@@ -160,14 +159,9 @@ details.kptree[open] summary{color:var(--ink)}
 <!-- ========== Tab2 工作台 ========== -->
 <section id="tab-dash" class="hidden"></section>
 
-<!-- ========== Tab3 刷题 ========== -->
+<!-- ========== 做题与批改（不入菜单：工作台勾选→开始做题 进入） ========== -->
 <section id="tab-quiz" class="hidden">
   <div class="card" id="quiz-box">加载中…</div>
-</section>
-
-<!-- ========== Tab4 出卷 ========== -->
-<section id="tab-paper" class="hidden">
-  <div class="card" id="paper-box">加载中…</div>
 </section>
 
 </main>
@@ -180,9 +174,10 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function tex(el){if(window.renderMathInElement)renderMathInElement(el,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});}
 $$('nav button').forEach(b=>b.onclick=()=>{
+  if(paperData&&!confirm('正在做题，是否退出？'))return;   // 做题中防误触（批改完成/放弃后不再拦）
   $$('nav button').forEach(x=>x.classList.toggle('on',x===b));
-  ['ingest','dash','quiz','paper'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!==b.dataset.tab));
-  if(b.dataset.tab==='dash')loadDash(); if(b.dataset.tab==='quiz')loadQuiz(); if(b.dataset.tab==='paper')loadPaper();
+  ['ingest','dash','quiz'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!==b.dataset.tab));
+  if(b.dataset.tab==='dash')loadDash();
 });
 
 /* ---------- Tab1 排版机 ---------- */
@@ -548,6 +543,9 @@ async function exportPaperPdf(){
     if(btn){btn.disabled=false;btn.textContent='🖨 导出PDF（'+j.n+'题）';}
   }catch(e){if(btn){btn.disabled=false;btn.textContent='🖨 导出PDF';}alert('❌ '+e);}
 }
+function quitPaper(){   // 「放弃」：显式退出不走菜单确认；作答不保存不计练习
+  paperData=null;goDash();
+}
 function goDash(){
   const b=$$('nav button').find(x=>x.dataset.tab==='dash');
   if(b)b.click();   // 返回工作台（loadDash 会恢复筛选与勾选）
@@ -641,8 +639,8 @@ function hideQModal(){$('#qmodal').classList.add('hidden');}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')hideQModal();});
 
 /* ---------- Tab3 刷题 ---------- */
-let quizPool=[], quizBag=[];   // 随机刷题：洗牌袋循环（全部刷完一轮再重新洗牌）
-let paperData=null;            // 做题模式：勾选题目（试卷式一次列出）
+/* ---------- 做题与批改（唯一入口：工作台勾选→开始做题；V1.0.3 移除随机刷题/相似题/出卷） ---------- */
+let paperData=null;   // 试卷进行中数据（非空=做题中：菜单切换需确认；批改完成/放弃后置 null）
 async function loadQuiz(){
   const ps=localStorage.getItem('paper_session');
   if(ps){
@@ -652,78 +650,10 @@ async function loadQuiz(){
       if(ids.length){showPaper(ids);return;}
     }catch(e){}
   }
-  const j=await (await fetch('/api/questions?filter=active')).json();
-  quizPool=(j.questions||[]).map(x=>x.id); quizBag=[];
-  nextQ();
-}
-function nextQ(){
-  if(!quizPool.length){$('#quiz-box').innerHTML='🎉 在库错题为空（或全部归档）';return;}
-  if(!quizBag.length)quizBag=[...quizPool].sort(()=>Math.random()-0.5);   // 一轮刷完重新洗牌，循环所有题目
-  showQ(quizBag.shift());
-}
-async function showQ(qid,variant){
-  const q=await (await fetch('/api/questions/'+qid)).json();
-  const an=q.analysis||{};
-  const diff={1:'简单',2:'中等',3:'困难'}[an.difficulty]||'';
-  const wrongBefore=(q.practice||[]).filter(p=>!p.correct).length;
-  const head=`<div class="quiz">
-    <div class="qhead"><b>${variant?'相似题':'错题'}</b>
-      <span class="tag t-${an.difficulty===1?'easy':an.difficulty===3?'hard':'med'}">${diff}</span>
-      <span class="tag t-med">${esc(an.chapter||'')}</span>
-      ${(an.knowledge_points||[]).map(k=>`<span class="tag t-review">${esc(k)}</span>`).join('')}
-      <span class="small" style="margin-left:auto">连对3次 → 建议归档</span></div>
-    <div class="qtext">${esc((q.question||{}).text||'')}</div>`;
-  const choicesHtml=(q.question&&q.question.choices)?`<div class="choices">${q.question.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:'';
-  const fig=q.figure_svg?`<figure>${q.figure_svg}</figure>`
-    :((q.question&&q.question.figure_crop)?`<figure><img src="/data/${q.question.figure_crop.replace(/^.*data\//,'')}" style="max-width:300px"><div class="small">原题照片裁剪图</div></figure>`:'');
-  if(variant){   // 相似题：看答案自判（相似题不入库）
-    $('#quiz-box').innerHTML=`${head}${choicesHtml}${fig}
-      <div id="ansbox" class="ans hidden"><b>答案：${esc(q.verified_answer||'（无）')}</b>
-        <div class="small" style="margin-top:4px">💡 ${esc(an.key_idea||'')}</div>
-        <div class="small" style="color:var(--red)">⚠ 易错：${esc(an.pitfall||'')}</div></div>
-      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
-        <button class="sec" onclick="document.getElementById('ansbox').classList.remove('hidden')">看答案</button>
-        <button class="sec" onclick="practiceQ('${qid}',true,this)">相似题：答对了</button>
-        <button class="warn" onclick="practiceQ('${qid}',false,this)">相似题：答错了</button>
-        <button class="sec" onclick="nextQ()" style="margin-left:auto">下一题 ⏭</button></div>
-      <div id="simbox" style="margin-top:10px"></div></div>`;
-    $('#quiz-box').dataset.qid=qid; $('#quiz-box').dataset.wrongBefore=wrongBefore;
-    $('#quiz-box').dataset.ans=q.verified_answer||'';
-    tex($('#quiz-box'));return;
-  }
-  // 按题型给出作答控件（自动评分）
-  let answerUi='';
-  if(q.type==='single'&&q.question&&q.question.choices){
-    answerUi=`<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">${q.question.choices.map(c=>
-      `<button class="sec" onclick="submitKeys('${qid}','${esc(c.key)}')">${esc(c.key)}</button>`).join('')}
-      <span class="small" style="align-self:center">点击选项作答，自动评分</span></div>`;
-  }else if(q.type==='multiple'&&q.question&&q.question.choices){
-    answerUi=`<div class="choices" id="quiz-multi">${q.question.choices.map(c=>
-      `<div><label><input type="checkbox" value="${esc(c.key)}"> ${esc(c.key)}. ${esc(c.text)}</label></div>`).join('')}</div>
-      <button class="pri" style="margin-top:8px" onclick="submitKeys('${qid}',null)">确认提交</button>`;
-  }else if(q.type==='fill'){
-    answerUi=`<div style="display:flex;gap:8px;margin-top:12px"><input type="text" id="quiz-ans" placeholder="输入答案"
-      style="flex:1;min-width:220px;padding:6px 10px;border:1px solid var(--line);border-radius:6px" onkeydown="if(event.key==='Enter')submitFill('${qid}')">
-      <button class="pri" onclick="submitFill('${qid}')">提交</button></div>`;
-  }else{   // short 问答：看答案自判
-    answerUi=`<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
-      <button class="sec" onclick="document.getElementById('ansbox').classList.remove('hidden')">看答案</button>
-      <button class="sec" onclick="practiceQ('${qid}',true,this)">答对了</button>
-      <button class="warn" onclick="practiceQ('${qid}',false,this)">答错了</button>
-      <button class="sec" onclick="genSim('${qid}')">生成相似题</button></div>
-      <div id="ansbox" class="ans hidden"><b>答案：${esc(q.verified_answer||'（待验证）')}</b>
-        <div class="small" style="margin-top:4px">💡 ${esc(an.key_idea||'')}</div>
-        <div class="small" style="color:var(--red)">⚠ 易错：${esc(an.pitfall||'')}</div></div>`;
-  }
-  $('#quiz-box').innerHTML=`${head}${choicesHtml}${fig}${answerUi}
-    <div id="quiz-feedback" style="margin-top:10px"></div>
-    <div id="simbox" style="margin-top:10px"></div>
-    <div style="display:flex;gap:10px;margin-top:10px"><button class="sec" onclick="nextQ()" style="margin-left:auto">下一题 ⏭</button></div>
-  </div>`;
-  $('#quiz-box').dataset.qid=qid;
-  $('#quiz-box').dataset.wrongBefore=wrongBefore;
-  $('#quiz-box').dataset.ans=q.verified_answer||'';
-  tex($('#quiz-box'));
+  $('#quiz-box').innerHTML='<div class="card" style="text-align:center;padding:46px;font-size:15px">'
+    +'📝 请回到「工作台」勾选题目，点 <b>开始做题</b> 进入本页批改练习<br>'
+    +'<span class="small" style="margin-top:6px;display:inline-block">（本页不再提供随机刷题入口）</span>'
+    +'<div style="margin-top:14px"><button class="sec" onclick="goDash()">← 去工作台</button></div></div>';
 }
 /* ---------- 自动评分 ---------- */
 function extractKeys(x){return [...new Set(String(x||'').toUpperCase().match(/[A-D]/g)||[])].sort().join('');}
@@ -739,44 +669,6 @@ function gradeFill(my,ans){
   const na=parseFloat(a),nb=parseFloat(b);
   if(!isNaN(na)&&!isNaN(nb))return Math.abs(na-nb)<1e-6;   // 数值等价（3=3.0）
   return false;
-}
-async function submitKeys(qid,multiKey){
-  const box=$('#quiz-box');
-  const my=multiKey||$$('#quiz-multi input:checked').map(x=>x.value).sort().join('');
-  await finishAnswer(qid,extractKeys(my)!==''&&extractKeys(my)===extractKeys(box.dataset.ans),box);
-}
-async function submitFill(qid){
-  const box=$('#quiz-box');
-  await finishAnswer(qid,gradeFill($('#quiz-ans').value,box.dataset.ans),box);
-}
-async function finishAnswer(qid,correct,box){
-  const wrongBefore=+box.dataset.wrongBefore||0;
-  const r=await (await fetch(`/api/questions/${qid}/practice`,
-    {method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({correct})})).json();
-  const stk=r.streak||0;
-  const badges=[
-    r.ready?'<span class="badge">✅ 建议归档</span>':`<span class="small">连对 ${stk}/3${correct?'，还差 '+(3-stk)+' 次':''}</span>`,
-    (!correct&&wrongBefore>=1)?'<span class="tag t-conflict">⚠ 重复做错</span>':''].join(' ');
-  box.querySelectorAll('button,input,select').forEach(el=>{
-    if(el.closest('#quiz-feedback')||el.closest('#simbox')||el.textContent.includes('下一题'))return;
-    el.disabled=true;});
-  document.getElementById('quiz-feedback').innerHTML=`
-    <div class="ans" style="border-color:${correct?'#cdecd8':'#f0c9cb'};background:${correct?'#f2fbf5':'#fdf1f1'}">
-      <b>${correct?'✅ 回答正确':'❌ 回答错误'}</b>　正确答案：<b>${esc(box.dataset.ans)||'（无）'}</b>
-      <div style="margin-top:6px">状态：${badges}</div>
-      <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
-        ${r.ready?`<button class="pri" onclick="masterQ('${qid}')">📦 归档本题</button>`:''}
-        <button class="sec" onclick="genSim('${qid}')">✨ 做相似题</button>
-      </div>
-    </div>`;
-}
-async function practiceQ(qid,correct,btn){
-  const r=await (await fetch(`/api/questions/${qid}/practice`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({correct})})).json();
-  btn.textContent=(correct?'✓ 已记录 · 连对 ':'✗ 已记录 · 连对 ')+r.streak;
-  if(r.ready)btn.insertAdjacentHTML('afterend',
-    ' <span class="badge">✅ 建议归档</span> <button class="pri" onclick="masterQ(\''+qid+'\')">📦 归档</button>');
-  btn.disabled=true;
 }
 /* ---------- 做题（试卷式）：勾选题目一次列出，作答后统一批改 ---------- */
 async function showPaper(ids){
@@ -811,7 +703,7 @@ async function showPaper(ids){
       <span class="small">作答完成后点「完成并批改」；也可打印/PDF 后在纸上作答</span>
       <span style="margin-left:auto;display:flex;gap:10px">
         <button class="pri" onclick="submitPaper()">✅ 完成并批改</button>
-        <button class="sec" onclick="goDash()">放弃</button></span></div>
+        <button class="sec" onclick="quitPaper()">放弃</button></span></div>
     <div class="print-head">
       <h2>数学错题练习卷</h2>
       <div class="pline">共 ${qs.length} 题 · 班级＿＿＿＿　姓名＿＿＿＿　日期＿＿＿＿</div>
@@ -864,14 +756,13 @@ async function submitPaper(){
         <b>${correct?'✅ 正确':'❌ 错误'}</b>　正确答案：<b>${esc(ans)||'（无）'}</b>
         <div style="margin-top:4px">状态：${badges}</div>
         <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">
-          ${r.ready?`<button class="pri" onclick="masterQ('${q.id}')">📦 归档</button>`:''}
-          <button class="sec" onclick="genSim('${q.id}')">✨ 做相似题</button></div></div>`;
+          ${r.ready?`<button class="pri" onclick="masterQ('${q.id}')">📦 归档</button>`:''}</div></div>`;
   }
   const n=divs.length, score=n?Math.round(ok/n*100):0;
   let comment;
   if(score>=90)comment='🎉 优秀！本组题目掌握扎实。';
   else if(score>=75)comment='👍 良好。巩固错题后很快都能建议归档。';
-  else if(score>=60)comment='💪 及格。建议对错题做相似题强化。';
+  else if(score>=60)comment='💪 及格。建议近期重做本组错题巩固。';
   else comment='📚 需要加强，以下知识点错得较多：';
   const kpChips=Object.entries(wrongKps).sort((a,b)=>b[1]-a[1])
     .map(([k,v])=>`<span class="tag t-conflict">${esc(k)} ×${v}</span>`).join(' ');
@@ -885,54 +776,6 @@ async function submitPaper(){
   window.scrollTo(0,0);
 }
 
-async function genSim(qid){
-  const box=$('#simbox'); box.innerHTML='<span class="small">生成相似题中…（约30秒）</span>';
-  const j=await (await fetch(`/api/questions/${qid}/similar`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{"count":2}'})).json();
-  if(j.error){box.innerHTML='❌ '+j.error;return;}
-  box.innerHTML=j.items.map((it,i)=>`<div class="qcard"><b>相似题${i+1}</b>
-    <div class="qtext">${esc(it.text)}</div>
-    <div class="answer-line">（点开练习时显示答案：${esc(it.answer)}）</div>
-    <button class="sec" onclick="showSim(${i})">练习这道</button></div>`).join('')
-    +(j.items.length?'':'<span class="small">生成失败，稍后再试</span>');
-  box._items=j.items; tex(box);
-}
-function showSim(i){const it=$('#simbox')._items[i];
-  $('#quiz-box').innerHTML=`<div class="quiz"><b>相似题</b><div class="qtext">${esc(it.text)}</div>
-   ${it.choices?`<div class="choices">${it.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:''}
-   <div class="ans"><b>答案：${esc(it.answer)}</b><div class="small">${esc(it.explanation)}</div></div>
-   <button class="sec" onclick="nextQ()">下一题 ⏭</button></div>`; tex($('#quiz-box'));}
-
-/* ---------- Tab4 出卷 ---------- */
-async function loadPaper(){
-  const d=await (await fetch('/api/stats')).json();
-  const chs=Object.keys(d.by_chapter), kps=Object.keys(d.by_knowledge_point);
-  $('#paper-box').innerHTML=`
-   <b>针对性出卷</b> <span class="small">基于在库错题的知识点/易错点画像；全部生成内容过图形校验+独立解题对账</span>
-   <table style="margin-top:10px;font-size:14px">
-    <tr><td style="padding:6px">章节：</td><td>${chs.map(c=>`<label style="margin-right:12px"><input type="checkbox" class="f-ch" value="${esc(c)}"> ${esc(c)}</label>`).join('')}</td></tr>
-    <tr><td style="padding:6px">知识点：</td><td>${kps.slice(0,10).map(k=>`<label style="margin-right:12px"><input type="checkbox" class="f-kp" value="${esc(k)}"> ${esc(k)}</label>`).join('')}</td></tr>
-    <tr><td style="padding:6px">难度占比：</td><td>①简单 <input type="number" id="mix1" value="30" min="0" max="100" style="width:56px">％
-      ②中等 <input type="number" id="mix2" value="50" min="0" max="100" style="width:56px">％
-      ③困难 <input type="number" id="mix3" value="20" min="0" max="100" style="width:56px">％</td></tr>
-    <tr><td style="padding:6px">题量：</td><td><input type="number" id="pc" value="8" min="3" max="20" style="width:64px"></td></tr>
-    <tr><td style="padding:6px">模式：</td><td><label><input type="radio" name="pm" value="variant" checked> 变式卷（基于错题改数据/换情境）</label>
-      <label style="margin-left:14px"><input type="radio" name="pm" value="original"> 原创卷（围绕易错点全新命题）</label></td></tr>
-   </table>
-   <div style="margin-top:12px"><button class="pri" id="btn-paper" onclick="doPaper()">生成试卷（1-3分钟）</button></div>
-   <div id="paper-out" style="margin-top:10px"></div>`;
-}
-async function doPaper(){
-  const btn=$('#btn-paper'); btn.disabled=true; btn.textContent='生成中…（1-3分钟）';
-  const body={chapters:$$('.f-ch:checked').map(x=>x.value),kps:$$('.f-kp:checked').map(x=>x.value),
-    difficulty_mix:{'1':+$('#mix1').value||30,'2':+$('#mix2').value||50,'3':+$('#mix3').value||20},
-    count:+$('#pc').value||8,mode:$$('input[name=pm]:checked')[0].value};
-  try{const j=await (await fetch('/api/paper',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
-    $('#paper-out').innerHTML=j.error?`❌ ${j.error}`:
-      `✅ 成卷 ${j.n} 题（质量链剔除 ${j.dropped} 道不合格题）
-       ${j.pdf?` · <a href="/out/${j.pdf.replace(/^.*out\//,'')}" target="_blank">打开PDF</a>`:''}`;
-  }catch(e){$('#paper-out').textContent='❌ '+e;}
-  btn.disabled=false; btn.textContent='生成试卷（1-3分钟）';
-}
 /* ---------- 知识点树（v0.7.1：浙教版八上 章/节/知识点） ---------- */
 let KB=null;
 async function loadKB(){
@@ -1080,10 +923,14 @@ loadUsers();
 loadKB();
 loadDash();
 loadAiConfig();
-if(location.hash==='#quiz'){
-  const qb=$$('nav button').find(x=>x.dataset.tab==='quiz');
-  if(qb)qb.click();   // 新标签页会话直达刷题（loadQuiz 读取会话队列）
+function enterQuizView(){   // 做题视图：菜单全部未选中，切到做题区
+  $$('nav button').forEach(x=>x.classList.remove('on'));
+  ['ingest','dash'].forEach(t=>$('#tab-'+t).classList.add('hidden'));
+  $('#tab-quiz').classList.remove('hidden');
+  loadQuiz();
 }
+if(location.hash==='#quiz'){enterQuizView();}   // 工作台「开始做题」新标签页直达
+window.addEventListener('hashchange',()=>{if(location.hash==='#quiz')enterQuizView();});   // 同页改 hash 兑底
 </script>
 </body>
 </html>

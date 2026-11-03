@@ -384,34 +384,6 @@ def api_delete(qid):
     return jsonify({"ok": ok})
 
 
-@app.post("/api/questions/<qid>/similar")
-def api_similar(qid):
-    try:
-        import pipeline
-        n = int(request.get_json(force=True).get("count", 2)) if request.data else 2
-        return jsonify({"items": pipeline.gen_similar(qid, n)})
-    except Exception as e:
-        return _err(e)
-
-
-# ---------- 出卷 ----------
-
-@app.post("/api/paper")
-def api_paper():
-    try:
-        import pipeline
-        body = request.get_json(force=True) or {}
-        out = pipeline.gen_paper(
-            chapters=body.get("chapters") or None,
-            kps=body.get("kps") or None,
-            difficulty_mix=body.get("difficulty_mix") or None,
-            count=int(body.get("count", 8)),
-            mode=body.get("mode", "variant"))
-        return jsonify(out)
-    except Exception as e:
-        return _err(e)
-
-
 # ---------- 用户管理（v0.7：按用户隔离题库/草稿单/照片） ----------
 
 @app.get("/api/users")
