@@ -78,18 +78,19 @@ table.tb th{color:var(--sub);font-weight:500}
 .small{font-size:12.5px;color:var(--sub)}
 /* 题目详情弹窗 */
 #qmodal{position:fixed;inset:0;background:rgba(20,25,40,.55);z-index:90;display:flex;align-items:center;justify-content:center}
-.qm-box{background:#fff;border-radius:14px;padding:20px 26px;width:min(780px,94vw);max-height:88vh;overflow:auto;box-shadow:0 10px 50px rgba(0,0,0,.3)}
+.qm-box{background:#fff;border-radius:14px;padding:0 26px 20px;width:min(780px,94vw);max-height:88vh;overflow:auto;box-shadow:0 10px 50px rgba(0,0,0,.3)}
 /* AI 引擎设置弹窗 */
 #aimodal{position:fixed;inset:0;background:rgba(20,25,40,.55);z-index:95;display:flex;align-items:center;justify-content:center}
-.ai-box{background:#fff;border-radius:14px;padding:20px 26px;width:min(600px,94vw);max-height:88vh;overflow:auto;box-shadow:0 10px 50px rgba(0,0,0,.3)}
+.ai-box{background:#fff;border-radius:14px;padding:0 26px 20px;width:min(600px,94vw);max-height:88vh;overflow:auto;box-shadow:0 10px 50px rgba(0,0,0,.3)}
 .ai-box h3{margin:0;font-size:17px}
 .ai-prov{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0}
 .ai-prov.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
 .ai-prov input[type=password],.ai-prov input[type=text]{width:100%;font:inherit;border:1px solid var(--line);border-radius:6px;padding:6px 9px;margin-top:6px}
 .ai-krow{display:flex;gap:8px;margin-top:6px;font-size:13px;align-items:center}
-.qm-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.qm-head{position:sticky;top:0;z-index:5;background:#fff;margin:0 -26px 10px;padding:20px 26px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.qm-meta{margin-top:12px}
 .qm-head b{font-size:16px}
-.qm-head button{margin-left:auto}
+.qm-head button:first-of-type{margin-left:auto}   /* 首个按钮（删除）推向右侧；后续按钮（关闭）紧邻 */
 .qm-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
 .qm-sec{border-top:1px solid var(--line);margin-top:10px;padding-top:8px;font-size:14px}
 .qm-prac{font-size:13px;color:var(--sub);margin-top:4px;line-height:1.8}
@@ -546,6 +547,14 @@ async function exportPaperPdf(){
 function quitPaper(){   // 「放弃」：显式退出不走菜单确认；作答不保存不计练习
   paperData=null;goDash();
 }
+async function delQ(qid){   // 详情弹窗删除：录入错误的题，连带照片/练习记录，不可恢复
+  if(!confirm('确定删除该题？\n照片与练习记录一并删除，不可恢复。'))return;
+  const j=await (await fetch('/api/questions/'+qid,{method:'DELETE'})).json();
+  if(j.error)return alert('❌ '+j.error);
+  hideQModal();
+  dashSelected.delete(qid);saveSel();updateSelCount();   // 勾选集同步剪枝
+  loadDash();   // 列表即时刷新
+}
 function goDash(){
   const b=$$('nav button').find(x=>x.dataset.tab==='dash');
   if(b)b.click();   // 返回工作台（loadDash 会恢复筛选与勾选）
@@ -610,6 +619,7 @@ async function showQModal(qid){
   $('#qmodal').innerHTML=`<div class="qm-box" onclick="event.stopPropagation()">
     <div class="qm-head"><b>题目详情</b><span class="small">${esc(q.id)}</span>
       ${q.mastered_at?'<span class="tag t-pass">已归档</span>':'<span class="tag t-review">在库</span>'}
+      <button class="warn" onclick="delQ('${q.id}')">🗑 删除</button>
       <button class="sec" onclick="hideQModal()">关闭 ✕</button></div>
     <div class="qm-meta">
       ${an.grade?`<span class="tag t-review">${esc(an.grade)}</span>`:''}
@@ -850,7 +860,7 @@ function renderAiModal(notice){
   const P=AI_CFG.providers;
   $('#aimodal').innerHTML=`<div class="ai-box">
     <div class="qm-head"><h3>⚙ AI 引擎设置</h3><button class="sec" onclick="closeAiConfig()">关闭</button></div>
-    ${notice?`<div class="small" style="margin-bottom:6px">${esc(notice)}</div>`:''}
+    ${notice?`<div class="small" style="margin:12px 0 6px">${esc(notice)}</div>`:''}
     ${Object.entries(P).map(([pid,p])=>`
       <div class="ai-prov ${AI_SEL===pid?'on':''}" onclick="aiPick('${pid}',event)">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">

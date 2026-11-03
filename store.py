@@ -228,12 +228,54 @@ def update(qid, **fields):
 
 
 def remove(qid):
+    """删除题目：JSON 记录 + 连带图片清理。
+    - figure_crop（裁剪图）：直接删文件，并从草稿单引用中同步清理（避免已处理草稿渲染坏图）
+    - photo（原图）：同一张照片可产多题，仅当剩余题目与草稿单都无引用时才删
+    返回是否删除"""
     _init_once()
     db = load()
-    before = len(db["questions"])
+    target = next((q for q in db["questions"] if q["id"] == qid), None)
+    if not target:
+        return False
     db["questions"] = [q for q in db["questions"] if q["id"] != qid]
     save(db)
-    return len(db["questions"]) < before
+
+    # ---- 连带图片清理 ----
+    crop = (target.get("question") or {}).get("figure_crop")
+    if crop:
+        try:
+            os.remove(crop)
+        except OSError:
+            pass
+        _scrub_crop_refs(crop)
+    photo = target.get("photo")
+    if photo:
+        used_by_q = any(q.get("photo") == photo for q in db["questions"])
+        used_by_draft = any(sh.get("photo") == photo for sh in load_sheets().get("sheets", []))
+        if not used_by_q and not used_by_draft:
+            try:
+                os.remove(photo)
+            except OSError:
+                pass
+    return True
+
+
+def _scrub_crop_refs(crop):
+    """从所有草稿单中清理对已删除裁剪图的引用（figure_crops[] / figure_crop）"""
+    if not crop:
+        return
+    db = load_sheets()
+    changed = False
+    for sh in db.get("sheets", []):
+        for q in sh.get("questions", []):
+            if isinstance(q.get("figure_crops"), list) and crop in q["figure_crops"]:
+                q["figure_crops"] = [c for c in q["figure_crops"] if c != crop]
+                changed = True
+            if q.get("figure_crop") == crop:
+                q["figure_crop"] = None
+                changed = True
+    if changed:
+        save_sheets(db)
 
 
 def add_practice(qid, correct, variant="original"):

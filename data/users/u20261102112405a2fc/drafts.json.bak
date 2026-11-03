@@ -271,7 +271,7 @@
       ]
      ],
      "figure_crops": [
-      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-123237-18a770_q13_0.png"
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-123237-18a770_q13_m.png"
      ],
      "selected": false,
      "reason": null,
@@ -279,19 +279,30 @@
      "figure_spec": null,
      "figure_svg": null,
      "figure_mode": "crop",
-     "figure_note": "默认使用原题照片裁剪图（省 token，原图即权威图形）",
+     "figure_note": "已抓取原题图形（原图取代矢量图形）",
      "grade": "八年级上册",
      "kp_sel": {
       "chapter": "第一章 三角形",
       "section": "1.5 三角形全等的判定",
       "kp": "三角形的稳定性"
-     }
+     },
+     "figure_manual_box": [
+      0.13599017848710926,
+      0.392002347319445,
+      0.31731041646992164,
+      0.5958838076874712
+     ],
+     "ingested_id": "20261103-164129-e7e425"
     }
    ],
    "id": "d20261103-123237-18a770",
    "created_at": "2026-11-03 12:32:37",
    "status": "pending",
-   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/photos/d20261103-123237-18a770.jpg"
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/photos/d20261103-123237-18a770.jpg",
+   "ingested": [
+    "20261103-164129-e7e425"
+   ],
+   "skipped_duplicates": []
   },
   {
    "source": "数学错题练习卷（四、解答题，共4题·满分40分·来源题库：错题练习卷）",
@@ -523,7 +534,253 @@
    "id": "d20261103-131003-a98577",
    "created_at": "2026-11-03 13:10:03",
    "status": "pending",
-   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/photos/d20261103-131003-a98577.jpg"
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/photos/d20261103-131003-a98577.jpg",
+   "ingested": [],
+   "skipped_duplicates": [
+    "20261103-103906-ae2e5e"
+   ]
+  },
+  {
+   "source": "B 提高能力",
+   "photo_size": [
+    1200,
+    1600
+   ],
+   "provider_note": "deepseek-flash",
+   "questions": [
+    {
+     "no": 6,
+     "type": "single",
+     "question": "如图，$AD$ 是等腰三角形 $ABC$ 的底边 $BC$ 上的中线，$BE$ 平分 $\\angle ABC$，交 $AD$ 于点 $E$。若 $AC=12$，$DE=3$，则 $\\triangle ABE$ 的面积是（ ）",
+     "choices": [
+      {
+       "key": "A",
+       "text": "16"
+      },
+      {
+       "key": "B",
+       "text": "18"
+      },
+      {
+       "key": "C",
+       "text": "32"
+      },
+      {
+       "key": "D",
+       "text": "36"
+      }
+     ],
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.78,
+       0.09,
+       0.99,
+       0.24
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-163907-698872_q6_0.png"
+     ],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "默认使用原题照片裁剪图（省 token，原图即权威图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第一章 三角形",
+      "section": "1.7 角平分线的性质",
+      "kp": "1.7 角平分线的性质"
+     }
+    },
+    {
+     "no": 7,
+     "type": "short",
+     "question": "已知：如图，点 $D,E$ 在 $\\triangle ABC$ 的边 $BC$ 上，$AB=AC$，$AD=AE$。求证：$BD=CE$。",
+     "choices": null,
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.12,
+       0.29,
+       0.31,
+       0.44
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-163907-698872_q7_0.png"
+     ],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "默认使用原题照片裁剪图（省 token，原图即权威图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.3 等腰三角形的性质定理",
+      "kp": "等腰三角形性质定理1"
+     }
+    },
+    {
+     "no": 8,
+     "type": "short",
+     "question": "如图，在 $\\triangle ABC$ 中，$AB=AC$，$AD$ 平分 $\\angle BAC$，$DE\\perp AB$ 于点 $E$，$DF\\perp AC$ 于点 $F$。则以下结论：①$DE=DF$；②$AE=AF$；③$\\angle BDE=\\angle CDF$；④$AD$ 上任意一点到 $B,C$ 两点的距离相等。正确的有______（填序号），并选择一个正确的结论给出证明。",
+     "choices": null,
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.12,
+       0.69,
+       0.31,
+       0.87
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-163907-698872_q8_0.png"
+     ],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "默认使用原题照片裁剪图（省 token，原图即权威图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第一章 三角形",
+      "section": "1.7 角平分线的性质",
+      "kp": "1.7 角平分线的性质"
+     }
+    }
+   ],
+   "id": "d20261103-163907-698872",
+   "created_at": "2026-11-03 16:39:07",
+   "status": "pending",
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/photos/d20261103-163907-698872.jpg"
+  },
+  {
+   "source": "数学练习册/试卷 第34页",
+   "photo_size": [
+    1600,
+    1200
+   ],
+   "provider_note": "deepseek-flash",
+   "questions": [
+    {
+     "no": 11,
+     "type": "single",
+     "question": "（题干部分缺失）为 $3$，则这个等腰三角形的腰长为（　　）",
+     "choices": [
+      {
+       "key": "A",
+       "text": "$2$"
+      },
+      {
+       "key": "B",
+       "text": "$8$"
+      },
+      {
+       "key": "C",
+       "text": "$2$ 或 $8$"
+      },
+      {
+       "key": "D",
+       "text": "$10$"
+      }
+     ],
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": false,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.2 等腰三角形",
+      "kp": "等腰三角形的概念"
+     }
+    },
+    {
+     "no": 12,
+     "type": "fill",
+     "question": "已知两条线段的长为 $3\\,\\mathrm{cm}$ 和 $4\\,\\mathrm{cm}$，当第三条线段的长为 ______ $\\mathrm{cm}$ 时，这三条线段就能组成一个直角三角形。",
+     "choices": null,
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.7 探索勾股定理",
+      "kp": "2.7 探索勾股定理"
+     }
+    },
+    {
+     "no": 13,
+     "type": "short",
+     "question": "如图，在 $\\triangle ABC$ 中，$AB=CB$，$\\angle ABC=90^\\circ$。$F$ 为 $AB$ 延长线上一点，点 $E$ 在 $BC$ 上，且 $BE=BF$。\\n(1) 求证：$\\triangle ABE \\cong \\triangle CBF$。\\n(2) 若 $\\angle CAE=30^\\circ$，求 $\\angle ACF$ 的度数。",
+     "choices": null,
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.12,
+       0.37,
+       0.32,
+       0.63
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-164930-32ac46_q13_0.png"
+     ],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "默认使用原题照片裁剪图（省 token，原图即权威图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第一章 三角形",
+      "section": "1.5 三角形全等的判定",
+      "kp": "三角形的稳定性"
+     }
+    }
+   ],
+   "id": "d20261103-164930-32ac46",
+   "created_at": "2026-11-03 16:49:30",
+   "status": "pending",
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/photos/d20261103-164930-32ac46.jpg"
   }
  ]
 }

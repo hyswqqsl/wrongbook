@@ -375,7 +375,7 @@ wrongbook/                 # 本项目（V1.0.1 起完全自包含，可独立�
 | POST | `/api/questions/<id>/practice` | `{correct, variant}` 记一次作答 |
 | POST | `/api/questions/<id>/master` | 归档（写 mastered_at） |
 | POST | `/api/questions/<id>/unmaster` | 重新激活 |
-| DELETE | `/api/questions/<id>` | 删除（连带照片） |
+| DELETE | `/api/questions/<id>` | 删除（连带裁剪图并清理草稿单引用；原图无其他题目/草稿引用时一并删除） |
 | GET  | `/out/<file>` | 下载 Word/PDF/MD |
 | GET  | `/api/kb` | 教材知识树（章/节/知识点） |
 | GET  | `/api/ai-config` | AI 引擎配置视图（引擎/掩码 key/模型；key 永不明文回传） |
