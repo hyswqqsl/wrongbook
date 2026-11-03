@@ -982,7 +982,9 @@ async function loadUsers(){
 async function switchUser(uid){
   if(!confirm('切换用户？当前页面未提交的内容将丢弃。')){loadUsers();return;}
   await fetch('/api/users/switch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:uid})});
-  location.reload();   // 整页刷新：全部数据源切到新用户
+  sessionStorage.setItem('after-switch','dash');   // 重载后直达工作台
+  history.replaceState(null,'',location.pathname); // 去掉 #quiz 残留 hash（直接改 href 同路径会被当片段导航不重载）
+  location.reload();
 }
 async function addUser(){
   const name=prompt('新用户名称（如：孩子B）：'); if(!name)return;
@@ -993,8 +995,13 @@ async function addUser(){
 }
 loadUsers();
 loadKB();
-loadDash();
 loadAiConfig();
+if(sessionStorage.getItem('after-switch')==='dash'){   // 切换用户后：直达工作台（V1.0.3e）
+  sessionStorage.removeItem('after-switch');
+  document.querySelector('nav button[data-tab=dash]').click();   // click 内含 loadDash
+}else{
+  loadDash();   // 默认着陆仍预载工作台数据
+}
 function enterQuizView(){   // 做题视图：菜单全部未选中，切到做题区
   $$('nav button').forEach(x=>x.classList.remove('on'));
   ['ingest','dash'].forEach(t=>$('#tab-'+t).classList.add('hidden'));
