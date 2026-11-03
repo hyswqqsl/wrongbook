@@ -40,6 +40,66 @@
    "created_at": "2026-11-03 16:41:29",
    "practice": [],
    "mastered_at": null
+  },
+  {
+   "source": "",
+   "type": "single",
+   "question": {
+    "text": "如图，$AD$ 是等腰三角形 $ABC$ 的底边 $BC$ 上的中线，$BE$ 平分 $\\angle ABC$，交 $AD$ 于点 $E$。若 $AC=12$，$DE=3$，则 $\\triangle ABE$ 的面积是（ ）",
+    "choices": [
+     {
+      "key": "A",
+      "text": "16"
+     },
+     {
+      "key": "B",
+      "text": "18"
+     },
+     {
+      "key": "C",
+      "text": "32"
+     },
+     {
+      "key": "D",
+      "text": "36"
+     }
+    ],
+    "figure_spec": null,
+    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-170752-718920_q6_m.png"
+   },
+   "printed_answer": null,
+   "verified_answer": "B",
+   "verify_status": "pass",
+   "mistake_reason": {
+    "kind": "careless",
+    "note": ""
+   },
+   "analysis": {
+    "grade": "八年级上册",
+    "chapter": "第一章 三角形",
+    "kp_path": [
+     "第一章 三角形",
+     "1.7 角平分线的性质",
+     "1.7 角平分线的性质"
+    ],
+    "knowledge_points": [
+     "等腰三角形三线合一",
+     "三角形内角平分线定理",
+     "直角三角形面积公式",
+     "等面积转化"
+    ],
+    "pitfall": "易看错“底边BC上的中线”而忽略三线合一；角平分线定理中AE:DE=AB:BD容易写反；把DE=3误当成AE；求△ABE面积时高应取BD，且容易漏乘1/2。",
+    "difficulty": 2,
+    "key_idea": "由三线合一得AD⊥BC，在Rt△ABD中用角平分线定理得AE·BD=AB·DE=36，所以S△ABE=½AE·BD=18。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/photos/d20261103-170752-718920.jpg",
+   "flags": {
+    "needs_review": false
+   },
+   "id": "20261103-170926-42fd5d",
+   "created_at": "2026-11-03 17:09:26",
+   "practice": [],
+   "mastered_at": null
   }
  ]
 }

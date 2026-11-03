@@ -47,7 +47,16 @@ table.tb{border-collapse:collapse;width:100%;font-size:13.5px}
 table.tb th,table.tb td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left}
 table.tb th{color:var(--sub);font-weight:500}
 .badge{background:var(--amber);color:#fff;font-size:11px;border-radius:5px;padding:1px 7px;margin-left:6px}
-.hidden{display:none!important}   /* !important：压过 #overlay 等 ID 选择器的 display */
+/* 录入：拖拽/粘贴/点选 三入口待传区 */
+#drop-area{margin-top:10px;border:2px dashed var(--line);border-radius:10px;min-height:96px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:border-color .15s,background .15s}
+#drop-area:hover{border-color:#b9c6e8}
+#drop-area.drag{border-color:var(--blue);background:#eef3ff}
+#thumbs{display:flex;gap:10px;flex-wrap:wrap;padding:12px}
+.thumb{position:relative;width:92px}
+.thumb img{width:92px;height:66px;object-fit:cover;border-radius:6px;border:1px solid var(--line);display:block;background:#f2f4f8}
+.thumb .rm{position:absolute;top:-7px;right:-7px;background:var(--red);color:#fff;border:0;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:1}
+.thumb .nm{font-size:11px;color:var(--sub);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hidden{display:none!important}   /* !important：压过 #overlay/#qmodal 等 ID 选择器的 display（V1.0.3d 误删致遮罩常显，已恢复） */
 /* 排版机人审 */
 .figsvg{text-align:center}.figsvg svg{max-width:360px;height:auto}
 .review{display:grid;grid-template-columns:1fr 1.2fr;gap:14px}
@@ -147,8 +156,18 @@ details.kptree[open] summary{color:var(--ink)}
 <section id="tab-ingest">
   <div class="card">
     <b>上传错题照片</b>　<span class="small">一张或多张试卷/练习册照片；系统自动转录全部题目并抓取图形，再由你勾选入库</span>
+    <div id="drop-area" title="点击选择文件；也可拖拽或粘贴">
+      <div id="drop-hint" style="text-align:center;padding:18px 12px">
+        <div style="font-size:32px;line-height:1.2">🖼️</div>
+        <div style="margin-top:4px"><b>拖拽图片到这里，或按 <span style="color:var(--blue)">Ctrl/⌘+V</span> 直接粘贴</b></div>
+        <div class="small">微信/QQ/网页里复制的图片、截图都可以直接粘贴；也可点击此区域选择文件（支持多张）</div>
+      </div>
+      <div id="thumbs" class="hidden"></div>
+    </div>
     <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <input type="file" id="photos" accept="image/*" multiple>
+      <button class="sec" onclick="pickFiles()">📁 选择文件</button>
+      <button class="sec" onclick="pasteFromClipboard()">📋 从剪贴板粘贴</button>
+      <input type="file" id="photos" accept="image/*" multiple class="hidden">
       <input type="text" id="src-note" placeholder="来源（可选，如：期中卷/课本P53）" style="flex:1;min-width:180px;padding:6px 10px;border:1px solid var(--line);border-radius:6px">
       <button class="pri" id="btn-upload">转录</button>
     </div>
@@ -188,8 +207,51 @@ let imgVer=Date.now();   // 裁剪图缓存版本：重抓/重框后递增，强
 function showOv(t){$('#ov-text').textContent=t;$('#overlay').classList.remove('hidden');}
 function setOv(t){$('#ov-text').textContent=t;}
 function hideOv(){$('#overlay').classList.add('hidden');}
+/* ---------- 图片待传队列：拖拽 / 粘贴 / 点选 三入口统一入队 ---------- */
+let pendingFiles=[];
+function addFiles(list){
+  const imgs=[...list].filter(f=>f.type&&f.type.startsWith('image/'));
+  if(!imgs.length)return alert('未识别到图片文件（仅支持图片）');
+  pendingFiles.push(...imgs);renderThumbs();
+}
+function renderThumbs(){
+  const el=$('#thumbs');
+  el.classList.toggle('hidden',!pendingFiles.length);
+  $('#drop-hint').classList.toggle('hidden',!!pendingFiles.length);
+  el.innerHTML=pendingFiles.map((f,i)=>`<div class="thumb">
+    <img src="${URL.createObjectURL(f)}" alt="">
+    <button class="rm" title="移除" onclick="rmFile(${i})">✕</button>
+    <div class="nm">${esc(f.name||'剪贴板图片')}</div></div>`).join('');
+}
+function rmFile(i){pendingFiles.splice(i,1);renderThumbs();}
+function pickFiles(){$('#photos').click();}
+$('#photos').onchange=e=>{addFiles(e.target.files);e.target.value='';};
+(function initDrop(){
+  const dz=$('#drop-area');
+  ['dragover','dragenter'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
+  ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
+  dz.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
+  dz.addEventListener('click',e=>{if(e.target.closest('#thumbs')&&!e.target.classList.contains('rm'))return;if(e.target.classList.contains('rm'))return;pickFiles();});
+})();
+document.addEventListener('paste',e=>{   // 录入 Tab 可见时：直接 Ctrl/⌘+V 粘贴图片
+  if($('#tab-ingest').classList.contains('hidden'))return;
+  const items=[...(e.clipboardData&&e.clipboardData.items||[])];
+  const imgs=items.filter(i=>i.type&&i.type.startsWith('image/')).map(i=>i.getAsFile()).filter(Boolean);
+  if(imgs.length){e.preventDefault();addFiles(imgs);$('#upload-status').textContent=`📋 已粘贴 ${imgs.length} 张图片，确认无误后点「转录」`;}
+});
+async function pasteFromClipboard(){   // 按钮主动读剪贴板（Chrome/Edge/Safari 支持；失败则提示按键粘贴）
+  try{
+    if(!(navigator.clipboard&&navigator.clipboard.read))throw new Error('unsupported');
+    const items=await navigator.clipboard.read();
+    const files=[];
+    for(const it of items)for(const t of it.types)
+      if(t.startsWith('image/')){const b=await it.getType(t);files.push(new File([b],'剪贴板图片.png',{type:t}));}
+    if(!files.length)return alert('剪贴板里没有图片：请先复制/截图一张图片再试。');
+    addFiles(files);
+  }catch(e){alert('无法直接读取剪贴板（浏览器未授权或不支持）。\n可直接在本页按 Ctrl/⌘+V 粘贴，效果相同。');}
+}
 $('#btn-upload').onclick=async()=>{
-  const files=[...$('#photos').files]; if(!files.length)return alert('先选择照片');
+  const files=[...pendingFiles]; if(!files.length)return alert('先选择/拖拽/粘贴照片');
   const note=$('#src-note').value.trim();
   sheets=[]; renderReview();                        // 清空上一单的试题
   showOv('转录中…');                                 // 锁屏
@@ -202,7 +264,7 @@ $('#btn-upload').onclick=async()=>{
         else{sheets.unshift(j); $('#upload-status').textContent=`✅ ${j.questions.length} 题已转录`; renderReview();}
       }catch(e){$('#upload-status').textContent='❌ '+e;}
     }
-  }finally{hideOv(); $('#photos').value='';}
+  }finally{hideOv(); pendingFiles=[]; renderThumbs();}
 };
 function renderReview(){
   const selTotal=sheets.reduce((a,s)=>a+s.questions.filter(q=>q.selected).length,0);

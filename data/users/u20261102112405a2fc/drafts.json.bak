@@ -760,7 +760,7 @@
       ]
      ],
      "figure_crops": [
-      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-164930-32ac46_q13_0.png"
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-164930-32ac46_q13_m.png"
      ],
      "selected": false,
      "reason": null,
@@ -768,19 +768,101 @@
      "figure_spec": null,
      "figure_svg": null,
      "figure_mode": "crop",
-     "figure_note": "默认使用原题照片裁剪图（省 token，原图即权威图形）",
+     "figure_note": "已抓取原题图形（原图取代矢量图形）",
      "grade": "八年级上册",
      "kp_sel": {
       "chapter": "第一章 三角形",
       "section": "1.5 三角形全等的判定",
       "kp": "三角形的稳定性"
-     }
+     },
+     "figure_manual_box": [
+      0.4099852047722479,
+      0.2390912520434254,
+      0.5046746623854944,
+      0.3571278869933353
+     ]
     }
    ],
    "id": "d20261103-164930-32ac46",
    "created_at": "2026-11-03 16:49:30",
    "status": "pending",
    "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/photos/d20261103-164930-32ac46.jpg"
+  },
+  {
+   "source": "",
+   "photo_size": [
+    1330,
+    318
+   ],
+   "provider_note": "deepseek-flash",
+   "questions": [
+    {
+     "no": 6,
+     "type": "single",
+     "question": "如图，$AD$ 是等腰三角形 $ABC$ 的底边 $BC$ 上的中线，$BE$ 平分 $\\angle ABC$，交 $AD$ 于点 $E$。若 $AC=12$，$DE=3$，则 $\\triangle ABE$ 的面积是（ ）",
+     "choices": [
+      {
+       "key": "A",
+       "text": "16"
+      },
+      {
+       "key": "B",
+       "text": "18"
+      },
+      {
+       "key": "C",
+       "text": "32"
+      },
+      {
+       "key": "D",
+       "text": "36"
+      }
+     ],
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.75,
+       0.02,
+       0.96,
+       0.62
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-170752-718920_q6_m.png"
+     ],
+     "selected": false,
+     "reason": {
+      "kind": "careless",
+      "note": ""
+     },
+     "edited": {
+      "question": "如图，$AD$ 是等腰三角形 $ABC$ 的底边 $BC$ 上的中线，$BE$ 平分 $\\angle ABC$，交 $AD$ 于点 $E$。若 $AC=12$，$DE=3$，则 $\\triangle ABE$ 的面积是（ ）"
+     },
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "已抓取原题图形（原图取代矢量图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第一章 三角形",
+      "section": "1.7 角平分线的性质",
+      "kp": "1.7 角平分线的性质"
+     },
+     "figure_manual_box": [
+      0.806875059023515,
+      0.03620409489762756,
+      1.0,
+      0.6352291192720182
+     ],
+     "ingested_id": "20261103-170926-42fd5d"
+    }
+   ],
+   "id": "d20261103-170752-718920",
+   "created_at": "2026-11-03 17:07:52",
+   "status": "pending",
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/photos/d20261103-170752-718920.jpg"
   }
  ]
 }

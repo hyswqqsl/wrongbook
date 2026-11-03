@@ -1,4 +1,45 @@
 {
  "version": 1,
- "questions": []
+ "questions": [
+  {
+   "source": "数学练习册/试卷 第34页（题目编号约11—13）",
+   "type": "short",
+   "question": {
+    "text": "如图，在 $\\triangle ABC$ 中，$AB=CB$，$\\angle ABC=90^\\circ$。$F$ 为 $AB$ 延长线上一点，点 $E$ 在 $BC$ 上，且 $BE=BF$。\n(1) 求证：$\\triangle ABE \\cong \\triangle CBF$。\n(2) 若 $\\angle CAE=30^\\circ$，求 $\\angle ACF$ 的度数。",
+    "choices": null,
+    "figure_spec": null,
+    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-123237-18a770_q13_m.png"
+   },
+   "printed_answer": null,
+   "verified_answer": "（1）因为AB=CB，BE=BF，且∠ABE=∠CBF=90°，由SAS可证△ABE≌△CBF。（2）设AB=CB=1，取B(0,0)，A(1,0)，C(0,1)，E(0,t)，F(-t,0)。由∠CAE=30°，用向量AC=(-1,1)、AE=(-1,t)得cos30°=(1+t)/(√2√(1+t²))，解得t=2-√3。再计算C处向量CA=(1,-1)、CF=(-t,-1)，可得∠ACF=60°。故∠ACF=60°。",
+   "verify_status": "pass",
+   "mistake_reason": {},
+   "analysis": {
+    "grade": "八年级上册",
+    "chapter": "第一章 三角形",
+    "kp_path": [
+     "第一章 三角形",
+     "1.5 三角形全等的判定",
+     "三角形的稳定性"
+    ],
+    "knowledge_points": [
+     "SAS全等判定",
+     "全等三角形对应角相等",
+     "等腰直角三角形的性质",
+     "角的和差转化"
+    ],
+    "pitfall": "第二问容易忽略用全等把∠BAE转化为∠BCF，或在求∠ACF时把∠ACB与∠BCF的和误写成差；也容易把∠CAE=30°直接当成∠BAE，导致45°与30°关系混乱。",
+    "difficulty": 2,
+    "key_idea": "先用SAS证全等得∠BCF=∠BAE，再用等腰直角三角形45°角作角的和差计算，得∠ACF=60°。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/photos/d20261103-123237-18a770.jpg",
+   "flags": {
+    "needs_review": false
+   },
+   "id": "20261103-164129-e7e425",
+   "created_at": "2026-11-03 16:41:29",
+   "practice": [],
+   "mastered_at": null
+  }
+ ]
 }
