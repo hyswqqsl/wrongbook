@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI错题本 · 数学</title>
+<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
+<script defer src="/static/vendor/katex/katex.min.js"></script>
+<script defer src="/static/vendor/katex/auto-render.min.js"></script>
+<style>
+:root{--ink:#1a1a2e;--sub:#666;--line:#e3e6ee;--blue:#2456d6;--bg:#f5f7fb;--red:#d64045;--green:#2e9e5b;--amber:#c77c0a}
+*{box-sizing:border-box} body{margin:0;font:15px/1.65 "PingFang SC","Songti SC",system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:10px 22px;display:flex;gap:18px;align-items:center;position:sticky;top:0;z-index:9}
+header h1{font-size:18px;margin:0 26px 0 0}
+nav button{border:0;background:none;font-size:15px;padding:8px 14px;cursor:pointer;border-radius:8px;color:var(--sub)}
+nav button.on{background:var(--blue);color:#fff}
+main{max-width:1180px;margin:18px auto;padding:0 18px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+button.pri{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:8px 18px;font-size:14px;cursor:pointer}
+button.sec{background:#fff;color:var(--blue);border:1px solid var(--blue);border-radius:8px;padding:7px 14px;font-size:14px;cursor:pointer}
+button.warn{background:var(--red);color:#fff;border:0;border-radius:8px;padding:7px 14px;font-size:14px;cursor:pointer}
+button:disabled{opacity:.45;cursor:wait}
+#overlay{position:fixed;inset:0;background:rgba(20,25,40,.55);z-index:99;display:flex;align-items:center;justify-content:center}
+.ov-box{background:#fff;border-radius:14px;padding:26px 44px;text-align:center;font-size:15px;box-shadow:0 8px 40px rgba(0,0,0,.25)}
+.spinner{width:34px;height:34px;border:4px solid var(--line);border-top-color:var(--blue);border-radius:50%;margin:0 auto 12px;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#result-banner{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:100;background:#e9f9ef;border:2px solid var(--green);border-radius:12px;padding:12px 22px;box-shadow:0 6px 30px rgba(0,0,0,.2);max-width:760px;font-size:14.5px}
+#result-banner h3{margin:0 0 4px;font-size:17px;color:var(--green)}
+.commitbar{position:sticky;top:52px;z-index:8;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.commitbar span{color:var(--sub)}.commitbar b{color:var(--ink)}
+.commitbar button{margin-left:auto}
+input[type=file],input[type=text],input[type=date],select{font:inherit}
+.tag{display:inline-block;font-size:12px;border-radius:6px;padding:1px 8px;margin-right:6px;vertical-align:1px}
+.t-easy{background:#e6f4ea;color:#1e7e43}.t-med{background:#fff4e0;color:#9a6700}.t-hard{background:#fdeaea;color:#b3261e}
+.t-conflict{background:#fdeaea;color:#b3261e}.t-pass{background:#e6f4ea;color:#1e7e43}.t-review{background:#eee;color:#555}
+.bignum{display:flex;gap:26px;margin-bottom:8px}
+.bignum div{text-align:center}.bignum b{display:block;font-size:34px}
+.bignum span{color:var(--sub);font-size:13px}
+.bars{margin:6px 0 14px}
+.bar-row{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:13px}
+.bar-row label{width:110px;color:var(--sub);text-align:right;flex:none}
+.bar-track{flex:1;background:#eef1f7;border-radius:5px;height:16px;position:relative}
+.bar-fill{height:100%;border-radius:5px;background:var(--blue)}
+.bar-row span{width:36px;font-size:12px;color:var(--sub)}
+table.tb{border-collapse:collapse;width:100%;font-size:13.5px}
+table.tb th,table.tb td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left}
+table.tb th{color:var(--sub);font-weight:500}
+.badge{background:var(--amber);color:#fff;font-size:11px;border-radius:5px;padding:1px 7px;margin-left:6px}
+.hidden{display:none!important}   /* !important：压过 #overlay 等 ID 选择器的 display */
+/* 排版机人审 */
+.figsvg{text-align:center}.figsvg svg{max-width:360px;height:auto}
+.review{display:grid;grid-template-columns:1fr 1.2fr;gap:14px}
+.photo-wrap{position:relative;user-select:none}
+.photo-wrap img{width:100%;display:block;border:1px solid var(--line);border-radius:8px}
+.photo-wrap.picking{cursor:crosshair}
+.photo-wrap.picking img{opacity:.75}
+.selbox{position:absolute;border:2px solid var(--blue);background:rgba(36,86,214,.14);pointer-events:none;border-radius:2px}
+.figops{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.figsrc{font-size:12.5px;color:var(--sub);margin-right:auto}
+.figops button{font-size:13px;padding:5px 11px}
+.figbusy{font-size:12.5px;color:var(--amber)}
+.qcard{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px;background:#fff}
+.qcard.sel{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
+.qcard textarea{width:100%;min-height:74px;font:13px/1.6 ui-monospace,monospace;border:1px solid var(--line);border-radius:6px;padding:6px}
+.qhead{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.qhead b{font-size:14px}
+.choices div{color:#333;padding-left:18px}
+.answer-line{color:var(--sub);font-size:13px;margin-top:4px}
+.reason-row{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap;font-size:13.5px}
+.reason-row input[type=text]{border:1px solid var(--line);border-radius:6px;padding:4px 8px;flex:1;min-width:120px}
+.report{background:#f6f8fc;border-radius:8px;padding:10px 14px;font-size:13px;font-family:ui-monospace,monospace;white-space:pre-wrap}
+/* 刷题 */
+.quiz figure{margin:8px 0;text-align:center}
+.quiz figure svg{max-width:420px;height:auto}
+.quiz .ans{background:#f2fbf5;border:1px solid #cdecd8;border-radius:8px;padding:10px 14px;margin-top:10px}
+.katex{font-size:1.02em}
+.small{font-size:12.5px;color:var(--sub)}
+/* 题目详情弹窗 */
+#qmodal{position:fixed;inset:0;background:rgba(20,25,40,.55);z-index:90;display:flex;align-items:center;justify-content:center}
+.qm-box{background:#fff;border-radius:14px;padding:20px 26px;width:min(780px,94vw);max-height:88vh;overflow:auto;box-shadow:0 10px 50px rgba(0,0,0,.3)}
+.qm-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.qm-head b{font-size:16px}
+.qm-head button{margin-left:auto}
+.qm-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.qm-sec{border-top:1px solid var(--line);margin-top:10px;padding-top:8px;font-size:14px}
+.qm-prac{font-size:13px;color:var(--sub);margin-top:4px;line-height:1.8}
+/* 年级/知识点归类 */
+.cls-row{display:flex;gap:10px;align-items:center;margin-top:8px;font-size:13.5px;flex-wrap:wrap}
+.cls-row select{padding:4px 6px;border:1px solid var(--line);border-radius:6px;font:inherit}
+details.kptree{position:relative}
+details.kptree summary{cursor:pointer;list-style:none;border:1px solid var(--line);border-radius:6px;padding:4px 10px;background:#fff;color:var(--blue);max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+details.kptree[open] summary{color:var(--ink)}
+.kptree-body{position:absolute;z-index:30;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.14);max-height:320px;overflow:auto;min-width:340px;padding:6px;margin-top:4px}
+.kp-ch>summary,.kp-sec>summary{cursor:pointer;padding:3px 6px;font-size:13.5px;border-radius:5px}
+.kp-ch>summary:hover,.kp-sec>summary:hover{background:#eef3ff}
+.kp-item{padding:3px 10px 3px 20px;font-size:13px;cursor:pointer;border-radius:5px}
+.kp-item:hover{background:#eef3ff}
+.kp-item.on{background:var(--blue);color:#fff}
+/* 做题（试卷式）选项 */
+.pq-opt{display:block;padding:4px 8px;border-radius:6px;cursor:pointer}
+.pq-opt:hover{background:#eef3ff}
+.print-head{display:none}
+@page{margin:1.6cm}
+@media print{
+  header,#overlay,#qmodal,#dash-filter,.no-print{display:none!important}
+  body{background:#fff}
+  main{max-width:none;margin:0;padding:0}
+  .card{border:none;box-shadow:none;padding:0;margin:0 0 12px}
+  .print-head{display:block;text-align:center;margin-bottom:18px}
+  .print-head h2{margin:0 0 6px;font-size:20px}
+  .print-head .pline{font-size:14px;color:#333}
+  .pq{break-inside:avoid;margin-bottom:22px;padding:0;border:none}
+  .pq-res,.pq-res *{display:none!important}
+  .pq-fill,.pq-short{border:none!important;border-bottom:1px solid #444!important;border-radius:0!important}
+  .pq-opt,.choices div{padding:2px 0}
+  .qtext{font-size:14px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>📐 AI错题本</h1>
+  <nav>
+    <button data-tab="ingest" class="on">录入（排版机）</button>
+    <button data-tab="dash">工作台</button>
+    <button data-tab="quiz">刷题</button>
+    <button data-tab="paper">出卷</button>
+  </nav>
+  <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+    <span class="small">用户</span>
+    <select id="user-sel" onchange="switchUser(this.value)" style="padding:5px 8px;border:1px solid var(--line);border-radius:6px;font:inherit"></select>
+    <button class="sec" style="font-size:13px;padding:5px 10px" onclick="addUser()">＋ 新用户</button>
+  </div>
+</header>
+<main>
+
+<!-- ========== Tab1 录入（排版机） ========== -->
+<section id="tab-ingest">
+  <div class="card">
+    <b>上传错题照片</b>　<span class="small">一张或多张试卷/练习册照片；系统自动转录全部题目并抓取图形，再由你勾选入库</span>
+    <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <input type="file" id="photos" accept="image/*" multiple>
+      <input type="text" id="src-note" placeholder="来源（可选，如：期中卷/课本P53）" style="flex:1;min-width:180px;padding:6px 10px;border:1px solid var(--line);border-radius:6px">
+      <button class="pri" id="btn-upload">转录</button>
+    </div>
+    <div id="upload-status" class="small" style="margin-top:8px"></div>
+  </div>
+  <div id="review-area"></div>
+</section>
+
+<!-- ========== Tab2 工作台 ========== -->
+<section id="tab-dash" class="hidden"></section>
+
+<!-- ========== Tab3 刷题 ========== -->
+<section id="tab-quiz" class="hidden">
+  <div class="card" id="quiz-box">加载中…</div>
+</section>
+
+<!-- ========== Tab4 出卷 ========== -->
+<section id="tab-paper" class="hidden">
+  <div class="card" id="paper-box">加载中…</div>
+</section>
+
+</main>
+<div id="overlay" class="hidden"><div class="ov-box"><div class="spinner"></div><div id="ov-text">处理中…</div></div></div>
+<div id="qmodal" class="hidden"></div>
+<div id="result-banner" class="hidden"></div>
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function tex(el){if(window.renderMathInElement)renderMathInElement(el,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});}
+$$('nav button').forEach(b=>b.onclick=()=>{
+  $$('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  ['ingest','dash','quiz','paper'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!==b.dataset.tab));
+  if(b.dataset.tab==='dash')loadDash(); if(b.dataset.tab==='quiz')loadQuiz(); if(b.dataset.tab==='paper')loadPaper();
+});
+
+/* ---------- Tab1 排版机 ---------- */
+let sheets=[];
+let imgVer=Date.now();   // 裁剪图缓存版本：重抓/重框后递增，强制浏览器刷新（文件名不变）
+/* ---------- 全屏遮罩（转录/录入期间锁屏） ---------- */
+function showOv(t){$('#ov-text').textContent=t;$('#overlay').classList.remove('hidden');}
+function setOv(t){$('#ov-text').textContent=t;}
+function hideOv(){$('#overlay').classList.add('hidden');}
+$('#btn-upload').onclick=async()=>{
+  const files=[...$('#photos').files]; if(!files.length)return alert('先选择照片');
+  const note=$('#src-note').value.trim();
+  sheets=[]; renderReview();                        // 清空上一单的试题
+  showOv('转录中…');                                 // 锁屏
+  try{
+    for(let i=0;i<files.length;i++){
+      setOv(`转录中（${i+1}/${files.length}）… 约20-60秒，请勿关闭页面`);
+      const fd=new FormData(); fd.append('photo',files[i]); if(note)fd.append('source',note);
+      try{const r=await fetch('/api/sheets',{method:'POST',body:fd}); const j=await r.json();
+        if(j.error){$('#upload-status').textContent='❌ '+j.error;}
+        else{sheets.unshift(j); $('#upload-status').textContent=`✅ ${j.questions.length} 题已转录`; renderReview();}
+      }catch(e){$('#upload-status').textContent='❌ '+e;}
+    }
+  }finally{hideOv(); $('#photos').value='';}
+};
+function renderReview(){
+  const selTotal=sheets.reduce((a,s)=>a+s.questions.filter(q=>q.selected).length,0);
+  const bar=sheets.length?`<div class="commitbar"><span>已勾选 <b>${selTotal}</b> 题 · 共 ${sheets.length} 张照片</span>
+    <button class="pri" onclick="commitAll(this)">提交入库</button></div>`:'';
+  $('#review-area').innerHTML=bar+sheets.map(sheet=>`
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div><b>人审视图</b> ${sheet.questions.length&&sheet.questions.every(q=>q.done)?'<span class="tag t-pass">✅ 已全部录入</span>':''} <span class="small">来源：${esc(sheet.source||'未标注')} · ${sheet.questions.length} 题 · 左：原图（与右侧逐题对照核对）</span></div>
+    </div>
+    <div class="review" style="margin-top:12px">
+      <div class="photo-wrap" id="pw-${sheet.id}" onmousedown="startPick(event,'${sheet.id}')">
+        <img src="/data/${sheet.photo.replace(/^.*data\//,'')}" style="width:100%;display:block;border:1px solid var(--line);border-radius:8px">
+        <div class="selbox hidden" id="sb-${sheet.id}"></div>
+      </div>
+      <div>${sheet.questions.map(q=>qCard(sheet,q)).join('')}</div>
+    </div>
+  </div>`).join('');
+  $('#review-area').querySelectorAll('.qtext,.choices').forEach(tex);
+}
+function figBlock(sheet,q){
+  const svg=q.figure_svg, crops=(q.figure_crops||[]);
+  const mode=q.figure_mode||(svg?'svg':(crops.length?'crop':'none'));
+  let fig='', src='';
+  if(svg){
+    fig=`<figure style="margin:8px 0;text-align:center"><div class="figsvg">${svg}</div></figure>`;
+    src='当前图形：矢量 SVG（自动生成，需与原题核对）';
+  }else if(crops.length){
+    fig=`<figure style="margin:8px 0;text-align:center"><img src="/data/${crops[0].replace(/^.*data\//,'')}?v=${imgVer}" style="max-width:280px;border:1px solid var(--line);border-radius:6px"></figure>`;
+    src='当前图形：原题照片裁剪图（原图为准）';
+  }else{
+    src='当前图形：无';
+  }
+  const ops=`<div class="figops"><span class="figsrc">${src}</span>
+    <button class="sec" onclick="autoCrop('${sheet.id}',${q.no},this)">🖼 自动抓取原图</button>
+    <button class="sec" onclick="startPickMode('${sheet.id}',${q.no})">✂️ 手动框选原图</button>
+    <span class="figbusy hidden" id="fb-${sheet.id}-${q.no}">处理中…</span>
+    <span class="figbusy hidden" id="figmsg-${sheet.id}-${q.no}"></span></div>`;
+  return fig+ops;
+}
+async function figBusy(sid,no,on,msg){
+  const el=document.getElementById(`fb-${sid}-${no}`); if(!el)return;
+  el.classList.toggle('hidden',!on); el.textContent=msg||'处理中…';
+}
+async function autoCrop(sid,no,btn){
+  const s=sheets.find(x=>x.id===sid), q=s.questions.find(x=>x.no===no);
+  btn.disabled=true; await figBusy(sid,no,true,'抓取中…');
+  try{
+    const j=await (await fetch(`/api/sheets/${sid}/questions/${no}/recrop`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json();
+    if(j.error){alert('❌ '+j.error); btn.disabled=false; await figBusy(sid,no,false); return;}
+    q.figure_crops=j.figure_crops; q.figure_spec=null; q.figure_svg=null; q.figure_mode='crop';
+    q.figure_note='已自动重新定位并抓取原图（原图取代矢量图形）';
+    imgVer=Date.now();   // 破缓存：裁剪文件名不变但内容已更新
+    renderReview(); flash(sid,no,'✅ 已抓取原图形');
+  }catch(e){alert('❌ '+e); btn.disabled=false; await figBusy(sid,no,false);}
+}
+function flash(sid,no,msg){
+  const t=document.getElementById(`figmsg-${sid}-${no}`);
+  if(t){t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'),6000);}
+}
+function qCard(sheet,q){
+  const diff={single:'单选',multiple:'多选',fill:'填空',short:'问答'}[q.type]||q.type;
+  return `<div class="qcard ${q.selected?'sel':''}" id="qcard-${sheet.id}-${q.no}">
+    <div class="qhead">
+      <input type="checkbox" ${q.selected?'checked':''} ${q.done?'disabled':''} onchange="patchQ('${sheet.id}',${q.no},{selected:this.checked},this)">
+      <b>第${q.no}题</b><span class="tag t-med">${diff}</span>
+      ${q.has_handwriting?'<span class="tag t-review">有手写</span>':''}
+      ${q.done==='ingested'?'<span class="tag t-pass">✓ 已入库</span>':q.done==='dup'?'<span class="tag t-review">⏭ 重复跳过</span>':''}
+      <span class="small">${q.selected?'✓ 入库':''}</span>
+    </div>
+    <div class="qtext">${esc(q.question)}</div>
+    ${q.choices?`<div class="choices">${q.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:''}
+    <div class="cls-row">
+      年级：<select onchange="patchQ('${sheet.id}',${q.no},{grade:this.value},this)">
+        ${['八年级上册','八年级下册','九年级上册','九年级下册','其他'].map(g=>`<option ${g===(q.grade||'八年级上册')?'selected':''}>${g}</option>`).join('')}
+      </select>
+      知识点：<details class="kptree">
+        <summary>${esc(kpLabel(q.kp_sel)||'点击选择知识点')}</summary>
+        <div class="kptree-body">${kpTreeHtml(sheet.id,q.no,q.kp_sel)}</div>
+      </details>
+    </div>
+    ${figBlock(sheet,q)}
+    ${q.has_figure&&!q.figure_svg&&!(q.figure_crops||[]).length?`<div class="small" style="color:var(--red)">⚠ 未获得图形：入库后保留题干，可手动补图</div>`:''}
+    ${q.figure_note?`<div class="small" style="color:var(--sub)">${esc(q.figure_note)}</div>`:''}
+    ${q.printed_answer?`<div class="answer-line">照片答案：${esc(q.printed_answer)}</div>`:''}
+    <div class="reason-row ${q.selected?'':'hidden'}" id="reason-${sheet.id}-${q.no}">
+      错因：<label><input type="radio" name="r-${sheet.id}-${q.no}" value="careless" ${q.reason&&q.reason.kind==='careless'?'checked':''} onchange="setReason('${sheet.id}',${q.no},'careless')">马虎</label>
+      <label><input type="radio" name="r-${sheet.id}-${q.no}" value="unknown" ${q.reason&&q.reason.kind==='unknown'?'checked':''} onchange="setReason('${sheet.id}',${q.no},'unknown')">不会</label>
+      <label><input type="radio" name="r-${sheet.id}-${q.no}" value="other" ${q.reason&&q.reason.kind==='other'?'checked':''} onchange="setReason('${sheet.id}',${q.no},'other')">其他</label>
+      <input type="text" placeholder="备注（如：看错条件）" value="${esc(q.reason&&q.reason.note||'')}" onchange="setReasonNote('${sheet.id}',${q.no},this.value)">
+    </div>
+    <div style="margin-top:6px"><button class="sec" onclick="editQ('${sheet.id}',${q.no})">✎ 编辑修正</button></div>
+  </div>`;
+}
+function hlQ(box,qid){}
+/* ---------- 左侧原图手动框选 ---------- */
+let pickState=null;   // {sid,no,startX,startY}
+function startPickMode(sid,no){
+  cancelPick();
+  pickState={sid,no,picking:true};
+  const pw=document.getElementById(`pw-${sid}`);
+  if(pw) pw.classList.add('picking');
+  document.addEventListener('keydown',pickEsc);
+  alert('✂️ 手动框选\n\n请在左侧原图上，用鼠标拖拽出该题图形所在区域。\n松开鼠标后自动抓取，原图将取代矢量图形。\n\n（按 Esc 或直接点击别处可取消）');
+}
+function pickEsc(e){
+  if(e.key==='Escape'&&pickState){ cancelPick(); }
+}
+function cancelPick(){
+  if(!pickState)return;
+  const pw=document.getElementById(`pw-${pickState.sid}`);
+  if(pw) pw.classList.remove('picking');
+  const sb=document.getElementById(`sb-${pickState.sid}`);
+  if(sb) sb.classList.add('hidden');
+  document.removeEventListener('keydown',pickEsc);
+  pickState=null;
+}
+function startPick(ev,sid){
+  if(!pickState||!pickState.picking)return;
+  ev.preventDefault();
+  const pw=ev.currentTarget, img=pw.querySelector('img');
+  const r=img.getBoundingClientRect();
+  const x=ev.clientX-r.left, y=ev.clientY-r.top;
+  const sb=document.getElementById(`sb-${sid}`);
+  pickState.startX=x; pickState.startY=y; pickState.rect=r; pickState.sb=sb;
+  sb.classList.remove('hidden');
+  sb.style.left=x+'px'; sb.style.top=y+'px'; sb.style.width='0px'; sb.style.height='0px';
+  const move=e=>{
+    const cx=Math.min(Math.max(e.clientX-r.left,0),r.width), cy=Math.min(Math.max(e.clientY-r.top,0),r.height);
+    sb.style.left=Math.min(x,cx)+'px'; sb.style.top=Math.min(y,cy)+'px';
+    sb.style.width=Math.abs(cx-x)+'px'; sb.style.height=Math.abs(cy-y)+'px';
+  };
+  const up=async e=>{
+    document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up);
+    const cx=Math.min(Math.max(e.clientX-r.left,0),r.width), cy=Math.min(Math.max(e.clientY-r.top,0),r.height);
+    const box=[Math.min(x,cx)/r.width, Math.min(y,cy)/r.height, Math.max(x,cx)/r.width, Math.max(y,cy)/r.height];
+    sb.classList.add('hidden');
+    pw.classList.remove('picking');
+    const sid2=pickState.sid, no=pickState.no;
+    pickState=null;
+    document.removeEventListener('keydown',pickEsc);
+    if(box[2]-box[0]<0.02||box[3]-box[1]<0.02){alert('框选区域太小，请重试');return;}
+    await figBusy(sid2,no,true,'抓取中…');
+    try{
+      const j=await (await fetch(`/api/sheets/${sid2}/questions/${no}/recrop`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({box})})).json();
+      if(j.error){alert('❌ '+j.error); await figBusy(sid2,no,false); return;}
+      const s=sheets.find(v=>v.id===sid2), q=s.questions.find(v=>v.no===no);
+      q.figure_crops=j.figure_crops; q.figure_spec=null; q.figure_svg=null; q.figure_mode='crop';
+      q.figure_note='已手动框选抓取原图（原图取代矢量图形）';
+      imgVer=Date.now();   // 破缓存：_m 文件被覆盖但 URL 未变（第二次框选不显示的根因）
+      renderReview(); flash(sid2,no,'✅ 已按框选抓取原图形');
+    }catch(err){alert('❌ '+err); await figBusy(sid2,no,false);}
+  };
+  document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
+}
+async function patchQ(sid,no,fields,el){
+  const s=sheets.find(x=>x.id===sid); const q=s.questions.find(x=>x.no===no);
+  Object.assign(q,fields);
+  await fetch(`/api/sheets/${sid}/questions/${no}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(fields)});
+  if('selected' in fields){renderReview();}
+}
+function setReason(sid,no,kind){const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
+  q.reason={kind,note:(q.reason&&q.reason.note)||''};
+  fetch(`/api/sheets/${sid}/questions/${no}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:q.reason})});}
+function setReasonNote(sid,no,note){const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
+  q.reason={kind:(q.reason&&q.reason.kind)||'other',note};
+  fetch(`/api/sheets/${sid}/questions/${no}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:q.reason})});}
+function editQ(sid,no){
+  const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
+  const card=document.getElementById(`qcard-${sid}-${no}`);
+  const t=(q.edited&&q.edited.question)||q.question;
+  card.querySelector('.qtext').innerHTML=`<textarea>${esc(t)}</textarea>
+    <div class="small" style="margin-top:4px">公式用 $..$ 包裹 LaTeX；保存后重新渲染</div>`;
+  const ta=card.querySelector('textarea'); ta.focus();
+  card.querySelector('.qtext').insertAdjacentHTML('afterend',
+    `<div style="margin-top:6px"><button class="pri" onclick="saveEdit('${sid}',${no})">保存</button></div>`);
+}
+async function saveEdit(sid,no){
+  const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
+  const t=document.querySelector(`#qcard-${sid}-${no} textarea`).value;
+  q.edited={...(q.edited||{}),question:t};
+  await fetch(`/api/sheets/${sid}/questions/${no}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({edited:q.edited})});
+  renderReview();
+}
+/* 全局提交：一次录入所有勾选题（跨多张照片），锁屏 → 完成横幅汇总（含查重跳过） */
+async function commitAll(btn){
+  const jobs=sheets.filter(s=>s.questions.some(q=>q.selected));
+  if(!jobs.length)return alert('先勾选要入库的错题');
+  const noReason=jobs.flatMap(s=>s.questions.filter(q=>q.selected&&(!q.reason||!q.reason.kind)));
+  if(noReason.length&&!confirm(`有 ${noReason.length} 题未标错因，确定继续？`))return;
+  showOv('录入中…');
+  const agg={ingested:[],skipped:[],errors:[]};
+  try{
+    for(let i=0;i<jobs.length;i++){
+      setOv(`录入中… 第 ${i+1}/${jobs.length} 张照片（已入库 ${agg.ingested.length} 题，跳过重复 ${agg.skipped.length} 题）`);
+      try{
+        const r=await fetch(`/api/sheets/${jobs[i].id}/commit`,{method:'POST'}); const j=await r.json();
+        if(j.error){agg.errors.push(j.error);continue;}
+        (j.results||[]).forEach(x=>{
+          const q=jobs[i].questions.find(v=>v.no===x.no);
+          if(x.skipped){agg.skipped.push(`第${x.no}题 与已入库题 ${x.duplicate_of} 重复，未重复录入`);
+            if(q){q.done='dup'; q.selected=false;}}                      // 该题处置完成
+          else if(x.id){agg.ingested.push({no:x.no,id:x.id,report:x.report||[]});
+            if(q){q.done='ingested'; q.selected=false;}}
+        });
+        // 照片不整体结束：未处理的题保持可勾选，可再次提交（v0.6.3）
+      }catch(e){agg.errors.push(String(e));}
+    }
+  }finally{hideOv();}
+  // 不隐藏题目列表：保留显示直到下次点「转录」再清空
+  renderReview();
+  $('#upload-status').textContent='✅ 已入库 '+agg.ingested.length+' 题'+
+    (agg.skipped.length?`，跳过重复 ${agg.skipped.length} 题`:'')+
+    (agg.errors.length?`，失败 ${agg.errors.length} 张`:'');
+  showResult(agg);
+}
+function showResult(a){
+  const el=$('#result-banner');
+  let html=`<h3>✅ 录入完成</h3><div>入库 <b>${a.ingested.length}</b> 题`+
+    (a.skipped.length?` · 跳过重复 <b>${a.skipped.length}</b> 题`:'')+
+    (a.errors.length?` · 失败 ${a.errors.length} 张`:'')+'</div>';
+  if(a.skipped.length)html+=`<div class="small" style="margin-top:4px">⏭ ${a.skipped.map(esc).join('；')}</div>`;
+  if(a.errors.length)html+=`<div class="small" style="color:var(--red);margin-top:4px">❌ ${a.errors.map(esc).join('；')}</div>`;
+  if(a.ingested.length)html+=`<details style="margin-top:6px"><summary class="small" style="cursor:pointer">录入详情</summary>`+
+    a.ingested.map(x=>`<div class="small" style="margin-top:6px"><b>第${x.no}题 → ${x.id}</b><br>${x.report.map(esc).join('<br>')}</div>`).join('')+'</details>';
+  html+=`<div style="margin-top:8px;text-align:right"><button class="sec" onclick="document.getElementById('result-banner').classList.add('hidden')">知道了</button></div>`;
+  el.innerHTML=html; el.classList.remove('hidden');
+}
+
+/* ---------- Tab2 工作台 ---------- */
+const REASON_CN={careless:'马虎',unknown:'不会',other:'其他',none:'未标注'};
+function loadDF(){try{return JSON.parse(localStorage.getItem('dash_filters'))||{}}catch(e){return{}}}
+function saveDFRaw(df){try{localStorage.setItem('dash_filters',JSON.stringify(df))}catch(e){}}
+function saveDF(){saveDFRaw({chapter:$('#f-chapter')?$('#f-chapter').value:'',
+  difficulty:$('#f-difficulty')?$('#f-difficulty').value:'',kp:$('#f-kp')?$('#f-kp').value:'',
+  reason:$('#f-reason')?$('#f-reason').value:'',
+  mastered:!!($('#f-mastered')&&$('#f-mastered').checked)})}
+async function loadDash(){
+  const a=$('#dash-filter');
+  if(a)saveDF();                        // 界面上的筛选以用户操作为准，先持久化
+  const df=loadDF();
+  const qs='?'+new URLSearchParams({chapter:df.chapter||'',difficulty:df.difficulty||'',
+    kp:df.kp||'',reason:df.reason||'',mastered:df.mastered?'1':''}).toString();
+  const d=await (await fetch('/api/stats'+qs)).json();
+  window._dashFacets=d.facets||{};
+  const bar=(title,dict)=>{const tot=Object.values(dict).reduce((a,b)=>a+b,0)||1;
+    return `<div class="bars"><div class="small" style="margin:6px 0 2px">${title}</div>`+
+    Object.entries(dict).map(([k,v])=>`<div class="bar-row"><label>${esc(k)}</label><div class="bar-track"><div class="bar-fill" style="width:${v/tot*100}%"></div></div><span>${v}</span></div>`).join('')+`</div>`;};
+  const diffTag={1:'t-easy',2:'t-med',3:'t-hard'}, diffCN={1:'简单',2:'中等',3:'困难'};
+  const reasonCN={careless:'马虎',unknown:'不会',other:'其他',none:'未标注'};
+  const filterHtml=`<div class="card" id="dash-filter" style="display:flex;flex-wrap:nowrap;align-items:center;gap:7px;overflow-x:auto;white-space:nowrap;padding:10px 14px">
+    <b style="flex:none">筛选</b>
+    章节 <select id="f-chapter" onchange="rebuildKpOptions()"><option value="">全部</option>${(d.facets.chapters||[]).map(c=>`<option ${c===df.chapter?'selected':''}>${esc(c)}</option>`).join('')}</select>
+    难度 <select id="f-difficulty"><option value="">全部</option>
+      <option value="1" ${df.difficulty==='1'?'selected':''}>① 简单</option>
+      <option value="2" ${df.difficulty==='2'?'selected':''}>② 中等</option>
+      <option value="3" ${df.difficulty==='3'?'selected':''}>③ 困难</option></select>
+    错因 <select id="f-reason"><option value="">全部</option>${(d.facets.reasons||[]).map(r=>`<option value="${r}" ${r===df.reason?'selected':''}>${reasonCN[r]||r}</option>`).join('')}</select>
+    知识点 <select id="f-kp" style="max-width:210px">${kpFilterOptions(df)}</select>
+    <label style="display:flex;align-items:center;gap:3px;flex:none;cursor:pointer"><input type="checkbox" id="f-mastered" ${df.mastered?'checked':''} onchange="loadDash()">含已归档</label>
+    <button class="pri" onclick="loadDash()" style="flex:none">🔍 搜索</button>
+    <button class="sec" onclick="resetDashFilter()" style="flex:none">重置</button>
+  </div>`;
+  $('#tab-dash').innerHTML=filterHtml+`
+  <div class="card"><div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <div class="bignum" style="flex:1;min-width:300px">
+    <div><b>${d.total}</b><span>总错题</span></div><div><b>${d.active}</b><span>在库</span></div>
+    <div><b>${d.mastered}</b><span>已归档</span></div><div><b>${d.zero_practice}</b><span>零练习</span></div>
+    <div><b>${d.ready_to_master.length}</b><span>建议归档</span></div></div>
+    <button class="sec" onclick="toggleStats(this)">📊 查看统计</button>
+  </div>
+  <div id="stat-charts" class="hidden">
+    ${bar('题型分布',d.by_type)}${bar('难度分布',d.by_difficulty)}${bar('章节分布',d.by_chapter)}${bar('错因分布',d.by_reason)}${bar('知识点 TOP',d.by_knowledge_point)}
+  </div></div>
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <b>错题列表</b> <span class="small">（连对3次→建议归档；公式已渲染，点「查看」看完整信息）</span>
+      <span style="margin-left:auto;display:flex;gap:10px;align-items:center">
+        <span class="small">已选 <b id="sel-count">0</b> 题</span>
+        <button class="pri" onclick="startPaper()">📝 开始做题（新标签页·统一批改）</button>
+        <button class="sec" onclick="exportPaperPdf()">🖨 导出PDF（打印用）</button>
+      </span>
+    </div>
+    <table class="tb"><tr>
+      <th><input type="checkbox" onchange="toggleAllRows(this)" title="全选"></th>
+      <th style="min-width:260px">题目</th><th>章节</th><th>难度</th><th>知识点</th><th>错因</th><th>练习</th><th>连对</th><th>状态</th><th></th></tr>
+    ${d.practice_overview.map(r=>`<tr>
+      <td><input type="checkbox" class="row-sel" value="${r.id}" ${dashSelected.has(r.id)?'checked':''} onchange="selRow('${r.id}',this.checked)"></td>
+      <td style="max-width:360px"><div style="display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden">${esc(r.text)}</div></td>
+      <td class="small">${esc(r.chapter)}</td>
+      <td><span class="tag ${diffTag[r.difficulty]||'t-med'}">${diffCN[r.difficulty]||r.difficulty}</span></td>
+      <td class="small" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.kp||'—')}</td>
+      <td class="small">${esc(r.reason)}</td>
+      <td>${r.times}次/对${r.correct}</td><td>${r.streak}</td>
+      <td>${r.mastered?'<span class="tag t-pass">已归档</span>':(r.need===0?'<span class="badge">建议归档</span>':'')}</td>
+      <td style="white-space:nowrap">
+        <button class="sec" style="font-size:12.5px;padding:3px 10px" onclick="showQModal('${r.id}')">查看</button>
+        ${r.mastered
+          ?`<button class="sec" style="font-size:12.5px;padding:3px 10px" onclick="masterQ('${r.id}',true)">激活</button>`
+          :`<button class="sec" style="font-size:12.5px;padding:3px 10px" onclick="masterQ('${r.id}')">归档</button>`}
+      </td></tr>`).join('')}
+    </table></div>`;
+  updateSelCount();
+  tex($('#tab-dash'));   // 题目列公式渲染
+}
+const dashSelected=new Set((()=>{   // 勾选集：localStorage 持久，跨标签页/搜索/切页保留
+  try{return JSON.parse(localStorage.getItem('dash_selected')||'[]')}catch(e){return[]}})());
+function saveSel(){try{localStorage.setItem('dash_selected',JSON.stringify([...dashSelected]))}catch(e){}}
+function toggleAllRows(cb){
+  $$('.row-sel').forEach(x=>{x.checked=cb.checked;cb.checked?dashSelected.add(x.value):dashSelected.delete(x.value);});
+  saveSel();updateSelCount();
+}
+function selRow(id,on){on?dashSelected.add(id):dashSelected.delete(id);saveSel();updateSelCount();}
+function updateSelCount(){const el=document.getElementById('sel-count');if(el)el.textContent=dashSelected.size;}
+function selectedRowIds(){return [...dashSelected];}
+function startPaper(){
+  const ids=selectedRowIds();
+  if(!ids.length)return alert('先勾选要做的题（表头复选框可全选）');
+  localStorage.setItem('paper_session',JSON.stringify(ids));
+  window.open(location.pathname+'#quiz','_blank');   // 新标签页：试卷式做题
+}
+async function exportPaperPdf(){
+  const ids=selectedRowIds();
+  if(!ids.length)return alert('先勾选要导出的题（表头复选框可全选）');
+  const btn=window.event&&window.event.target;
+  if(btn){btn.disabled=true;btn.textContent='PDF 生成中…';}
+  try{
+    const r=await fetch('/api/questions/export-pdf',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ids,with_answer:true})});
+    const j=await r.json();
+    if(j.error)return alert('❌ '+j.error);
+    window.open('/out/'+j.pdf.replace(/^.*out\//,''),'blank');
+    if(btn){btn.disabled=false;btn.textContent='🖨 导出PDF（'+j.n+'题）';}
+  }catch(e){if(btn){btn.disabled=false;btn.textContent='🖨 导出PDF';}alert('❌ '+e);}
+}
+function goDash(){
+  const b=$$('nav button').find(x=>x.dataset.tab==='dash');
+  if(b)b.click();   // 返回工作台（loadDash 会恢复筛选与勾选）
+}
+async function masterQ(id,un){
+  const btn=window.event&&window.event.target;
+  await fetch(`/api/questions/${id}/${un?'unmaster':'master'}`,{method:'POST'});
+  if(btn){btn.textContent=un?'✅ 已激活':'✅ 已归档';btn.disabled=true;}
+  if(!document.getElementById('tab-dash').classList.contains('hidden'))loadDash();
+}
+/* 知识点筛选选项：题库知识点汇总（与列表展示同源，保证选了就能搜到）；
+   未选章节=全部章（optgroup 分组）；选了章节=仅该章；按出现次数降序 */
+function kpFilterOptions(df){
+  df=df||loadDF();
+  const ch=df.chapter||'', cur=df.kp||'';
+  let html='<option value="">全部</option>';
+  const byCh=(window._dashFacets||{}).kp_by_chapter||{};
+  const chapters=ch?[ch]:Object.keys(byCh).sort();
+  chapters.forEach(c=>{
+    const kps=byCh[c]||[];
+    if(!kps.length)return;
+    html+=`<optgroup label="${esc(c)}">`+
+      kps.map(k=>`<option value="${esc(k)}" ${cur===k?'selected':''}>${esc(k)}</option>`).join('')+
+      '</optgroup>';
+  });
+  return html;
+}
+function rebuildKpOptions(){
+  const df=loadDF();
+  const cs=document.getElementById('f-chapter');
+  if(cs)df.chapter=cs.value;          // 章节预览即生效（知识点候选跟随）
+  saveDFRaw(df);
+  const sel=document.getElementById('f-kp');
+  if(sel){const cur=df.kp||'';sel.innerHTML=kpFilterOptions(df);
+    if(![...sel.options].some(o=>o.value===cur))sel.value='';}
+}
+function resetDashFilter(){
+  try{localStorage.removeItem('dash_filters')}catch(e){}
+  ['f-chapter','f-difficulty','f-kp','f-reason'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const fm=document.getElementById('f-mastered'); if(fm)fm.checked=false;
+  loadDash();
+}
+function toggleStats(btn){
+  const el=document.getElementById('stat-charts');
+  el.classList.toggle('hidden');
+  btn.textContent=el.classList.contains('hidden')?'📊 查看统计':'📥 收起统计';
+}
+/* ---------- 题目详情弹窗 ---------- */
+async function showQModal(qid){
+  const q=await (await fetch('/api/questions/'+qid)).json();
+  if(q.error)return alert('❌ '+q.error);
+  const an=q.analysis||{};
+  const pr=q.practice||[];
+  let stk=0; for(const p of [...pr].reverse()){if(p.correct)stk++;else break;}
+  const diffTag={1:'t-easy',2:'t-med',3:'t-hard'}, diffCN={1:'简单',2:'中等',3:'困难'};
+  const reasonCN={careless:'马虎',unknown:'不会',other:'其他'};
+  const mr=q.mistake_reason||{};
+  const reason=reasonCN[mr.kind]||'未标注'+(mr.note?`（${esc(mr.note)}）`:'');
+  const kps=[...new Set([...(an.kp_path||[]).filter(Boolean),...(an.knowledge_points||[])])];
+  const fig=q.figure_svg?`<figure style="text-align:center;margin:8px 0"><div class="figsvg">${q.figure_svg}</div></figure>`
+    :(q.question&&q.question.figure_crop?`<figure style="text-align:center;margin:8px 0"><img src="/data/${q.question.figure_crop.replace(/^.*data\//,'')}" style="max-width:300px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
+  $('#qmodal').innerHTML=`<div class="qm-box" onclick="event.stopPropagation()">
+    <div class="qm-head"><b>题目详情</b><span class="small">${esc(q.id)}</span>
+      ${q.mastered_at?'<span class="tag t-pass">已归档</span>':'<span class="tag t-review">在库</span>'}
+      <button class="sec" onclick="hideQModal()">关闭 ✕</button></div>
+    <div class="qm-meta">
+      ${an.grade?`<span class="tag t-review">${esc(an.grade)}</span>`:''}
+      ${an.chapter?`<span class="tag t-med">${esc(an.chapter)}</span>`:''}
+      <span class="tag ${diffTag[an.difficulty]||'t-med'}">难度 ${diffCN[an.difficulty]||an.difficulty}</span>
+      ${kps.map(k=>`<span class="tag t-review">${esc(k)}</span>`).join('')}
+    </div>
+    <div class="qtext">${esc((q.question||{}).text||'')}</div>
+    ${(q.question||{}).choices?`<div class="choices">${q.question.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:''}
+    ${fig}
+    <div class="qm-sec"><b>答案</b>：${esc(q.verified_answer||'（无）')}
+      ${q.verify_status==='conflict'?'<span class="tag t-conflict">与照片答案冲突</span>':q.verify_status==='pass'?'<span class="tag t-pass">已验伪</span>':''}
+      ${q.printed_answer&&q.printed_answer!==q.verified_answer?`<span class="small">（照片印刷答案：${esc(q.printed_answer)}）</span>`:''}</div>
+    ${an.key_idea?`<div class="qm-sec"><b>💡 思路</b>：${esc(an.key_idea)}</div>`:''}
+    ${an.pitfall?`<div class="qm-sec"><b>⚠️ 易错</b>：${esc(an.pitfall)}</div>`:''}
+    <div class="qm-sec"><b>错因</b>：${reason}</div>
+    <div class="qm-sec"><b>练习情况</b>：${pr.length} 次 · 答对 ${pr.filter(p=>p.correct).length} · 当前连对 <b>${stk}</b>
+      ${stk>=3?'<span class="badge">建议归档</span>':''}
+      ${pr.length?`<div class="qm-prac">${[...pr].reverse().map(p=>`${esc(p.at)} · ${p.correct?'✓ 答对':'✗ 答错'}${p.variant==='similar'?'（相似题）':''}`).join('<br>')}</div>`:'<span class="small">（从未练习）</span>'}</div>
+    <div class="small" style="margin-top:10px">来源：${esc(q.source||'—')} · 录入：${esc(q.created_at||'')}</div>
+  </div>`;
+  $('#qmodal').classList.remove('hidden');
+  document.getElementById('qmodal').onclick=hideQModal;   // 点遮罩关闭
+  tex($('#qmodal'));
+}
+function hideQModal(){$('#qmodal').classList.add('hidden');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')hideQModal();});
+
+/* ---------- Tab3 刷题 ---------- */
+let quizPool=[], quizBag=[];   // 随机刷题：洗牌袋循环（全部刷完一轮再重新洗牌）
+let paperData=null;            // 做题模式：勾选题目（试卷式一次列出）
+async function loadQuiz(){
+  const ps=localStorage.getItem('paper_session');
+  if(ps){
+    localStorage.removeItem('paper_session');
+    try{
+      const ids=JSON.parse(ps)||[];
+      if(ids.length){showPaper(ids);return;}
+    }catch(e){}
+  }
+  const j=await (await fetch('/api/questions?filter=active')).json();
+  quizPool=(j.questions||[]).map(x=>x.id); quizBag=[];
+  nextQ();
+}
+function nextQ(){
+  if(!quizPool.length){$('#quiz-box').innerHTML='🎉 在库错题为空（或全部归档）';return;}
+  if(!quizBag.length)quizBag=[...quizPool].sort(()=>Math.random()-0.5);   // 一轮刷完重新洗牌，循环所有题目
+  showQ(quizBag.shift());
+}
+async function showQ(qid,variant){
+  const q=await (await fetch('/api/questions/'+qid)).json();
+  const an=q.analysis||{};
+  const diff={1:'简单',2:'中等',3:'困难'}[an.difficulty]||'';
+  const wrongBefore=(q.practice||[]).filter(p=>!p.correct).length;
+  const head=`<div class="quiz">
+    <div class="qhead"><b>${variant?'相似题':'错题'}</b>
+      <span class="tag t-${an.difficulty===1?'easy':an.difficulty===3?'hard':'med'}">${diff}</span>
+      <span class="tag t-med">${esc(an.chapter||'')}</span>
+      ${(an.knowledge_points||[]).map(k=>`<span class="tag t-review">${esc(k)}</span>`).join('')}
+      <span class="small" style="margin-left:auto">连对3次 → 建议归档</span></div>
+    <div class="qtext">${esc((q.question||{}).text||'')}</div>`;
+  const choicesHtml=(q.question&&q.question.choices)?`<div class="choices">${q.question.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:'';
+  const fig=q.figure_svg?`<figure>${q.figure_svg}</figure>`
+    :((q.question&&q.question.figure_crop)?`<figure><img src="/data/${q.question.figure_crop.replace(/^.*data\//,'')}" style="max-width:300px"><div class="small">原题照片裁剪图</div></figure>`:'');
+  if(variant){   // 相似题：看答案自判（相似题不入库）
+    $('#quiz-box').innerHTML=`${head}${choicesHtml}${fig}
+      <div id="ansbox" class="ans hidden"><b>答案：${esc(q.verified_answer||'（无）')}</b>
+        <div class="small" style="margin-top:4px">💡 ${esc(an.key_idea||'')}</div>
+        <div class="small" style="color:var(--red)">⚠ 易错：${esc(an.pitfall||'')}</div></div>
+      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+        <button class="sec" onclick="document.getElementById('ansbox').classList.remove('hidden')">看答案</button>
+        <button class="sec" onclick="practiceQ('${qid}',true,this)">相似题：答对了</button>
+        <button class="warn" onclick="practiceQ('${qid}',false,this)">相似题：答错了</button>
+        <button class="sec" onclick="nextQ()" style="margin-left:auto">下一题 ⏭</button></div>
+      <div id="simbox" style="margin-top:10px"></div></div>`;
+    $('#quiz-box').dataset.qid=qid; $('#quiz-box').dataset.wrongBefore=wrongBefore;
+    $('#quiz-box').dataset.ans=q.verified_answer||'';
+    tex($('#quiz-box'));return;
+  }
+  // 按题型给出作答控件（自动评分）
+  let answerUi='';
+  if(q.type==='single'&&q.question&&q.question.choices){
+    answerUi=`<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">${q.question.choices.map(c=>
+      `<button class="sec" onclick="submitKeys('${qid}','${esc(c.key)}')">${esc(c.key)}</button>`).join('')}
+      <span class="small" style="align-self:center">点击选项作答，自动评分</span></div>`;
+  }else if(q.type==='multiple'&&q.question&&q.question.choices){
+    answerUi=`<div class="choices" id="quiz-multi">${q.question.choices.map(c=>
+      `<div><label><input type="checkbox" value="${esc(c.key)}"> ${esc(c.key)}. ${esc(c.text)}</label></div>`).join('')}</div>
+      <button class="pri" style="margin-top:8px" onclick="submitKeys('${qid}',null)">确认提交</button>`;
+  }else if(q.type==='fill'){
+    answerUi=`<div style="display:flex;gap:8px;margin-top:12px"><input type="text" id="quiz-ans" placeholder="输入答案"
+      style="flex:1;min-width:220px;padding:6px 10px;border:1px solid var(--line);border-radius:6px" onkeydown="if(event.key==='Enter')submitFill('${qid}')">
+      <button class="pri" onclick="submitFill('${qid}')">提交</button></div>`;
+  }else{   // short 问答：看答案自判
+    answerUi=`<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+      <button class="sec" onclick="document.getElementById('ansbox').classList.remove('hidden')">看答案</button>
+      <button class="sec" onclick="practiceQ('${qid}',true,this)">答对了</button>
+      <button class="warn" onclick="practiceQ('${qid}',false,this)">答错了</button>
+      <button class="sec" onclick="genSim('${qid}')">生成相似题</button></div>
+      <div id="ansbox" class="ans hidden"><b>答案：${esc(q.verified_answer||'（待验证）')}</b>
+        <div class="small" style="margin-top:4px">💡 ${esc(an.key_idea||'')}</div>
+        <div class="small" style="color:var(--red)">⚠ 易错：${esc(an.pitfall||'')}</div></div>`;
+  }
+  $('#quiz-box').innerHTML=`${head}${choicesHtml}${fig}${answerUi}
+    <div id="quiz-feedback" style="margin-top:10px"></div>
+    <div id="simbox" style="margin-top:10px"></div>
+    <div style="display:flex;gap:10px;margin-top:10px"><button class="sec" onclick="nextQ()" style="margin-left:auto">下一题 ⏭</button></div>
+  </div>`;
+  $('#quiz-box').dataset.qid=qid;
+  $('#quiz-box').dataset.wrongBefore=wrongBefore;
+  $('#quiz-box').dataset.ans=q.verified_answer||'';
+  tex($('#quiz-box'));
+}
+/* ---------- 自动评分 ---------- */
+function extractKeys(x){return [...new Set(String(x||'').toUpperCase().match(/[A-D]/g)||[])].sort().join('');}
+function normAns(x){
+  let t=String(x||'').toLowerCase().replace(/\s+/g,'')
+    .replace(/[,,。;;::!！??()（）]/g,'');
+  t=t.replace(/(cm|mm|dm|m|°|%)$/,'');   // 去常见单位尾
+  return t;
+}
+function gradeFill(my,ans){
+  const a=normAns(my),b=normAns(ans);
+  if(a&&a===b)return true;
+  const na=parseFloat(a),nb=parseFloat(b);
+  if(!isNaN(na)&&!isNaN(nb))return Math.abs(na-nb)<1e-6;   // 数值等价（3=3.0）
+  return false;
+}
+async function submitKeys(qid,multiKey){
+  const box=$('#quiz-box');
+  const my=multiKey||$$('#quiz-multi input:checked').map(x=>x.value).sort().join('');
+  await finishAnswer(qid,extractKeys(my)!==''&&extractKeys(my)===extractKeys(box.dataset.ans),box);
+}
+async function submitFill(qid){
+  const box=$('#quiz-box');
+  await finishAnswer(qid,gradeFill($('#quiz-ans').value,box.dataset.ans),box);
+}
+async function finishAnswer(qid,correct,box){
+  const wrongBefore=+box.dataset.wrongBefore||0;
+  const r=await (await fetch(`/api/questions/${qid}/practice`,
+    {method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({correct})})).json();
+  const stk=r.streak||0;
+  const badges=[
+    r.ready?'<span class="badge">✅ 建议归档</span>':`<span class="small">连对 ${stk}/3${correct?'，还差 '+(3-stk)+' 次':''}</span>`,
+    (!correct&&wrongBefore>=1)?'<span class="tag t-conflict">⚠ 重复做错</span>':''].join(' ');
+  box.querySelectorAll('button,input,select').forEach(el=>{
+    if(el.closest('#quiz-feedback')||el.closest('#simbox')||el.textContent.includes('下一题'))return;
+    el.disabled=true;});
+  document.getElementById('quiz-feedback').innerHTML=`
+    <div class="ans" style="border-color:${correct?'#cdecd8':'#f0c9cb'};background:${correct?'#f2fbf5':'#fdf1f1'}">
+      <b>${correct?'✅ 回答正确':'❌ 回答错误'}</b>　正确答案：<b>${esc(box.dataset.ans)||'（无）'}</b>
+      <div style="margin-top:6px">状态：${badges}</div>
+      <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
+        ${r.ready?`<button class="pri" onclick="masterQ('${qid}')">📦 归档本题</button>`:''}
+        <button class="sec" onclick="genSim('${qid}')">✨ 做相似题</button>
+      </div>
+    </div>`;
+}
+async function practiceQ(qid,correct,btn){
+  const r=await (await fetch(`/api/questions/${qid}/practice`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({correct})})).json();
+  btn.textContent=(correct?'✓ 已记录 · 连对 ':'✗ 已记录 · 连对 ')+r.streak;
+  if(r.ready)btn.insertAdjacentHTML('afterend',
+    ' <span class="badge">✅ 建议归档</span> <button class="pri" onclick="masterQ(\''+qid+'\')">📦 归档</button>');
+  btn.disabled=true;
+}
+/* ---------- 做题（试卷式）：勾选题目一次列出，作答后统一批改 ---------- */
+async function showPaper(ids){
+  const qs=await Promise.all(ids.map(id=>fetch('/api/questions/'+id).then(r=>r.json())));
+  paperData=qs;
+  const body=qs.map((q,i)=>{
+    const an=q.analysis||{};
+    const fig=q.figure_svg?`<figure>${q.figure_svg}</figure>`
+      :((q.question&&q.question.figure_crop)?`<figure><img src="/data/${q.question.figure_crop.replace(/^.*data\//,'')}" style="max-width:280px"></figure>`:'');
+    let ui='';
+    if(q.type==='single')ui=(q.question.choices||[]).map(c=>
+      `<label class="pq-opt"><input type="radio" name="pq-${i}" value="${esc(c.key)}"> ${esc(c.key)}. ${esc(c.text)}</label>`).join('');
+    else if(q.type==='multiple')ui=(q.question.choices||[]).map(c=>
+      `<label class="pq-opt"><input type="checkbox" class="pq-m" value="${esc(c.key)}"> ${esc(c.key)}. ${esc(c.text)}</label>`).join('');
+    else if(q.type==='fill')ui=`<input class="pq-fill" placeholder="输入答案" style="width:240px;padding:6px 10px;border:1px solid var(--line);border-radius:6px">`;
+    else ui=`<textarea class="pq-short" placeholder="输入解答要点（自动比对关键答案）" style="width:100%;min-height:56px;border:1px solid var(--line);border-radius:6px;padding:6px;font:inherit"></textarea>`;
+    return `<div class="pq card" style="margin-bottom:12px" data-i="${i}">
+      <div class="qhead"><b>第 ${i+1} 题</b>
+        <span class="tag t-${an.difficulty===1?'easy':an.difficulty===3?'hard':'med'}">${({1:'简单',2:'中等',3:'困难'})[an.difficulty]||''}</span>
+        <span class="tag t-med">${esc(an.chapter||'')}</span>
+        ${(an.knowledge_points||[]).slice(0,3).map(k=>`<span class="tag t-review">${esc(k)}</span>`).join('')}</div>
+      <div class="qtext">${esc((q.question||{}).text||'')}</div>
+      ${(q.question&&q.question.choices)?`<div class="choices">${q.question.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:''}
+      ${fig}
+      <div class="pq-ui" style="margin-top:8px">${ui}</div>
+      <div class="pq-res" style="margin-top:8px"></div>
+    </div>`;
+  }).join('');
+  $('#quiz-box').innerHTML=`
+    <div class="no-print" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <b>📝 做题（共 ${qs.length} 题）</b>
+      <span class="small">作答完成后点「完成并批改」；也可打印/PDF 后在纸上作答</span>
+      <span style="margin-left:auto;display:flex;gap:10px">
+        <button class="pri" onclick="submitPaper()">✅ 完成并批改</button>
+        <button class="sec" onclick="goDash()">放弃</button></span></div>
+    <div class="print-head">
+      <h2>数学错题练习卷</h2>
+      <div class="pline">共 ${qs.length} 题 · 班级＿＿＿＿　姓名＿＿＿＿　日期＿＿＿＿</div>
+    </div>
+    <div id="paper-summary"></div>
+    ${body}
+    <div class="no-print" style="margin:10px 0"><button class="pri" onclick="submitPaper()">✅ 完成并批改</button></div>`;
+  tex($('#quiz-box'));
+  window.scrollTo(0,0);
+}
+function gradeShort(my,ans){
+  const a=normAns(my),b=normAns(ans);
+  if(!a)return false;
+  if(a===b)return true;
+  const na=parseFloat(a),nb=parseFloat(b);
+  if(!isNaN(na)&&!isNaN(nb))return Math.abs(na-nb)<1e-6;
+  return b.includes(a)||a.includes(b);   // 要点包含即算对
+}
+async function submitPaper(){
+  if(!paperData)return;
+  const divs=[...document.querySelectorAll('#quiz-box .pq')];
+  divs.forEach(div=>div.querySelectorAll('input,textarea,button').forEach(el=>el.disabled=true));
+  let ok=0; const wrongKps={};
+  for(const div of divs){
+    const i=+div.dataset.i, q=paperData[i];
+    const an=q.analysis||{};
+    const ans=q.verified_answer||'', type=q.type;
+    let my='', correct=false;
+    if(type==='single'){const r=div.querySelector('input:checked');my=r?r.value:'';
+      correct=my!==''&&extractKeys(my)===extractKeys(ans);}
+    else if(type==='multiple'){my=[...div.querySelectorAll('input:checked')].map(x=>x.value).sort().join('');
+      correct=my!==''&&extractKeys(my)===extractKeys(ans);}
+    else if(type==='fill'){my=div.querySelector('.pq-fill')?div.querySelector('.pq-fill').value:'';
+      correct=gradeFill(my,ans);}
+    else{my=div.querySelector('.pq-short')?div.querySelector('.pq-short').value:'';
+      correct=gradeShort(my,ans);}
+    const wrongBefore=(q.practice||[]).filter(p=>!p.correct).length;
+    const r=await (await fetch(`/api/questions/${q.id}/practice`,
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({correct})})).json();
+    if(correct)ok++;
+    if(!correct)((an.kp_path||[]).slice(2,3).concat(an.knowledge_points||[])).forEach(k=>{if(k)wrongKps[k]=(wrongKps[k]||0)+1;});
+    const stk=r.streak||0;
+    const badges=[
+      r.ready?'<span class="badge">✅ 建议归档</span>':`<span class="small">连对 ${stk}/3</span>`,
+      (!correct&&wrongBefore>=1)?'<span class="tag t-conflict">⚠ 重复做错</span>':'',
+      my===''?'<span class="tag t-review">未作答</span>':`<span class="small">你的答案：${esc(my)}</span>`].join(' ');
+    div.querySelector('.pq-res').innerHTML=`
+      <div class="ans" style="border-color:${correct?'#cdecd8':'#f0c9cb'};background:${correct?'#f2fbf5':'#fdf1f1'}">
+        <b>${correct?'✅ 正确':'❌ 错误'}</b>　正确答案：<b>${esc(ans)||'（无）'}</b>
+        <div style="margin-top:4px">状态：${badges}</div>
+        <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">
+          ${r.ready?`<button class="pri" onclick="masterQ('${q.id}')">📦 归档</button>`:''}
+          <button class="sec" onclick="genSim('${q.id}')">✨ 做相似题</button></div></div>`;
+  }
+  const n=divs.length, score=n?Math.round(ok/n*100):0;
+  let comment;
+  if(score>=90)comment='🎉 优秀！本组题目掌握扎实。';
+  else if(score>=75)comment='👍 良好。巩固错题后很快都能建议归档。';
+  else if(score>=60)comment='💪 及格。建议对错题做相似题强化。';
+  else comment='📚 需要加强，以下知识点错得较多：';
+  const kpChips=Object.entries(wrongKps).sort((a,b)=>b[1]-a[1])
+    .map(([k,v])=>`<span class="tag t-conflict">${esc(k)} ×${v}</span>`).join(' ');
+  document.getElementById('paper-summary').innerHTML=`
+    <div class="card" style="border:2px solid var(--blue)">
+      <b>批改结果</b>　得分 <b style="font-size:26px">${score}</b> 分（答对 ${ok}/${n}）
+      <div style="margin-top:6px">${comment} ${kpChips||'（全部正确 🎉）'}</div>
+      <div class="small" style="margin-top:4px">每题作答已计入练习记录（连对次数/建议归档状态见各题）</div>
+    </div>`;
+  paperData=null;
+  window.scrollTo(0,0);
+}
+
+async function genSim(qid){
+  const box=$('#simbox'); box.innerHTML='<span class="small">生成相似题中…（约30秒）</span>';
+  const j=await (await fetch(`/api/questions/${qid}/similar`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{"count":2}'})).json();
+  if(j.error){box.innerHTML='❌ '+j.error;return;}
+  box.innerHTML=j.items.map((it,i)=>`<div class="qcard"><b>相似题${i+1}</b>
+    <div class="qtext">${esc(it.text)}</div>
+    <div class="answer-line">（点开练习时显示答案：${esc(it.answer)}）</div>
+    <button class="sec" onclick="showSim(${i})">练习这道</button></div>`).join('')
+    +(j.items.length?'':'<span class="small">生成失败，稍后再试</span>');
+  box._items=j.items; tex(box);
+}
+function showSim(i){const it=$('#simbox')._items[i];
+  $('#quiz-box').innerHTML=`<div class="quiz"><b>相似题</b><div class="qtext">${esc(it.text)}</div>
+   ${it.choices?`<div class="choices">${it.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:''}
+   <div class="ans"><b>答案：${esc(it.answer)}</b><div class="small">${esc(it.explanation)}</div></div>
+   <button class="sec" onclick="nextQ()">下一题 ⏭</button></div>`; tex($('#quiz-box'));}
+
+/* ---------- Tab4 出卷 ---------- */
+async function loadPaper(){
+  const d=await (await fetch('/api/stats')).json();
+  const chs=Object.keys(d.by_chapter), kps=Object.keys(d.by_knowledge_point);
+  $('#paper-box').innerHTML=`
+   <b>针对性出卷</b> <span class="small">基于在库错题的知识点/易错点画像；全部生成内容过图形校验+独立解题对账</span>
+   <table style="margin-top:10px;font-size:14px">
+    <tr><td style="padding:6px">章节：</td><td>${chs.map(c=>`<label style="margin-right:12px"><input type="checkbox" class="f-ch" value="${esc(c)}"> ${esc(c)}</label>`).join('')}</td></tr>
+    <tr><td style="padding:6px">知识点：</td><td>${kps.slice(0,10).map(k=>`<label style="margin-right:12px"><input type="checkbox" class="f-kp" value="${esc(k)}"> ${esc(k)}</label>`).join('')}</td></tr>
+    <tr><td style="padding:6px">难度占比：</td><td>①简单 <input type="number" id="mix1" value="30" min="0" max="100" style="width:56px">％
+      ②中等 <input type="number" id="mix2" value="50" min="0" max="100" style="width:56px">％
+      ③困难 <input type="number" id="mix3" value="20" min="0" max="100" style="width:56px">％</td></tr>
+    <tr><td style="padding:6px">题量：</td><td><input type="number" id="pc" value="8" min="3" max="20" style="width:64px"></td></tr>
+    <tr><td style="padding:6px">模式：</td><td><label><input type="radio" name="pm" value="variant" checked> 变式卷（基于错题改数据/换情境）</label>
+      <label style="margin-left:14px"><input type="radio" name="pm" value="original"> 原创卷（围绕易错点全新命题）</label></td></tr>
+   </table>
+   <div style="margin-top:12px"><button class="pri" id="btn-paper" onclick="doPaper()">生成试卷（1-3分钟）</button></div>
+   <div id="paper-out" style="margin-top:10px"></div>`;
+}
+async function doPaper(){
+  const btn=$('#btn-paper'); btn.disabled=true; btn.textContent='生成中…（1-3分钟）';
+  const body={chapters:$$('.f-ch:checked').map(x=>x.value),kps:$$('.f-kp:checked').map(x=>x.value),
+    difficulty_mix:{'1':+$('#mix1').value||30,'2':+$('#mix2').value||50,'3':+$('#mix3').value||20},
+    count:+$('#pc').value||8,mode:$$('input[name=pm]:checked')[0].value};
+  try{const j=await (await fetch('/api/paper',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+    $('#paper-out').innerHTML=j.error?`❌ ${j.error}`:
+      `✅ 成卷 ${j.n} 题（质量链剔除 ${j.dropped} 道不合格题）
+       ${j.pdf?` · <a href="/out/${j.pdf.replace(/^.*out\//,'')}" target="_blank">打开PDF</a>`:''}`;
+  }catch(e){$('#paper-out').textContent='❌ '+e;}
+  btn.disabled=false; btn.textContent='生成试卷（1-3分钟）';
+}
+/* ---------- 知识点树（v0.7.1：浙教版八上 章/节/知识点） ---------- */
+let KB=null;
+async function loadKB(){
+  try{ KB=await (await fetch('/api/kb')).json(); }catch(e){}
+  if(sheets.length)renderReview();   // 树到位后重渲染已转录卡片
+  if(!document.getElementById('tab-dash').classList.contains('hidden'))loadDash();   // 刷新知识点筛选选项
+}
+function kpLabel(sel){
+  if(!sel||!sel.kp)return '';
+  return [sel.chapter,sel.section,sel.kp].filter(Boolean).join(' · ');
+}
+function kpTreeHtml(sid,no,sel){
+  if(!KB)return '<span class="small">知识库加载中…</span>';
+  return KB.chapters.map(c=>{
+    const chOpen=sel&&sel.chapter===c.title?' open':'';
+    return `<details class="kp-ch"${chOpen}>
+      <summary>《${esc(c.title)}》</summary>
+      ${c.sections.map(sn=>{
+        const secOpen=sel&&sel.section===sn.title?' open':'';
+        return `<details class="kp-sec"${secOpen}>
+          <summary>${esc(sn.title)}</summary>
+          ${sn.kps.map(k=>{
+            const on=sel&&sel.kp===k&&sel.section===sn.title?' on':'';
+            return `<div class="kp-item${on}" onclick="setKp('${sid}',${no},'${esc(c.title)}','${esc(sn.title)}','${esc(k)}',this)">▸ ${esc(k)}</div>`;
+          }).join('')}
+        </details>`;
+      }).join('')}
+    </details>`;
+  }).join('');
+}
+function setKp(sid,no,ch,sec,kp,el){
+  const sel={chapter:ch,section:sec,kp};
+  const s=sheets.find(x=>x.id===sid); const q=s&&s.questions.find(x=>x.no===no);
+  if(q)q.kp_sel=sel;
+  patchQ(sid,no,{kp_sel:sel},null);
+  const det=el.closest('details.kptree');
+  det.querySelector('summary').textContent=[ch,sec,kp].filter(Boolean).join(' · ');
+  det.querySelectorAll('.kp-item.on').forEach(x=>x.classList.remove('on'));
+  el.classList.add('on');
+  det.open=false;
+}
+
+/* ---------- 用户切换（v0.7：按用户隔离题库/草稿单/照片） ---------- */
+async function loadUsers(){
+  try{
+    const j=await (await fetch('/api/users')).json();
+    $('#user-sel').innerHTML=j.users.map(u=>`<option value="${u.id}" ${u.id===j.current?'selected':''}>${esc(u.name)}</option>`).join('');
+  }catch(e){}
+}
+async function switchUser(uid){
+  if(!confirm('切换用户？当前页面未提交的内容将丢弃。')){loadUsers();return;}
+  await fetch('/api/users/switch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:uid})});
+  location.reload();   // 整页刷新：全部数据源切到新用户
+}
+async function addUser(){
+  const name=prompt('新用户名称（如：孩子B）：'); if(!name)return;
+  const r=await fetch('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  const j=await r.json();
+  if(j.error)return alert('❌ '+j.error);
+  location.reload();   // 新用户题库为空，已自动切换
+}
+loadUsers();
+loadKB();
+loadDash();
+if(location.hash==='#quiz'){
+  const qb=$$('nav button').find(x=>x.dataset.tab==='quiz');
+  if(qb)qb.click();   // 新标签页会话直达刷题（loadQuiz 读取会话队列）
+}
+</script>
+</body>
+</html>

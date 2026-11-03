@@ -1,0 +1,7 @@
+.venv/
+key.env
+__pycache__/
+.pytest_cache/
+data/photos/
+data/crops/
+out/

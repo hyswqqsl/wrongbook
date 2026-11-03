@@ -1,0 +1,873 @@
+{
+ "version": 1,
+ "questions": [
+  {
+   "source": "2025期中卷",
+   "type": "single",
+   "question": {
+    "text": "如图，在 $\\triangle ABC$ 中，AB的垂直平分线交AB于点E，交BC于点D。已知 $AC=5$，$\\triangle ACD$ 的周长为14，则BC的长为（ ）",
+    "choices": [
+     {
+      "key": "A",
+      "text": "9"
+     },
+     {
+      "key": "B",
+      "text": "14"
+     },
+     {
+      "key": "C",
+      "text": "19"
+     },
+     {
+      "key": "D",
+      "text": "无法确定"
+     }
+    ],
+    "figure_spec": {
+     "points": [
+      {
+       "name": "A",
+       "x": 1.5,
+       "y": 1.5
+      },
+      {
+       "name": "B",
+       "x": 8.5,
+       "y": 1.5
+      },
+      {
+       "name": "C",
+       "x": 1.0,
+       "y": 6.474937
+      },
+      {
+       "name": "D",
+       "x": 5.0,
+       "y": 3.821637
+      },
+      {
+       "name": "E",
+       "x": 5.0,
+       "y": 1.5
+      }
+     ],
+     "segments": [
+      {
+       "a": "A",
+       "b": "B",
+       "dashed": false
+      },
+      {
+       "a": "A",
+       "b": "C",
+       "dashed": false
+      },
+      {
+       "a": "B",
+       "b": "C",
+       "dashed": false
+      },
+      {
+       "a": "A",
+       "b": "D",
+       "dashed": false
+      },
+      {
+       "a": "D",
+       "b": "E",
+       "dashed": false
+      }
+     ]
+    },
+    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/crops/d20261101-170522-598e9e_q1_0.png"
+   },
+   "printed_answer": null,
+   "verified_answer": "A",
+   "verify_status": "pass",
+   "mistake_reason": {
+    "kind": "unknown",
+    "note": "垂直平分线性质不熟"
+   },
+   "analysis": {
+    "chapter": "第二章 特殊三角形",
+    "knowledge_points": [
+     "线段垂直平分线的性质：垂直平分线上的点到线段两端点距离相等",
+     "三角形周长公式",
+     "等量代换与线段转化"
+    ],
+    "pitfall": "思路卡点在于不能由点D在AB的垂直平分线上想到AD=BD，导致无法把△ACD周长中的AD+CD转化为BD+CD=BC；突破口是识别“垂直平分线模型”，利用AD=BD完成线段代换。",
+    "difficulty": 1,
+    "key_idea": "看到线段垂直平分线，先想“到两端点距离相等”，把AD转化为BD，从而将周长转化为AC+BC。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/photos/d20261101-170522-598e9e.jpg",
+   "flags": {
+    "needs_review": false
+   },
+   "id": "20261101-170740-8a6d1e",
+   "created_at": "2026-11-01 17:07:40",
+   "practice": [
+    {
+     "at": "2026-11-01 17:11:42",
+     "correct": true,
+     "variant": "original"
+    },
+    {
+     "at": "2026-11-01 17:52:35",
+     "correct": true,
+     "variant": "original"
+    },
+    {
+     "at": "2026-11-01 17:52:46",
+     "correct": true,
+     "variant": "original"
+    }
+   ],
+   "mastered_at": "2026-11-02 15:23:35",
+   "similar": [
+    {
+     "id": "s1",
+     "text": "在△ABC中，AB的垂直平分线交AB于点E，交BC于点D。已知AC=6，△ACD的周长为16，则BC的长为（ ）",
+     "choices": [
+      "9",
+      "10",
+      "11",
+      "12"
+     ],
+     "answer": "B",
+     "explanation": "因为点D在AB的垂直平分线上，所以AD=BD。△ACD的周长为AC+AD+CD=AC+BD+CD=AC+BC。代入得16=6+BC，所以BC=10。易错点：要想到由垂直平分线得到AD=BD，再把AD+CD转化为BC。",
+     "difficulty": 1,
+     "figure_spec": null,
+     "verified": false
+    },
+    {
+     "id": "s2",
+     "text": "在△ABC中，AB的垂直平分线交AB于点E，交BC于点D。若BC=9，△ACD的周长为12，则AC的长为（ ）",
+     "choices": [
+      "2",
+      "3",
+      "4",
+      "5"
+     ],
+     "answer": "B",
+     "explanation": "因为点D在AB的垂直平分线上，所以AD=BD。△ACD的周长为AC+AD+CD=AC+BD+CD=AC+BC。代入得12=AC+9，所以AC=3。易错点：不能直接求AC，要先用AD=BD把△ACD的周长转化为AC+BC。",
+     "difficulty": 2,
+     "figure_spec": null,
+     "verified": false
+    },
+    {
+     "id": "s3",
+     "text": "如图，在 △ABC 中，AC 的垂直平分线交 AC 于点 E，交 BC 于点 D。已知 AB=8，△ABD 的周长为 18，则 BC 的长为（　）",
+     "choices": [
+      "9",
+      "10",
+      "13",
+      "5"
+     ],
+     "answer": "10",
+     "explanation": "因为点 D 在 AC 的垂直平分线上，由线段垂直平分线的性质得 AD=DC。于是 △ABD 的周长＝AB+BD+AD＝AB+BD+DC＝AB+BC。又 AB=8，△ABD 的周长为 18，所以 BC=18-8=10。易错点提醒：见到“垂直平分线”应立即想到“到两端点距离相等”，把 AD 换成 DC，从而把折线 BD+DA 转化成线段 BC；若想不到这一步，就可能误把 △ABD 的周长减去 AB 后与 AD、BD 分别纠结，甚至错选 5（误把 AD 当答案）。",
+     "difficulty": 1,
+     "figure_spec": null,
+     "verified": false
+    },
+    {
+     "id": "s4",
+     "text": "如图，在 △ABC 中，AB 的垂直平分线交 AB 于点 E，交 BC 于点 D。已知 AB=6，AC=8，△ACD 的周长为 18，则 △ABC 的周长为（　）",
+     "choices": [
+      "20",
+      "22",
+      "24",
+      "26"
+     ],
+     "answer": "24",
+     "explanation": "因为点 D 在 AB 的垂直平分线上，所以 AD=BD。于是 △ACD 的周长＝AC+CD+AD＝AC+CD+BD＝AC+BC＝18，又 AC=8，得 BC=10。所以 △ABC 的周长＝AB+BC+AC＝6+10+8=24。易错点提醒：第一步仍是用“垂直平分线上的点到线段两端点距离相等”把 AD 换成 BD，将 △ACD 的周长“拉直”为 AC+BC；第二步别忘了再求整个三角形的周长，需要把 AB 也加上，漏加 AB 会错选 18，只求 BC 就直接作答则会误选 10 之外的值（如 22、26）。",
+     "difficulty": 2,
+     "figure_spec": null,
+     "verified": false
+    }
+   ]
+  },
+  {
+   "source": "B 提高能力",
+   "type": "single",
+   "question": {
+    "text": "如图，$AD$ 是等腰三角形 $ABC$ 的底边 $BC$ 上的中线，$BE$ 平分 $\\angle ABC$，交 $AD$ 于点 $E$。若 $AC=12$，$DE=3$，则 $\\triangle ABE$ 的面积是（ ）",
+    "choices": [
+     {
+      "key": "A",
+      "text": "16"
+     },
+     {
+      "key": "B",
+      "text": "18"
+     },
+     {
+      "key": "C",
+      "text": "32"
+     },
+     {
+      "key": "D",
+      "text": "36"
+     }
+    ],
+    "figure_spec": {
+     "points": [
+      {
+       "name": "A",
+       "x": 1.0,
+       "y": 2.0
+      },
+      {
+       "name": "B",
+       "x": 9.0,
+       "y": 2.0
+      },
+      {
+       "name": "C",
+       "x": 5.0,
+       "y": 10.0
+      },
+      {
+       "name": "D",
+       "x": 7.0,
+       "y": 6.0
+      },
+      {
+       "name": "E",
+       "x": 4.6,
+       "y": 4.4
+      }
+     ],
+     "segments": [
+      {
+       "a": "A",
+       "b": "B",
+       "dashed": false
+      },
+      {
+       "a": "B",
+       "b": "C",
+       "dashed": false
+      },
+      {
+       "a": "C",
+       "b": "A",
+       "dashed": false
+      },
+      {
+       "a": "A",
+       "b": "D",
+       "dashed": false
+      },
+      {
+       "a": "B",
+       "b": "E",
+       "dashed": false
+      }
+     ]
+    },
+    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/crops/d20261101-211823-e45041_q6_0.png"
+   },
+   "printed_answer": null,
+   "verified_answer": "B",
+   "verify_status": "pass",
+   "mistake_reason": {
+    "kind": "careless",
+    "note": ""
+   },
+   "analysis": {
+    "chapter": "第二章 特殊三角形",
+    "knowledge_points": [
+     "等腰三角形三线合一",
+     "三角形内角平分线定理（角平分线分对边成比例）",
+     "三角形面积公式"
+    ],
+    "pitfall": "容易把DE=3误看成AE=3，或用△ABD中角平分线定理时把AE:DE=AB:BD写反；计算△ABE面积时还要注意以AE为底、B到AD的距离为高。",
+    "difficulty": 2,
+    "key_idea": "由等腰三角形三线合一得AD⊥BC，在△ABD中用角平分线定理得AE·BD=AB·DE=36，所以S△ABE=1/2·AE·BD=18。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/photos/d20261101-211823-e45041.jpg",
+   "flags": {
+    "needs_review": false
+   },
+   "id": "20261101-212133-eabb64",
+   "created_at": "2026-11-01 21:21:33",
+   "practice": [
+    {
+     "at": "2026-11-02 16:00:54",
+     "correct": false,
+     "variant": "original"
+    }
+   ],
+   "mastered_at": null
+  },
+  {
+   "source": "B 提高能力",
+   "type": "short",
+   "question": {
+    "text": "已知：如图，点 $D$，$E$ 在 $\\triangle ABC$ 的边 $BC$ 上，$AB=AC$，$AD=AE$。求证：$BD=CE$。",
+    "choices": null,
+    "figure_spec": {
+     "points": [
+      {
+       "name": "A",
+       "x": 5.0,
+       "y": 8.0
+      },
+      {
+       "name": "B",
+       "x": 1.0,
+       "y": 2.0
+      },
+      {
+       "name": "C",
+       "x": 9.0,
+       "y": 2.0
+      },
+      {
+       "name": "D",
+       "x": 3.0,
+       "y": 2.0
+      },
+      {
+       "name": "E",
+       "x": 7.0,
+       "y": 2.0
+      }
+     ],
+     "segments": [
+      {
+       "a": "A",
+       "b": "B",
+       "dashed": false
+      },
+      {
+       "a": "A",
+       "b": "C",
+       "dashed": false
+      },
+      {
+       "a": "B",
+       "b": "C",
+       "dashed": false
+      },
+      {
+       "a": "A",
+       "b": "D",
+       "dashed": false
+      },
+      {
+       "a": "A",
+       "b": "E",
+       "dashed": false
+      }
+     ]
+    },
+    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/crops/d20261101-211823-e45041_q7_0.png"
+   },
+   "printed_answer": null,
+   "verified_answer": "作AH⊥BC于H。因为AB=AC，所以H为BC中点，BH=CH。又AD=AE，且AH公共，∠AHD=∠AHE=90°，故Rt△AHD≌Rt△AHE，得DH=EH。于是按图中位置有BD=BH-DH=CH-EH=CE，所以BD=CE。",
+   "verify_status": "pass",
+   "mistake_reason": {
+    "kind": "careless",
+    "note": ""
+   },
+   "analysis": {
+    "chapter": "第二章 特殊三角形",
+    "knowledge_points": [
+     "等腰三角形三线合一（底边上的高也是底边中线）",
+     "直角三角形全等判定 HL",
+     "等腰三角形两腰相等、底角相等",
+     "线段的和差关系（BD=BH-DH，CE=CH-EH）"
+    ],
+    "pitfall": "思路本身不难，失分多在细节看错：一是作高后忘记用“三线合一”说明H是BC中点，直接默认BH=CH；二是证Rt△AHD≌Rt△AHE时对应关系写错（把斜边AD对AE、直角边AH对DH搞混），或漏写∠AHD=∠AHE=90°这一条件；三是在图中线段位置关系上出错，把BD=BH-DH写成BD=BH+DH，或把DH、EH对应到错误的端点，导致最后一步“作差得BD=CE”算错、写反。",
+    "difficulty": 2,
+    "key_idea": "作底边BC上的高AH，先用等腰三角形三线合一得BH=CH，再用HL证Rt△AHD≌Rt△AHE得DH=EH，两式相减即得BD=CE。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/photos/d20261101-211823-e45041.jpg",
+   "flags": {
+    "needs_review": false
+   },
+   "id": "20261101-212202-410520",
+   "created_at": "2026-11-01 21:22:02",
+   "practice": [
+    {
+     "at": "2026-11-02 16:00:54",
+     "correct": false,
+     "variant": "original"
+    }
+   ],
+   "mastered_at": null,
+   "similar": [
+    {
+     "id": "s1",
+     "text": "如图，在△ABC中，AB=AC，点D、E在边BC上，且AD=AE。求证：BE=CD。",
+     "choices": null,
+     "answer": "证明：作AH⊥BC于H。因为AB=AC，所以BH=CH（等腰三角形三线合一）。又AD=AE，AH公共，∠AHD=∠AHE=90°，所以Rt△AHD≌Rt△AHE（HL），得DH=EH。由图中B、D、H、E、C的顺序可知，BE=BH+EH，CD=CH+DH。又BH=CH，EH=DH，所以BE=CD。",
+     "explanation": "关键仍是先作底边上的高，用“三线合一”说明BH=CH；再根据AD=AE、AH公共及直角条件，用HL证Rt△AHD≌Rt△AHE，得到DH=EH。注意本题最后是线段相加：BE=BH+EH，CD=CH+DH，不能机械套用原题的作差。易错点：忘记说明H是BC中点；HL对应关系写错；把图中线段和差关系看反。",
+     "difficulty": 2,
+     "figure_spec": null,
+     "verified": false
+    },
+    {
+     "id": "s2",
+     "text": "如图，在△ABC中，AB=AC，点D、B、C、E依次在同一直线上，且AD=AE。求证：BD=CE。",
+     "choices": null,
+     "answer": "证明：作AH⊥BC于H。因为AB=AC，所以BH=CH（等腰三角形三线合一）。又AD=AE，AH公共，∠AHD=∠AHE=90°，所以Rt△AHD≌Rt△AHE（HL），得DH=EH。由图中D、B、H、C、E的顺序可知，DH=BH+BD，EH=CH+CE。因为DH=EH，BH=CH，所以BH+BD=CH+CE，进而BD=CE。",
+     "explanation": "作高AH后，先用“三线合一”得到BH=CH；再由AD=AE、AH公共和直角条件，用HL证Rt△AHD≌Rt△AHE，得DH=EH。注意D、E在BC外侧，线段关系是DH=BH+BD，EH=CH+CE，而不是相减；最后由等式两边同时减去BH=CH得到BD=CE。易错点：不写“三线合一”直接默认BH=CH；HL中斜边、直角边对应混乱；外侧线段和差关系判断错误。",
+     "difficulty": 3,
+     "figure_spec": null,
+     "verified": false
+    }
+   ]
+  },
+  {
+   "source": "B 提高能力",
+   "type": "short",
+   "question": {
+    "text": "如图，在 $\\triangle ABC$ 中，$AB=AC$，$AD$ 平分 $\\angle BAC$，$DE\\perp AB$ 于点 $E$，$DF\\perp AC$ 于点 $F$。则以下结论：①$DE=DF$；②$AE=AF$；③$\\angle BDE=\\angle CDF$；④$AD$ 上任意一点到 $B$，$C$ 两点的距离相等。正确的有____（填序号），并选择一个正确的结论给出证明。",
+    "choices": null,
+    "figure_spec": {
+     "points": [
+      {
+       "name": "A",
+       "x": 5.0,
+       "y": 9.0
+      },
+      {
+       "name": "B",
+       "x": 1.0,
+       "y": 2.0
+      },
+      {
+       "name": "C",
+       "x": 9.0,
+       "y": 2.0
+      },
+      {
+       "name": "D",
+       "x": 5.0,
+       "y": 2.0
+      },
+      {
+       "name": "E",
+       "x": 1.985,
+       "y": 3.723
+      },
+      {
+       "name": "F",
+       "x": 8.015,
+       "y": 3.723
+      }
+     ],
+     "segments": [
+      {
+       "a": "A",
+       "b": "B",
+       "dashed": false
+      },
+      {
+       "a": "A",
+       "b": "C",
+       "dashed": false
+      },
+      {
+       "a": "B",
+       "b": "C",
+       "dashed": false
+      },
+      {
+       "a": "A",
+       "b": "D",
+       "dashed": false
+      },
+      {
+       "a": "D",
+       "b": "E",
+       "dashed": false
+      },
+      {
+       "a": "D",
+       "b": "F",
+       "dashed": false
+      }
+     ]
+    },
+    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/crops/d20261101-211823-e45041_q8_0.png"
+   },
+   "printed_answer": null,
+   "verified_answer": "①②③④。证明①：因为AD平分∠BAC，所以∠DAE=∠DAF；又DE⊥AB，DF⊥AC，所以∠DEA=∠DFA=90°，且AD=AD，故Rt△AED≌Rt△AFD，从而DE=DF。由全等也得AE=AF；由AB=AC及AD为顶角平分线，知直线AD是BC的垂直平分线，故AD上任意点到B、C两点距离相等；又由关于AD的对称性可得∠BDE=∠CDF。",
+   "verify_status": "pass",
+   "mistake_reason": {
+    "kind": "careless",
+    "note": ""
+   },
+   "analysis": {
+    "chapter": "第二章 特殊三角形",
+    "knowledge_points": [
+     "等腰三角形“三线合一”",
+     "角平分线的性质定理",
+     "直角三角形全等判定（HL）",
+     "线段垂直平分线的性质"
+    ],
+    "pitfall": "容易漏看或混淆结论④中“到B、C两点距离相等”的对象，把AD上的点到两腰的距离与到B、C的距离混为一谈；也容易只验证①②而漏判③④。",
+    "difficulty": 2,
+    "key_idea": "抓住等腰三角形顶角平分线即对称轴，结合Rt△AED≌Rt△AFD和线段垂直平分线性质判断各结论。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/photos/d20261101-211823-e45041.jpg",
+   "flags": {
+    "needs_review": false
+   },
+   "id": "20261101-212231-04d022",
+   "created_at": "2026-11-01 21:22:31",
+   "practice": [],
+   "mastered_at": null
+  },
+  {
+   "source": "数学练习册/试卷（页面右上印有页码 16，左下印有页码 34），第 34 页",
+   "type": "short",
+   "question": {
+    "text": "如图，在 $\\triangle ABC$ 中，$AB=CB$，$\\angle ABC=90^\\circ$。$F$ 为 $AB$ 延长线上一点，点 $E$ 在 $BC$ 上，且 $BE=BF$。\n(1) 求证：$\\triangle ABE \\cong \\triangle CBF$。\n(2) 若 $\\angle CAE=30^\\circ$，求 $\\angle ACF$ 的度数。",
+    "choices": null,
+    "figure_spec": {
+     "points": [
+      {
+       "name": "B",
+       "x": 4.0,
+       "y": 2.0
+      },
+      {
+       "name": "A",
+       "x": 9.0,
+       "y": 2.0
+      },
+      {
+       "name": "C",
+       "x": 4.0,
+       "y": 7.0
+      },
+      {
+       "name": "E",
+       "x": 4.0,
+       "y": 3.339746
+      },
+      {
+       "name": "F",
+       "x": 2.660254,
+       "y": 2.0
+      }
+     ],
+     "segments": [
+      {
+       "a": "A",
+       "b": "B",
+       "dashed": false
+      },
+      {
+       "a": "B",
+       "b": "C",
+       "dashed": false
+      },
+      {
+       "a": "C",
+       "b": "A",
+       "dashed": false
+      },
+      {
+       "a": "B",
+       "b": "F",
+       "dashed": false
+      },
+      {
+       "a": "C",
+       "b": "F",
+       "dashed": false
+      },
+      {
+       "a": "A",
+       "b": "E",
+       "dashed": false
+      }
+     ]
+    },
+    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/crops/d20261101-213412-5798ca_q13_0.png"
+   },
+   "printed_answer": null,
+   "verified_answer": "（1）∵AB=CB，BE=BF，且AB⊥BC，F在AB延长线上，∴∠ABE=∠CBF=90°。由SAS得△ABE≌△CBF。\n（2）等腰直角△ABC中，∠ACB=∠CAB=45°。又∠CAE=30°，在△ACE中，∠ACE=45°，∴∠AEC=105°，从而∠AEB=75°。由（1）全等得∠CFB=∠AEB=75°。因A、B、F共线，∠AFC=75°。于是∠ACF=180°-∠CAF-∠AFC=180°-45°-75°=60°。故∠ACF=60°。",
+   "verify_status": "pass",
+   "mistake_reason": {
+    "kind": "unknown",
+    "note": ""
+   },
+   "analysis": {
+    "chapter": "第一章 三角形",
+    "knowledge_points": [
+     "全等三角形的判定（SAS）",
+     "全等三角形对应角相等",
+     "等腰直角三角形的性质（两底角均为45°）",
+     "三角形内角和定理"
+    ],
+    "pitfall": "学生不会的卡点在于：第(1)问想不到利用AB⊥BC及F在AB延长线上得到∠ABE=∠CBF=90°，从而凑齐SAS条件；第(2)问不会把∠AEB通过全等转化为∠CFB，再结合A、B、F共线、等腰直角三角形45°及三角形内角和逐步求角。突破口是先证全等，再用全等转移角。",
+    "difficulty": 2,
+    "key_idea": "先由SAS证△ABE≌△CBF，再利用全等转移角，结合等腰直角三角形45°和内角和求∠ACF。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/photos/d20261101-213412-5798ca.jpg",
+   "flags": {
+    "needs_review": false
+   },
+   "id": "20261101-213537-60ac76",
+   "created_at": "2026-11-01 21:35:37",
+   "practice": [],
+   "mastered_at": null
+  },
+  {
+   "source": "",
+   "type": "short",
+   "question": {
+    "text": "如图，直角三角形纸片的两直角边 $AC=6\\text{ cm},BC=8\\text{ cm}$。现将直角边 $AC$ 沿 $AD$ 折叠，使它落在斜边 $AB$ 上，点 $C$ 与点 $E$ 重合。求 $CD$ 的长。",
+    "choices": null,
+    "figure_spec": {
+     "points": [
+      {
+       "name": "A",
+       "x": 9.0,
+       "y": 1.0
+      },
+      {
+       "name": "B",
+       "x": 1.0,
+       "y": 1.0
+      },
+      {
+       "name": "C",
+       "x": 6.12,
+       "y": 4.84
+      },
+      {
+       "name": "D",
+       "x": 4.2,
+       "y": 3.4
+      },
+      {
+       "name": "E",
+       "x": 4.2,
+       "y": 1.0
+      }
+     ],
+     "segments": [
+      {
+       "a": "A",
+       "b": "B",
+       "dashed": false
+      },
+      {
+       "a": "B",
+       "b": "C",
+       "dashed": false
+      },
+      {
+       "a": "C",
+       "b": "A",
+       "dashed": false
+      },
+      {
+       "a": "A",
+       "b": "D",
+       "dashed": false
+      },
+      {
+       "a": "D",
+       "b": "E",
+       "dashed": false
+      }
+     ]
+    },
+    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/crops/d20261101-213844-73fb2b_q14_0.png"
+   },
+   "printed_answer": null,
+   "verified_answer": "3 cm",
+   "verify_status": "pass",
+   "mistake_reason": {
+    "kind": "unknown",
+    "note": ""
+   },
+   "analysis": {
+    "chapter": "第二章 特殊三角形",
+    "knowledge_points": [
+     "勾股定理",
+     "折叠的轴对称性质（对应线段相等、对应角相等）",
+     "方程思想求线段长"
+    ],
+    "pitfall": "思路卡点在于不能把折叠条件转化为 AE=AC=6、DE=CD 且 ∠AED=∠ACD=90°，从而得到 DE⊥AB、BE=AB-AE=4；突破口是设 CD=x，则 DB=8-x，在 Rt△BDE 中用勾股定理列方程。",
+    "difficulty": 2,
+    "key_idea": "利用折叠得到 AE=AC=6、DE=CD 且 DE⊥AB，再在 Rt△BDE 中用勾股定理列方程求 CD。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/photos/d20261101-213844-73fb2b.jpg",
+   "flags": {
+    "needs_review": false
+   },
+   "id": "20261101-214105-47aacd",
+   "created_at": "2026-11-01 21:41:05",
+   "practice": [
+    {
+     "at": "2026-11-02 16:10:20",
+     "correct": true,
+     "variant": "original"
+    }
+   ],
+   "mastered_at": null
+  },
+  {
+   "source": "",
+   "type": "short",
+   "question": {
+    "text": "如图，直角三角形纸片的两直角边 $AC=6\\text{ cm}$，$BC=8\\text{ cm}$。现将直角边 $AC$ 沿 $AD$ 折叠，使它落在斜边 $AB$ 上，点 $C$ 与点 $E$ 重合。求 $CD$ 的长。",
+    "choices": null,
+    "figure_spec": null,
+    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/crops/d20261102-090711-7cb259_q14_0.png"
+   },
+   "printed_answer": null,
+   "verified_answer": "3 cm",
+   "verify_status": "pass",
+   "mistake_reason": {},
+   "analysis": {
+    "chapter": "第二章 特殊三角形",
+    "knowledge_points": [
+     "勾股定理",
+     "折叠的轴对称性质（折叠前后图形全等）",
+     "角平分线性质定理",
+     "方程思想"
+    ],
+    "pitfall": "折叠转化不充分：未由折叠得到 AE=AC=6、DE=CD 且 DE⊥AB，进而未求出 BE=AB-AE=4；或在 Rt△BDE 中把 BD 错表示为 8+CD，导致方程列错。",
+    "difficulty": 2,
+    "key_idea": "利用折叠全等把 CD 转化为 DE，再在 Rt△BDE 中用勾股定理列方程求解。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/photos/d20261102-090711-7cb259.jpg",
+   "flags": {
+    "needs_review": false
+   },
+   "id": "20261102-090803-e6526f",
+   "created_at": "2026-11-02 09:08:03",
+   "practice": [],
+   "mastered_at": null
+  },
+  {
+   "source": "初中数学练习册/试卷 第34页",
+   "type": "short",
+   "question": {
+    "text": "如图，在 $\\triangle ABC$ 中，$AB=CB$，$\\angle ABC=90^\\circ$。$F$ 为 $AB$ 延长线上一点，点 $E$ 在 $BC$ 上，且 $BE=BF$。\n(1) 求证：$\\triangle ABE \\cong \\triangle CBF$。\n(2) 若 $\\angle CAE=30^\\circ$，求 $\\angle ACF$ 的度数。",
+    "choices": null,
+    "figure_spec": null,
+    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/crops/d20261102-090706-747cd2_q13_m.png"
+   },
+   "printed_answer": null,
+   "verified_answer": "（1）因为AB=CB，BE=BF，且∠ABE=∠CBF=90°，所以△ABE≌△CBF（SAS）。（2）由全等得∠BAE=∠BCF。又∠BAC=∠BCA=45°。已知∠CAE=30°，故∠BAE=45°-30°=15°，从而∠BCF=15°。因F在AB的延长线上，CB位于∠ACF内部，所以∠ACF=∠ACB+∠BCF=45°+15°=60°。",
+   "verify_status": "pass",
+   "mistake_reason": {},
+   "analysis": {
+    "chapter": "第二章 特殊三角形",
+    "knowledge_points": [
+     "等腰直角三角形的性质（两锐角均为45°）",
+     "全等三角形的判定（SAS）",
+     "全等三角形对应角相等",
+     "角的和差计算"
+    ],
+    "pitfall": "第二问易把∠CAE=30°直接当作∠BAE，或忽略F在AB延长线上、CB位于∠ACF内部，把∠ACF误算为45°−15°=30°；正确应先由∠BAC=45°得∠BAE=15°，再由全等得∠BCF=15°，最后∠ACF=45°+15°=60°。",
+    "difficulty": 2,
+    "key_idea": "用SAS证全等转移角，结合等腰直角三角形中的45°角，注意∠ACF由∠ACB与∠BCF相加得到。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/photos/d20261102-090706-747cd2.jpg",
+   "flags": {
+    "needs_review": false
+   },
+   "id": "20261102-090859-1c8d10",
+   "created_at": "2026-11-02 09:08:59",
+   "practice": [],
+   "mastered_at": null
+  },
+  {
+   "source": "数学练习册第34页（三角形/直角三角形相关练习）",
+   "type": "single",
+   "question": {
+    "text": "……为 $3$，则这个等腰三角形的底边长为（　　）",
+    "choices": [
+     {
+      "key": "A",
+      "text": "$2$"
+     },
+     {
+      "key": "B",
+      "text": "$8$"
+     },
+     {
+      "key": "C",
+      "text": "$2$ 或 $8$"
+     },
+     {
+      "key": "D",
+      "text": "$10$"
+     }
+    ],
+    "figure_spec": null,
+    "figure_crop": null
+   },
+   "printed_answer": null,
+   "verified_answer": null,
+   "verify_status": "bad_question",
+   "mistake_reason": {},
+   "analysis": {
+    "chapter": "第二章 特殊三角形",
+    "knowledge_points": [
+     "等腰三角形的性质（两腰相等）",
+     "三角形三边关系定理（两边之和大于第三边）",
+     "分类讨论思想（腰与底未指明）",
+     "等腰三角形的周长与边长计算"
+    ],
+    "pitfall": "题目未指明长为3的边是腰还是底，学生常凭直觉默认3是腰（或默认3是底），只算一种情形就作答，漏掉另一情形；并且计算后不用“两边之和大于第三边”去检验、取舍，导致把不合法的三边组合也算进去，无法判断答案到底是唯一值还是多种可能。",
+    "difficulty": 2,
+    "key_idea": "已知两边求等腰三角形第三边（底边）时，腰与底不确定，必须把3分别当腰、当底分类讨论，并用三边关系检验每组解，答案可能是多解。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/photos/d20261102-094508-ae61d2.jpg",
+   "flags": {
+    "needs_review": true
+   },
+   "id": "20261102-094605-2ff3f2",
+   "created_at": "2026-11-02 09:46:05",
+   "practice": [],
+   "mastered_at": null
+  },
+  {
+   "source": "数学练习册第34页（三角形/直角三角形相关练习）",
+   "type": "fill",
+   "question": {
+    "text": "已知两条线段的长为 $3\\ \\mathrm{cm}$ 和 $4\\ \\mathrm{cm}$，当第三条线段的长为 ______ $\\mathrm{cm}$ 时，这三条线段就能组成一个直角三角形。",
+    "choices": null,
+    "figure_spec": null,
+    "figure_crop": null
+   },
+   "printed_answer": null,
+   "verified_answer": null,
+   "verify_status": "bad_question",
+   "mistake_reason": {},
+   "analysis": {
+    "chapter": "第二章 特殊三角形",
+    "knowledge_points": [
+     "勾股定理",
+     "勾股定理逆定理",
+     "分类讨论思想"
+    ],
+    "pitfall": "默认3 cm和4 cm都是直角边，只算出第三条边为5 cm；忽略第三条线段也可能作为直角边、4 cm作为斜边的情形（此时为√7 cm），未对斜边位置分类讨论。",
+    "difficulty": 2,
+    "key_idea": "第三边身份未定，需分“第三边为斜边”和“第三边为直角边”两种情况讨论。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/photos/d20261102-094508-ae61d2.jpg",
+   "flags": {
+    "needs_review": true
+   },
+   "id": "20261102-094629-7cd2d9",
+   "created_at": "2026-11-02 09:46:29",
+   "practice": [],
+   "mastered_at": null
+  }
+ ]
+}

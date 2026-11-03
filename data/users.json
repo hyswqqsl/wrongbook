@@ -1,0 +1,16 @@
+{
+ "version": 1,
+ "current": "test",
+ "users": [
+  {
+   "id": "test",
+   "name": "测试账号",
+   "created_at": "2026-11-02 10:50:59"
+  },
+  {
+   "id": "u20261102112405a2fc",
+   "name": "shao",
+   "created_at": "2026-11-02 11:24:05"
+  }
+ ]
+}
