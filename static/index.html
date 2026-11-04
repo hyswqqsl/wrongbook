@@ -307,8 +307,10 @@ function figBlock(sheet,q){
   }else{
     src='当前图形：无';
   }
+  if(!svg&&!crops.length&&!q.has_figure)
+    return `<div class="small" style="color:var(--sub);margin:4px 0">${src}</div>`;   // 无图题：不显示抓图/画图按钮（v1.1.0c）
+  // 有图题：转录时已自动抓图 → 不再提供「自动抓取」按钮；保留手动框选（框偏了重框）+ GeoGebra 重画
   const ops=`<div class="figops"><span class="figsrc">${src}</span>
-    <button class="sec" onclick="autoCrop('${sheet.id}',${q.no},this)">🖼 自动抓取原图</button>
     <button class="sec" onclick="startPickMode('${sheet.id}',${q.no})">✂️ 手动框选原图</button>
     ${q.has_figure?`<button class="sec" onclick="openGgbDraft('${sheet.id}',${q.no})">🧠 GeoGebra重画</button>`:''}
     <span class="figbusy hidden" id="fb-${sheet.id}-${q.no}">处理中…</span>
@@ -319,18 +321,8 @@ async function figBusy(sid,no,on,msg){
   const el=document.getElementById(`fb-${sid}-${no}`); if(!el)return;
   el.classList.toggle('hidden',!on); el.textContent=msg||'处理中…';
 }
-async function autoCrop(sid,no,btn){
-  const s=sheets.find(x=>x.id===sid), q=s.questions.find(x=>x.no===no);
-  btn.disabled=true; await figBusy(sid,no,true,'抓取中…');
-  try{
-    const j=await (await fetch(`/api/sheets/${sid}/questions/${no}/recrop`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json();
-    if(j.error){alert('❌ '+j.error); btn.disabled=false; await figBusy(sid,no,false); return;}
-    q.figure_crops=j.figure_crops; q.figure_spec=null; q.figure_svg=null; q.figure_mode='crop';
-    q.figure_note='已自动重新定位并抓取原图（原图取代矢量图形）';
-    imgVer=Date.now();   // 破缓存：裁剪文件名不变但内容已更新
-    renderReview(); flash(sid,no,'✅ 已抓取原图形');
-  }catch(e){alert('❌ '+e); btn.disabled=false; await figBusy(sid,no,false);}
-}
+/* autoCrop 已移除（v1.1.0c）：转录时每题已自动抓图，无需按钮重抓；框偏了用手动框选；
+   /recrop 无 box 的自动重定位 API 保留备用（recrop-all 内部同逻辑） */
 function flash(sid,no,msg){
   const t=document.getElementById(`figmsg-${sid}-${no}`);
   if(t){t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'),6000);}
@@ -787,14 +779,15 @@ function showGgb(cmds){
 function hideGgb(){$('#gmodal').classList.add('hidden');}
 async function ggbGen(){
   if(!ggbState)return;
-  ggbLog('🤖 正在根据题干生成构造命令（纯文本 LLM）…');
+  showOv('🧠 正在生成构造命令（纯文本 LLM 调用）…');   // 全局遮罩（z-index 99 > gmodal 96）：生成期间不允许其他操作
   try{
     const j=await (await fetch('/api/ggb-script',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question:ggbState.question,prev_errors:ggbState.lastFails||null})})).json();
+    hideOv();
     if(j.error)return ggbLog('❌ '+esc(j.error));
     $('#ggb-cmds').value=j.commands.join('\n');
     ggbRun();
-  }catch(e){ggbLog('❌ '+esc(String(e)));}
+  }catch(e){hideOv();ggbLog('❌ '+esc(String(e)));}
 }
 /* Set* 样式命令在 web 版 evalCommand 里不执行（实测 geometry/classic 均 false）→
    翻译为 Apps API 同名直调方法（v1.1.0b 实证：setLineStyle/setColor 视觉生效） */

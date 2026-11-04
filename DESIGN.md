@@ -45,6 +45,10 @@
   前端翻译为 Apps API 直调（setLineStyle/setPointSize/setColor/setVisible/setLabelVisible/setCaption；
   API 方法返回 void，“不异常即成功”，XML 验证生效；SetPointSize(P,0) 语义翻译为隐藏）——
   用户报错的 6 行 SetPointSize 复验全部通过
+- **V1.1.0c 反馈修复**：翻译器正则改为查表匹配（原 `^Set\w+` 前缀匹配漏了 **ShowLabel**——
+  用户实测又报 5 行失败，修正后 0 失败）；补 ZoomIn→setCoordSystem 翻译；
+  人审题卡按钮收敛：**无图题不显示图形按钮**、「🖼自动抓取原图」按钮移除（转录时每题已自动抓图，
+  框偏了用手动框选；/recrop API 保留备用）；GeoGebra 弹窗「重新生成」加全局遮罩（生成期间锁操作）
 - **V1.1.0c**：翻译器正则只认 Set 前缀 → ShowLabel 漏翻（仍走 evalCommand 报假失败）；
   改查表匹配任意命令名，补 ZoomIn→setCoordSystem；用户 20 行脚本仿真验证全路由正确
 - **V1.1.0d**：打开弹窗**不再自动调 LLM**（空脚本时提示手动生成，存档脚本仍本地重放 0 token）；
@@ -406,7 +410,7 @@ wrongbook/                 # 本项目（V1.0.1 起完全自包含，可独立�
 **流程（草稿期）**：
 
 ```
-题卡 [🖼抓原图][✂️手动框选][🧠GeoGebra重画]（has_figure 才显示）
+题卡 [✂️手动框选][🧠GeoGebra重画]（有图才显示；「🖼自动抓取」按钮已移除——转录时每题已自动抓图，v1.1.0c）
       │ 点重画 → 弹窗嵌入本地 applet
       ▼
 POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
@@ -506,7 +510,8 @@ POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
 
 > V1.0.3 起菜单仅「录入/工作台」；做题页由工作台「开始做题」新标签页直达（#quiz），
 > 无会话时显示引导（不再随机刷题）；相似题/出卷入口已移除。
-> v1.1a 已实施：题卡图形纠正入口增至三个（+ 🧠GeoGebra重画），工作台详情增「✎改图」，见 5.5。
+> v1.1a 已实施：题卡图形纠正入口（✂️手动框选 / 🧠GeoGebra重画；v1.1.0c 起「自动抓取」按钮移除——
+> 转录时已自动抓图，无图题不显示按钮），工作台详情增「✎改图」，见 5.5。
 
 公式渲染：KaTeX 本地文件（static/vendor/katex，离线可用），v1 直接渲染 LaTeX。
 
