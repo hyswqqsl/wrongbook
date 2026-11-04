@@ -38,7 +38,13 @@
    },
    "id": "20261103-164129-e7e425",
    "created_at": "2026-11-03 16:41:29",
-   "practice": [],
+   "practice": [
+    {
+     "at": "2026-11-03 20:30:45",
+     "correct": true,
+     "variant": "original"
+    }
+   ],
    "mastered_at": null
   },
   {
@@ -98,6 +104,97 @@
    },
    "id": "20261103-170926-42fd5d",
    "created_at": "2026-11-03 17:09:26",
+   "practice": [
+    {
+     "at": "2026-11-03 20:30:45",
+     "correct": false,
+     "variant": "original"
+    }
+   ],
+   "mastered_at": null
+  },
+  {
+   "source": "B 提高能力（数学练习册页）",
+   "type": "short",
+   "question": {
+    "text": "已知：如图，点 $D,E$ 在 $\\triangle ABC$ 的边 $BC$ 上，$AB=AC$，$AD=AE$。求证：$BD=CE$。",
+    "choices": null,
+    "figure_spec": null,
+    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-201208-3bc274_q7_m.png"
+   },
+   "printed_answer": null,
+   "verified_answer": "证明：设 H 为 A 到 BC 的垂足。由 AB=AC，等腰三角形底边上的高也是中线，所以 H 是 BC 的中点，HB=HC。又 AD=AE，所以 A 在 DE 的垂直平分线上；而 D、E 都在 BC 上，AH⊥BC，故 H 也是 DE 的中点，即 HD=HE。于是 B、C 关于 H 对称，D、E 也关于 H 对称，因此 BD=CE。证毕。",
+   "verify_status": "pass",
+   "mistake_reason": {
+    "kind": "unknown",
+    "note": ""
+   },
+   "analysis": {
+    "grade": "八年级上册",
+    "chapter": "第二章 特殊三角形",
+    "kp_path": [
+     "第二章 特殊三角形",
+     "2.3 等腰三角形的性质定理",
+     "等腰三角形性质定理1"
+    ],
+    "knowledge_points": [
+     "等腰三角形三线合一",
+     "线段垂直平分线的判定",
+     "轴对称与对称点"
+    ],
+    "pitfall": "思路卡点是不会作底边BC上的高AH，未能由AB=AC想到三线合一得到H为BC中点；也不会把AD=AE转化为A在DE的垂直平分线上，从而找不到BC与DE的公共中点H，突破口是作高构造两个等腰三角形共用的中点。",
+    "difficulty": 1,
+    "key_idea": "作底边BC上的高AH，利用等腰三角形三线合一和垂直平分线判定，得到H同时是BC、DE的中点，再由对称性得BD=CE。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/photos/d20261103-201208-3bc274.jpg",
+   "flags": {
+    "needs_review": false
+   },
+   "id": "20261103-201411-1e3cb9",
+   "created_at": "2026-11-03 20:14:11",
+   "practice": [],
+   "mastered_at": null
+  },
+  {
+   "source": "B 提高能力（数学练习册页）",
+   "type": "short",
+   "question": {
+    "text": "如图，在 $\\triangle ABC$ 中，$AB=AC$，$AD$ 平分 $\\angle BAC$，$DE\\perp AB$ 于点 $E$，$DF\\perp AC$ 于点 $F$。则以下结论：①$DE=DF$；②$AE=AF$；③$\\angle BDE=\\angle CDF$；④$AD$ 上任意一点到 $B,C$ 两点的距离相等。正确的有______（填序号），并选择一个正确的结论给出证明。",
+    "choices": null,
+    "figure_spec": null,
+    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-201208-3bc274_q8_m.png"
+   },
+   "printed_answer": null,
+   "verified_answer": "正确结论为①②③④。证明①：在△ADE和△ADF中，AD平分∠BAC，所以∠EAD=∠FAD；又DE⊥AB，DF⊥AC，所以∠AED=∠AFD=90°；AD为公共边，因此Rt△ADE≌Rt△ADF，故DE=DF。",
+   "verify_status": "pass",
+   "mistake_reason": {
+    "kind": "careless",
+    "note": ""
+   },
+   "analysis": {
+    "grade": "八年级上册",
+    "chapter": "第一章 三角形",
+    "kp_path": [
+     "第一章 三角形",
+     "1.7 角平分线的性质",
+     "1.7 角平分线的性质"
+    ],
+    "knowledge_points": [
+     "等腰三角形的三线合一",
+     "角平分线的性质（角平分线上的点到角两边距离相等）",
+     "直角三角形全等的判定（HL）",
+     "线段垂直平分线的性质"
+    ],
+    "pitfall": "多结论判断时容易只看局部图形，漏用“AB=AC且AD平分∠BAC”推出AD垂直平分BC，从而误判④；证明时也容易把Rt△ADE与Rt△ADF的对应边、对应角看错，或忽略公共边AD。",
+    "difficulty": 2,
+    "key_idea": "抓住等腰三角形顶角平分线也是底边垂直平分线，再用角平分线性质或HL证Rt△ADE≌Rt△ADF，即可判断各结论。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/photos/d20261103-201208-3bc274.jpg",
+   "flags": {
+    "needs_review": false
+   },
+   "id": "20261103-201433-33005d",
+   "created_at": "2026-11-03 20:14:33",
    "practice": [],
    "mastered_at": null
   }

@@ -867,6 +867,173 @@
     "20261103-170926-42fd5d"
    ],
    "skipped_duplicates": []
+  },
+  {
+   "source": "B 提高能力（数学练习册页）",
+   "photo_size": [
+    1200,
+    1600
+   ],
+   "provider_note": "deepseek-flash",
+   "questions": [
+    {
+     "no": 6,
+     "type": "single",
+     "question": "如图，$AD$ 是等腰三角形 $ABC$ 的底边 $BC$ 上的中线，$BE$ 平分 $\\angle ABC$，交 $AD$ 于点 $E$。若 $AC=12$，$DE=3$，则 $\\triangle ABE$ 的面积是（　）",
+     "choices": [
+      {
+       "key": "A",
+       "text": "16"
+      },
+      {
+       "key": "B",
+       "text": "18"
+      },
+      {
+       "key": "C",
+       "text": "32"
+      },
+      {
+       "key": "D",
+       "text": "36"
+      }
+     ],
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.72,
+       0.11,
+       0.98,
+       0.27
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-201208-3bc274_q6_m.png"
+     ],
+     "selected": false,
+     "reason": {
+      "kind": "unknown",
+      "note": ""
+     },
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "已抓取原题图形（原图取代矢量图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第一章 三角形",
+      "section": "1.7 角平分线的性质",
+      "kp": "1.7 角平分线的性质"
+     },
+     "figure_manual_box": [
+      0.792772373847074,
+      0.10171814808687638,
+      0.9942393049390877,
+      0.21515846193841137
+     ],
+     "skipped_dup": "20261103-170926-42fd5d"
+    },
+    {
+     "no": 7,
+     "type": "short",
+     "question": "已知：如图，点 $D,E$ 在 $\\triangle ABC$ 的边 $BC$ 上，$AB=AC$，$AD=AE$。求证：$BD=CE$。",
+     "choices": null,
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.09,
+       0.31,
+       0.33,
+       0.46
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-201208-3bc274_q7_m.png"
+     ],
+     "selected": false,
+     "reason": {
+      "kind": "unknown",
+      "note": ""
+     },
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "已抓取原题图形（原图取代矢量图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.3 等腰三角形的性质定理",
+      "kp": "等腰三角形性质定理1"
+     },
+     "figure_manual_box": [
+      0.05741807536122391,
+      0.32406116323588496,
+      0.2407529826549564,
+      0.4496017772315837
+     ],
+     "ingested_id": "20261103-201411-1e3cb9"
+    },
+    {
+     "no": 8,
+     "type": "short",
+     "question": "如图，在 $\\triangle ABC$ 中，$AB=AC$，$AD$ 平分 $\\angle BAC$，$DE\\perp AB$ 于点 $E$，$DF\\perp AC$ 于点 $F$。则以下结论：①$DE=DF$；②$AE=AF$；③$\\angle BDE=\\angle CDF$；④$AD$ 上任意一点到 $B,C$ 两点的距离相等。正确的有______（填序号），并选择一个正确的结论给出证明。",
+     "choices": null,
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.12,
+       0.71,
+       0.3,
+       0.89
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/crops/d20261103-201208-3bc274_q8_m.png"
+     ],
+     "selected": false,
+     "reason": {
+      "kind": "careless",
+      "note": ""
+     },
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "已抓取原题图形（原图取代矢量图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第一章 三角形",
+      "section": "1.7 角平分线的性质",
+      "kp": "1.7 角平分线的性质"
+     },
+     "figure_manual_box": [
+      0.07957943778134542,
+      0.706733155295063,
+      0.29313438473888,
+      0.8458866069529459
+     ],
+     "ingested_id": "20261103-201433-33005d"
+    }
+   ],
+   "id": "d20261103-201208-3bc274",
+   "created_at": "2026-11-03 20:12:08",
+   "status": "processed",
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/u20261102112405a2fc/photos/d20261103-201208-3bc274.jpg",
+   "ingested": [
+    "20261103-201411-1e3cb9",
+    "20261103-201433-33005d"
+   ],
+   "skipped_duplicates": [
+    "20261103-170926-42fd5d"
+   ]
   }
  ]
 }
