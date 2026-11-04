@@ -252,13 +252,16 @@ def _save_ggb_png(data_url):
 @app.post("/api/ggb-script")
 def api_ggb_script():
     """🧠 v1.1：LLM 生成 GeoGebra 构造命令（草稿/入库两场景共用）。
-    body {question, prev_errors?: […], ref_crop?: 原题图形路径} → {commands[], vision}
+    body {question, prev_errors?: […], script?+errors?: 修复模式, ref_crop?: 原题图形路径} → {commands[], vision}
+    带 script+errors → 排错修复模式（🩺分析解决）；否则新生成；
     有 ref_crop → 读图转 data URI 走视觉调用（布局/摆向与课本原图对齐，v1.1.0e）；无则纯文本"""
     try:
         import base64
         import ggbflow
         body = request.get_json(silent=True) or {}
         ref = body.get("ref_crop")
+        script = body.get("script")
+        errors = body.get("errors")
         uri = None
         if isinstance(ref, str) and ref and os.path.exists(ref):
             try:
@@ -266,8 +269,10 @@ def api_ggb_script():
                     uri = "data:image/png;base64," + base64.b64encode(f.read()).decode()
             except Exception:
                 uri = None   # 读图失败降级纯文本，不阻塞生成
-        commands = ggbflow.gen_commands(body.get("question") or "",
-                                        prev_errors=body.get("prev_errors"), uri=uri)
+        commands = ggbflow.fix_commands(body.get("question") or "", script, errors, uri=uri) \
+            if isinstance(script, str) and script.strip() and isinstance(errors, list) and errors \
+            else ggbflow.gen_commands(body.get("question") or "",
+                                      prev_errors=body.get("prev_errors"), uri=uri)
         return jsonify({"ok": True, "commands": commands, "vision": bool(uri)})
     except Exception as e:
         return _err(e)

@@ -34,6 +34,45 @@ GGB_PROMPT = """你是几何作图专家。根据下面的初中数学题干，�
 {question}"""
 
 
+GGB_FIX_PROMPT = """你是 GeoGebra 排错专家。下面是一段 GeoGebra 构造命令脚本，部分行执行失败。
+请修复：保留正确的行，只修错误行（常见错误：引用了未定义的对象名、Set 系列 SetPointSize/SetLineStyle 参数不合法、
+依赖顺序颠倒、多余的中文字符或全角符号）。按依赖顺序输出修复后的完整命令序列；
+只用这些命令：{whitelist}
+只输出 JSON（不要其他文字）：{{"commands":[…]}}
+
+题干（供参考）：
+{question}
+
+当前脚本：
+{script}
+
+执行失败的行：
+{errors}"""
+
+
+def fix_commands(question, script, errors, uri=None, client=None, model=None):
+    """脚本+报错 → 修复后的完整命令列表（「🩺分析解决」按钮，人手动触发）。client/model 可注入。"""
+    from common import make_client
+    from reviewflow import ask_json_vision
+    if not (script or "").strip():
+        raise ValueError("脚本为空，无需修复")
+    img_hint = "\n附图是原题图形的照片，修复后的布局尽量与图一致。" if uri else ""
+    prompt = GGB_FIX_PROMPT.format(
+        whitelist="、".join(GGB_COMMAND_WHITELIST),
+        question=(question or "").strip()[:500],
+        script=script.strip(),
+        errors="\n".join(str(e)[:200] for e in (errors or [])) or "（未提供，请检查脚本中的明显错误）") + img_hint
+    if client is None:
+        client, model = make_client(vision=bool(uri))
+    data = ask_json_vision(client, model, prompt, uri, max_tokens=8000)
+    cmds = [str(c).strip() for c in (data.get("commands") or []) if str(c).strip()]
+    cmds = [re.sub(r"^```[a-z]*|```$", "", c).rstrip(";").strip() for c in cmds]
+    cmds = [c for c in cmds if c]
+    if not cmds:
+        raise RuntimeError("模型未返回有效命令")
+    return cmds
+
+
 def gen_commands(question, prev_errors=None, client=None, model=None, uri=None):
     """题干(+可选原题图形照片) → 命令列表；prev_errors = 前端失败行（文本回路重试）。
 

@@ -87,6 +87,25 @@ class TestGenCommands(unittest.TestCase):
         self.assertIn("附图", _recorded["prompt"])
         self.assertIn("与图一致", _recorded["prompt"])
 
+    def test_fix_commands_sends_script_and_errors(self):
+        """v1.1.0f：🩺分析解决——脚本+报错发给 LLM，返回修复后的完整命令"""
+        import ggbflow
+        import reviewflow
+        reviewflow._orig_ask = reviewflow.ask_json_vision
+        _stub_client_returns(["A=(4,0)", "B=(0,0)", "sAB=Segment(A,B)"])
+        cmds = ggbflow.fix_commands(
+            "如图，AB=CB…", "A=(4,0)\nsAB=Segment(A1,B)", ["第2行: sAB=Segment(A1,B)"],
+            client="stub", model="stub")
+        self.assertEqual(cmds, ["A=(4,0)", "B=(0,0)", "sAB=Segment(A,B)"])
+        self.assertIn("sAB=Segment(A1,B)", _recorded["prompt"])   # 脚本全文进入 prompt
+        self.assertIn("执行失败的行", _recorded["prompt"])
+        self.assertIn("A1", _recorded["prompt"])
+
+    def test_fix_commands_empty_script_rejected(self):
+        import ggbflow
+        with self.assertRaises(ValueError):
+            ggbflow.fix_commands("题干", "  ", ["err"], client="stub", model="stub")
+
     def test_empty_question_rejected(self):
         import ggbflow
         with self.assertRaises(ValueError):
@@ -152,6 +171,18 @@ class TestGgbFigureApi(unittest.TestCase):
         self.assertEqual(r2.status_code, 200)
         self.assertFalse(r2.get_json()["vision"])
         self.assertIsNone(_recorded["uri"])
+
+    def test_ggb_script_endpoint_fix_mode(self):
+        """v1.1.0f：带 script+errors → 排错修复模式"""
+        import reviewflow
+        reviewflow._orig_ask = reviewflow.ask_json_vision
+        _stub_client_returns(["A=(4,0)", "sAB=Segment(A,B)"])
+        r = self.c.post("/api/ggb-script", json={
+            "question": "如图", "script": "sAB=Segment(A1,B)",
+            "errors": ["第1行: sAB=Segment(A1,B)"]})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.get_json()["commands"], ["A=(4,0)", "sAB=Segment(A,B)"])
+        self.assertIn("当前脚本", _recorded["prompt"])
 
     def test_ggb_figure_saves_and_archives_script(self):
         import os
