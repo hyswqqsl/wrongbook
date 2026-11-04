@@ -152,7 +152,8 @@ class TestAiConfig(unittest.TestCase):
 
     def test_mask(self):
         self.assertEqual(ai_config.mask(""), "")
-        self.assertEqual(ai_config.mask("sk-REDACTED"), "sk-4****77e5")
+        # 假 key：单测 fixture 严禁使用真实 key（真实 key 一旦入库即视为泄露）
+        self.assertEqual(ai_config.mask("sk-abcdef123456fake"), "sk-a****fake")
         self.assertEqual(ai_config.mask("short"), "****")
 
 
