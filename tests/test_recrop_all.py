@@ -141,3 +141,35 @@ class TestRecropAll(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestAutoContrast(unittest.TestCase):
+    """偏暗裁剪图自动拉对比（v1.1.0g）：抓图时 ImageOps.autocontrast(cutoff=1)"""
+
+    def test_dark_crop_gets_contrast_boost(self):
+        """暗图（灰阶 40~90）裁剪后应拉伸到接近全幅，对比度显著提升"""
+        import io as _io
+        import store
+        from PIL import Image as PImage
+        # 造一张偏暗照片：渐变灰 40~90（无亮部无暗部）
+        grad = PImage.new("L", (100, 100))
+        grad.putdata([40 + (i * 50) // 10000 for i in range(10000)])
+        raw = _io.BytesIO()
+        grad.convert("RGB").save(raw, "JPEG")
+        raw = raw.getvalue()
+        # 原灰阶动态范围
+        orig_ext = grad.getextrema()
+        with tempfile.TemporaryDirectory() as td:
+            old = store.CROP_DIR
+            store.CROP_DIR = td
+            try:
+                paths = reviewflow.crop_figures(raw, "dk", [{"no": 1, "k": 0, "box": [0.1, 0.1, 0.9, 0.9]}])
+                self.assertEqual(len(paths), 1)
+                out = PImage.open(paths[0]["path"]).convert("L")
+            finally:
+                store.CROP_DIR = old
+        new_ext = out.getextrema()
+        orig_spread = orig_ext[1] - orig_ext[0]
+        new_spread = new_ext[1] - new_ext[0]
+        self.assertGreater(new_spread, orig_spread * 2, f"对比度未提升: {orig_ext} -> {new_ext}")
+        self.assertGreater(new_spread, 150, f"拉伸不足: {new_ext}")

@@ -90,17 +90,21 @@ table.tb th{color:var(--sub);font-weight:500}
 .qm-box{background:#fff;border-radius:14px;padding:0 26px 20px;width:min(780px,94vw);max-height:88vh;overflow:auto;box-shadow:0 10px 50px rgba(0,0,0,.3)}
 /* AI 引擎设置弹窗 */
 #aimodal{position:fixed;inset:0;background:rgba(20,25,40,.55);z-index:95;display:flex;align-items:center;justify-content:center}
+/* 图片放大查看器（v1.1.0g）：点击题卡/详情图形 → 全屏看大图，点任意处/Esc 关闭 */
+#imgview{position:fixed;inset:0;background:rgba(10,12,20,.85);z-index:97;display:flex;align-items:center;justify-content:center;cursor:zoom-out}
+#imgview img{max-width:92vw;max-height:92vh;border-radius:8px;box-shadow:0 10px 60px rgba(0,0,0,.5)}
+.zoomimg{cursor:zoom-in}
 .ai-box{background:#fff;border-radius:14px;padding:0 26px 20px;width:min(600px,94vw);max-height:88vh;overflow:auto;box-shadow:0 10px 50px rgba(0,0,0,.3)}
 /* 🧠 GeoGebra 重画弹窗（v1.1a） */
 #gmodal{position:fixed;inset:0;background:rgba(20,25,40,.55);z-index:96;display:flex;align-items:center;justify-content:center}
 .ggb-box{background:#fff;border-radius:14px;padding:14px 18px;width:fit-content;max-width:96vw;max-height:92vh;overflow:auto;box-shadow:0 10px 50px rgba(0,0,0,.3)}
 .ggb-main{display:flex;gap:14px;margin-top:10px;align-items:stretch}
-.ggb-question{border:1px solid var(--line);background:#f7f8fc;border-radius:8px;padding:8px 12px;margin-top:10px;font-size:13.5px;line-height:1.6;max-height:120px;overflow:auto}
+.ggb-question{border:1px solid var(--line);background:#f7f8fc;border-radius:8px;padding:8px 12px;margin-top:10px;font-size:13.5px;line-height:1.6;max-height:120px;overflow:auto;max-width:880px;overflow-wrap:anywhere}   /* 限宽：长题干换行，不撑大 fit-content 弹窗（v1.1.0g）*/
 .ggb-side{width:360px;display:flex;flex-direction:column;gap:6px}
 .ggb-side textarea{flex:1;min-height:0;width:100%;box-sizing:border-box;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;padding:6px;border:1px solid var(--line);border-radius:6px;resize:none}
 .ggb-btns{display:flex;gap:6px;width:100%}
 .ggb-btns .sec{flex:1;white-space:nowrap;padding:6px 2px;font-size:12.5px;text-align:center}
-.ggb-log{min-height:44px;max-height:120px;overflow:auto;background:#f7f7fa;border:1px solid var(--line);border-radius:6px;padding:6px 8px;line-height:1.5}
+.ggb-log{min-height:44px;max-height:120px;overflow:auto;background:#f7f7fa;border:1px solid var(--line);border-radius:6px;padding:6px 8px;line-height:1.5;overflow-wrap:anywhere}
 .ai-box h3{margin:0;font-size:17px}
 .ai-prov{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0}
 .ai-prov.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
@@ -199,6 +203,7 @@ details.kptree[open] summary{color:var(--ink)}
 <div id="qmodal" class="hidden"></div>
 <div id="aimodal" class="hidden"></div>
 <div id="gmodal" class="hidden"></div>
+<div id="imgview" class="hidden" onclick="this.classList.add('hidden')"><img id="imgview-img" alt=""></div>
 <div id="result-banner" class="hidden"></div>
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -230,7 +235,7 @@ function renderThumbs(){
   el.classList.toggle('hidden',!pendingFiles.length);
   $('#drop-hint').classList.toggle('hidden',!!pendingFiles.length);
   el.innerHTML=pendingFiles.map((f,i)=>`<div class="thumb">
-    <img src="${URL.createObjectURL(f)}" alt="">
+    <img src="${URL.createObjectURL(f)}" alt="" onclick="viewImg(this.src)" class="zoomimg" title="点击放大">
     <button class="rm" title="移除" onclick="rmFile(${i})">✕</button>
     <div class="nm">${esc(f.name||'剪贴板图片')}</div></div>`).join('');
 }
@@ -304,7 +309,7 @@ function figBlock(sheet,q){
     fig=`<figure style="margin:8px 0;text-align:center"><div class="figsvg">${svg}</div></figure>`;
     src='当前图形：矢量 SVG（自动生成，需与原题核对）';
   }else if(crops.length){
-    fig=`<figure style="margin:8px 0;text-align:center"><img src="/data/${crops[0].replace(/^.*data\//,'')}?v=${imgVer}" style="max-width:280px;border:1px solid var(--line);border-radius:6px"></figure>`;
+    fig=`<figure style="margin:8px 0;text-align:center"><img src="/data/${crops[0].replace(/^.*data\//,'')}?v=${imgVer}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:280px;border:1px solid var(--line);border-radius:6px"></figure>`;
     src=q.figure_ggb?'当前图形：GeoGebra 重绘图（已存档）':'当前图形：原题照片裁剪图（原图为准）';
   }else{
     src='当前图形：无';
@@ -681,7 +686,7 @@ async function showQModal(qid){
   const reason=reasonCN[mr.kind]||'未标注'+(mr.note?`（${esc(mr.note)}）`:'');
   const kps=[...new Set([...(an.kp_path||[]).filter(Boolean),...(an.knowledge_points||[])])];
   const fig=q.figure_svg?`<figure style="text-align:center;margin:8px 0"><div class="figsvg">${q.figure_svg}</div></figure>`
-    :(q.question&&q.question.figure_crop?`<figure style="text-align:center;margin:8px 0"><img id="qmodal-fig" src="/data/${q.question.figure_crop.replace(/^.*data\//,'')}?v=${imgVer}" style="max-width:300px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
+    :(q.question&&q.question.figure_crop?`<figure style="text-align:center;margin:8px 0"><img id="qmodal-fig" src="/data/${q.question.figure_crop.replace(/^.*data\//,'')}?v=${imgVer}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:300px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
   qmodalQ=q;
   $('#qmodal').innerHTML=`<div class="qm-box" onclick="event.stopPropagation()">
     <div class="qm-head"><b>题目详情</b><span class="small">${esc(q.id)}</span>
@@ -719,8 +724,11 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')hideQModal();});
 /* ---------- 🧠 GeoGebra 图形工作台（v1.1a，DESIGN.md 5.5） ----------
    分工：LLM 生成构造命令（草稿）→ 本地 applet 执行（构造即正确）→ 人拖拽修正画法 → 导出 PNG */
 let qmodalQ=null;    // 详情弹窗当前题（✎改图用）
-let ggbState=null;   // {mode:'draft'|'record', sid,no,qid,question,lastFails}
+let ggbState=null;   // {mode:'draft'|'record', sid,no,qid,question,lastFails,H,refCrop}
 let ggbLoaded=false;
+/* 图片放大查看器（v1.1.0g）：题卡/详情弹窗图形点击 → 全屏看大图；点任意处/Esc 关闭 */
+function viewImg(src){$('#imgview-img').src=src;$('#imgview').classList.remove('hidden');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#imgview').classList.add('hidden');});
 function ggbShell(){
   const H=ggbState.H;
   return `<div class="ggb-box" onclick="event.stopPropagation()">

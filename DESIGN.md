@@ -62,6 +62,11 @@
   applet 参数 errorDialogsActive:false（GeoGebra 自带错误弹窗不再打断，错误走统一失败行统计）；
   新增「🩺分析解决」按钮（只有报错了才出现）：把当前脚本+失败行发给 LLM 排错，
   返回修复后完整命令（新 fix_commands + /api/ggb-script 修复分支），修复过程全局遮罩锁操作
+- **V1.1.0g 反馈修复**：**抓图自动对比度增强**——crop_figures 落盘前 ImageOps.autocontrast(cutoff=1)
+  （偏暗纸张照片提亮拉对比：实测灰阶 (27,234)→(0,255)；展示与视觉输入都受益；
+  recrop_all/手动框选同受益，幂等）；GeoGebra 弹窗题干条限宽 880px + overflow-wrap:anywhere
+  （长题干换行，不再撑大 fit-content 弹窗，日志同防）；**图片放大查看器** viewImg
+  （题卡/工作台详情图形点击 → 全屏大图，点任意处/Esc 关闭）
 - **V1.1.0c**：翻译器正则只认 Set 前缀 → ShowLabel 漏翻（仍走 evalCommand 报假失败）；
   改查表匹配任意命令名，补 ZoomIn→setCoordSystem；用户 20 行脚本仿真验证全路由正确
 - **V1.1.0d**：打开弹窗**不再自动调 LLM**（空脚本时提示手动生成，存档脚本仍本地重放 0 token）；

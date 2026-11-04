@@ -11,7 +11,7 @@
   - 纯文字题：无图（figure_mode="none"）
 """
 import os, re, json, io, base64
-from PIL import Image
+from PIL import Image, ImageOps
 
 from common import make_client, CN_TYPE
 from store import add_sheet
@@ -148,6 +148,7 @@ def crop_figures(photo_bytes, sheet_id, boxes):
     out = []
     for no, k, (l, t, r, b) in valid:
         crop = img.crop((int(l * W), int(t * H), int(r * W), int(b * H)))
+        crop = ImageOps.autocontrast(crop, cutoff=1)   # 偏暗纸张照片自动拉对比（v1.1.0g；展示/视觉输入都受益）
         path = os.path.join(store.CROP_DIR, "{0}_q{1}_{2}.png".format(sheet_id, no, k))
         crop.save(path)
         out.append({"no": no, "k": k, "path": path, "w": crop.size[0], "h": crop.size[1]})
