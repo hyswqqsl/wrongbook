@@ -91,6 +91,14 @@ table.tb th{color:var(--sub);font-weight:500}
 /* AI 引擎设置弹窗 */
 #aimodal{position:fixed;inset:0;background:rgba(20,25,40,.55);z-index:95;display:flex;align-items:center;justify-content:center}
 .ai-box{background:#fff;border-radius:14px;padding:0 26px 20px;width:min(600px,94vw);max-height:88vh;overflow:auto;box-shadow:0 10px 50px rgba(0,0,0,.3)}
+/* 🧠 GeoGebra 重画弹窗（v1.1a） */
+#gmodal{position:fixed;inset:0;background:rgba(20,25,40,.55);z-index:96;display:flex;align-items:center;justify-content:center}
+.ggb-box{background:#fff;border-radius:14px;padding:14px 18px;width:min(880px,94vw);max-height:92vh;overflow:auto;box-shadow:0 10px 50px rgba(0,0,0,.3)}
+.ggb-main{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+.ggb-side{width:290px;display:flex;flex-direction:column;gap:6px}
+.ggb-side textarea{width:100%;box-sizing:border-box;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;padding:6px;border:1px solid var(--line);border-radius:6px;resize:vertical}
+.ggb-btns{display:flex;gap:6px;flex-wrap:wrap}
+.ggb-log{min-height:44px;max-height:120px;overflow:auto;background:#f7f7fa;border:1px solid var(--line);border-radius:6px;padding:6px 8px;line-height:1.5}
 .ai-box h3{margin:0;font-size:17px}
 .ai-prov{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0}
 .ai-prov.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
@@ -121,7 +129,7 @@ details.kptree[open] summary{color:var(--ink)}
 .print-head{display:none}
 @page{margin:1.6cm}
 @media print{
-  header,#overlay,#qmodal,#dash-filter,.no-print{display:none!important}
+  header,#overlay,#qmodal,#aimodal,#gmodal,#dash-filter,.no-print{display:none!important}
   body{background:#fff}
   main{max-width:none;margin:0;padding:0}
   .card{border:none;box-shadow:none;padding:0;margin:0 0 12px}
@@ -188,6 +196,7 @@ details.kptree[open] summary{color:var(--ink)}
 <div id="overlay" class="hidden"><div class="ov-box"><div class="spinner"></div><div id="ov-text">处理中…</div></div></div>
 <div id="qmodal" class="hidden"></div>
 <div id="aimodal" class="hidden"></div>
+<div id="gmodal" class="hidden"></div>
 <div id="result-banner" class="hidden"></div>
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -288,19 +297,20 @@ function renderReview(){
 function figBlock(sheet,q){
   const svg=q.figure_svg, crops=(q.figure_crops||[]);
   const mode=q.figure_mode||(svg?'svg':(crops.length?'crop':'none'));
-  let fig='', src='';
+  let src='';
   if(svg){
     fig=`<figure style="margin:8px 0;text-align:center"><div class="figsvg">${svg}</div></figure>`;
     src='当前图形：矢量 SVG（自动生成，需与原题核对）';
   }else if(crops.length){
     fig=`<figure style="margin:8px 0;text-align:center"><img src="/data/${crops[0].replace(/^.*data\//,'')}?v=${imgVer}" style="max-width:280px;border:1px solid var(--line);border-radius:6px"></figure>`;
-    src='当前图形：原题照片裁剪图（原图为准）';
+    src=q.figure_ggb?'当前图形：GeoGebra 重绘图（命令脚本已存档，可再编辑）':'当前图形：原题照片裁剪图（原图为准）';
   }else{
     src='当前图形：无';
   }
   const ops=`<div class="figops"><span class="figsrc">${src}</span>
     <button class="sec" onclick="autoCrop('${sheet.id}',${q.no},this)">🖼 自动抓取原图</button>
     <button class="sec" onclick="startPickMode('${sheet.id}',${q.no})">✂️ 手动框选原图</button>
+    ${q.has_figure?`<button class="sec" onclick="openGgbDraft('${sheet.id}',${q.no})">🧠 GeoGebra重画</button>`:''}
     <span class="figbusy hidden" id="fb-${sheet.id}-${q.no}">处理中…</span>
     <span class="figbusy hidden" id="figmsg-${sheet.id}-${q.no}"></span></div>`;
   return fig+ops;
@@ -677,10 +687,12 @@ async function showQModal(qid){
   const reason=reasonCN[mr.kind]||'未标注'+(mr.note?`（${esc(mr.note)}）`:'');
   const kps=[...new Set([...(an.kp_path||[]).filter(Boolean),...(an.knowledge_points||[])])];
   const fig=q.figure_svg?`<figure style="text-align:center;margin:8px 0"><div class="figsvg">${q.figure_svg}</div></figure>`
-    :(q.question&&q.question.figure_crop?`<figure style="text-align:center;margin:8px 0"><img src="/data/${q.question.figure_crop.replace(/^.*data\//,'')}" style="max-width:300px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
+    :(q.question&&q.question.figure_crop?`<figure style="text-align:center;margin:8px 0"><img id="qmodal-fig" src="/data/${q.question.figure_crop.replace(/^.*data\//,'')}?v=${imgVer}" style="max-width:300px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
+  qmodalQ=q;
   $('#qmodal').innerHTML=`<div class="qm-box" onclick="event.stopPropagation()">
     <div class="qm-head"><b>题目详情</b><span class="small">${esc(q.id)}</span>
       ${q.mastered_at?'<span class="tag t-pass">已归档</span>':'<span class="tag t-review">在库</span>'}
+      <button class="sec" onclick="openGgbRecord()">✎改图</button>
       <button class="warn" onclick="delQ('${q.id}')">🗑 删除</button>
       <button class="sec" onclick="hideQModal()">关闭 ✕</button></div>
     <div class="qm-meta">
@@ -709,6 +721,129 @@ async function showQModal(qid){
 }
 function hideQModal(){$('#qmodal').classList.add('hidden');}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')hideQModal();});
+
+/* ---------- 🧠 GeoGebra 图形工作台（v1.1a，DESIGN.md 5.5） ----------
+   分工：LLM 生成构造命令（草稿）→ 本地 applet 执行（构造即正确）→ 人拖拽修正画法 → 导出 PNG */
+let qmodalQ=null;    // 详情弹窗当前题（✎改图用）
+let ggbState=null;   // {mode:'draft'|'record', sid,no,qid,question,autoRetries}
+let ggbLoaded=false;
+function ggbShell(){return `<div class="ggb-box" onclick="event.stopPropagation()">
+  <div class="qm-head"><b>🧠 GeoGebra 重画</b><span class="small">LLM 出命令草稿 · 拖拽修正画法 · 导出静态图</span>
+    <button class="sec" onclick="hideGgb()">关闭 ✕</button></div>
+  <div class="ggb-main">
+    <div id="ggb-elem" style="width:520px;height:400px;border:1px solid var(--line);border-radius:6px;background:#fff"></div>
+    <div class="ggb-side">
+      <div class="small">构造命令（可手改后重新执行）：</div>
+      <textarea id="ggb-cmds" rows="13" spellcheck="false" placeholder="A=(0,0)\nB=(4,0)\nSegment(A,B)…"></textarea>
+      <div class="ggb-btns">
+        <button class="sec" onclick="ggbRun()">▶️ 执行命令</button>
+        <button class="sec" onclick="ggbGen()">🤖 重新生成</button>
+        <button class="sec" onclick="ggbExport()">✅ 导出并保存</button>
+      </div>
+      <div class="ggb-log small" id="ggb-log">图形内可直接拖动自由点调整画法（几何约束保持）。</div>
+    </div>
+  </div></div>`;}
+function ggbLog(html){const el=document.getElementById('ggb-log');if(el)el.innerHTML=html;}
+function loadGgbJs(cb){
+  if(window.GGBApplet){cb();return;}
+  const s=document.createElement('script');
+  s.src='/static/vendor/geogebra/deployggb.js';
+  s.onload=cb;
+  s.onerror=()=>ggbLog('❌ deployggb.js 加载失败：请先运行 <b>tools/fetch_geogebra.sh</b> 下载 bundle（D22）');
+  document.head.appendChild(s);
+}
+function openGgbDraft(sid,no){
+  const s=sheets.find(x=>x.id===sid),q=s&&s.questions.find(x=>x.no===no);
+  if(!q)return;
+  const text=(q.edited&&q.edited.question)||q.question||'';
+  ggbState={mode:'draft',sid,no,question:text,autoRetries:0};
+  showGgb(q.figure_ggb||null);
+}
+function openGgbRecord(){
+  const q=qmodalQ;if(!q)return;
+  ggbState={mode:'record',qid:q.id,question:(q.question||{}).text||'',autoRetries:0};
+  showGgb((q.question||{}).figure_ggb||null);
+}
+function showGgb(cmds){
+  $('#gmodal').innerHTML=ggbShell();
+  $('#gmodal').classList.remove('hidden');
+  $('#gmodal').onclick=hideGgb;
+  if(cmds&&cmds.length)$('#ggb-cmds').value=cmds.join('\n');
+  loadGgbJs(()=>{
+    const params={appName:'geometry',width:520,height:400,showToolBar:false,showMenuBar:false,
+      showAlgebraInput:false,showResetIcon:false,enableRightClick:false,preventFocus:true,language:'zh_CN'};
+    const applet=new GGBApplet(params,true);
+    applet.setHTML5Codebase('/static/vendor/geogebra/HTML5/5.0/web3d/');
+    applet.inject('ggb-elem');   // 注入后全局 window.ggbApplet 可用
+    const wait=setInterval(()=>{
+      if(window.ggbApplet&&window.ggbApplet.evalCommand){
+        clearInterval(wait);
+        if($('#ggb-cmds').value.trim())ggbRun();else ggbGen();
+      }
+    },300);
+  });
+}
+function hideGgb(){$('#gmodal').classList.add('hidden');}
+async function ggbGen(){
+  if(!ggbState)return;
+  ggbLog('🤖 正在根据题干生成构造命令（纯文本 LLM）…');
+  try{
+    const j=await (await fetch('/api/ggb-script',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({question:ggbState.question})})).json();
+    if(j.error)return ggbLog('❌ '+esc(j.error));
+    $('#ggb-cmds').value=j.commands.join('\n');
+    ggbRun();
+  }catch(e){ggbLog('❌ '+esc(String(e)));}
+}
+function ggbRun(){
+  const txt=$('#ggb-cmds').value.trim();if(!txt)return;
+  const lines=txt.split('\n').map(x=>x.trim()).filter(Boolean);
+  const fails=[];
+  window.ggbApplet.reset();
+  lines.forEach((ln,i)=>{try{if(!window.ggbApplet.evalCommand(ln))fails.push('第'+(i+1)+'行: '+ln);}catch(e){fails.push('第'+(i+1)+'行: '+ln+' ('+e+')');}});
+  if(fails.length){
+    ggbLog('❌ '+fails.length+' 行执行失败：<br>'+esc(fails.join('；')));
+    if(ggbState.autoRetries<2){ggbState.autoRetries++;ggbRetry(fails);}
+    else ggbLog('❌ 自动重试已用完。可手改上方命令行后点「▶️ 执行命令」，或「🤖 重新生成」。');
+  }else{
+    ggbState.autoRetries=0;
+    ggbLog('✅ 构造成功（'+lines.length+' 行）。可拖动自由点修正画法，满意后点「✅ 导出并保存」。');
+  }
+}
+async function ggbRetry(fails){
+  ggbLog('🔁 失败行已反馈给模型自动重试（第 '+ggbState.autoRetries+'/2 次）…');
+  try{
+    const j=await (await fetch('/api/ggb-script',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({question:ggbState.question,prev_errors:fails})})).json();
+    if(j.error)return ggbLog('❌ '+esc(j.error));
+    $('#ggb-cmds').value=j.commands.join('\n');
+    ggbRun();
+  }catch(e){ggbLog('❌ '+esc(String(e)));}
+}
+function ggbExport(){
+  if(!window.ggbApplet){ggbLog('❌ applet 未就绪');return;}
+  const st=ggbState;
+  window.ggbApplet.getScreenshotBase64(async(b64)=>{
+    const png='data:image/png;base64,'+b64;
+    const commands=$('#ggb-cmds').value.split('\n').map(x=>x.trim()).filter(Boolean);
+    try{
+      if(st.mode==='draft'){
+        const j=await (await fetch(`/api/sheets/${st.sid}/questions/${st.no}/ggb-figure`,
+          {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({png,commands})})).json();
+        if(j.error)return ggbLog('❌ '+esc(j.error));
+        const s=sheets.find(x=>x.id===st.sid),q=s.questions.find(x=>x.no===st.no);
+        q.figure_crops=j.figure_crops;q.figure_spec=null;q.figure_svg=null;q.figure_mode='crop';
+        q.figure_ggb=commands;q.figure_note='GeoGebra 重绘图（脚本已存档，可再编辑）';
+        imgVer=Date.now();hideGgb();renderReview();flash(st.sid,st.no,'✅ 已保存 GeoGebra 重绘图');
+      }else{
+        const j=await (await fetch('/api/questions/'+st.qid+'/figure',
+          {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({png,commands})})).json();
+        if(j.error)return ggbLog('❌ '+esc(j.error));
+        imgVer=Date.now();hideGgb();showQModal(st.qid);   // 重开详情弹窗刷新图形（?v= 破缓存）
+      }
+    }catch(e){ggbLog('❌ '+esc(String(e)));}
+  },2);
+}
 
 /* ---------- Tab3 刷题 ---------- */
 /* ---------- 做题与批改（唯一入口：工作台勾选→开始做题；V1.0.3 移除随机刷题/相似题/出卷） ---------- */

@@ -237,6 +237,59 @@ def api_recrop(sid, no):
         return _err(e)
 
 
+def _save_ggb_png(data_url):
+    """dataURL(data:image/png;base64,…) → PIL RGB Image；两个 GeoGebra 保存端点共用"""
+    import base64
+    from PIL import Image
+    if not isinstance(data_url, str) or ";base64," not in data_url:
+        raise ValueError("png 字段需为 data:image/png;base64,… 格式")
+    head, b64 = data_url.split(";base64,", 1)
+    if not head.startswith("data:image/"):
+        raise ValueError("仅支持 data:image/png|jpeg")
+    return Image.open(io.BytesIO(base64.b64decode(b64))).convert("RGB")
+
+
+@app.post("/api/ggb-script")
+def api_ggb_script():
+    """🧠 v1.1a：LLM 生成 GeoGebra 构造命令（纯文本，不调视觉；草稿/入库两场景共用）。
+    body {question, prev_errors?: […]} → {commands[]}；prev_errors 为前端执行失败行文本回路重试"""
+    try:
+        import ggbflow
+        body = request.get_json(silent=True) or {}
+        commands = ggbflow.gen_commands(body.get("question") or "", prev_errors=body.get("prev_errors"))
+        return jsonify({"ok": True, "commands": commands})
+    except Exception as e:
+        return _err(e)
+
+
+@app.post("/api/sheets/<sid>/questions/<int:no>/ggb-figure")
+def api_ggb_figure(sid, no):
+    """🧠 v1.1a：保存人审期 GeoGebra 重绘图。
+    body {png: dataURL, commands: […]} → 存 <sheet>_q<no>_g.png（幂等覆盖，同 recrop_all 哲学）
+    + figure_ggb 脚本存档 + 切 crop 模式（对齐 use_crop：展示图即权威）"""
+    try:
+        sheet, q = _sheet_and_q(sid, no)
+        if not q:
+            return jsonify({"error": "不存在"}), 404
+        if sheet.get("status") == "processed":
+            return jsonify({"error": "该草稿单已处理"}), 400
+        body = request.get_json(force=True, silent=True) or {}
+        img = _save_ggb_png(body.get("png"))
+        commands = body.get("commands") if isinstance(body.get("commands"), list) else None
+        os.makedirs(store.CROP_DIR, exist_ok=True)
+        path = os.path.join(store.CROP_DIR, "{0}_q{1}_g.png".format(sid, no))
+        img.save(path)
+        store.patch_sheet_question(sid, no, {
+            "figure_crops": [path], "figure_spec": None, "figure_svg": None,
+            "figure_mode": "crop", "figure_ggb": commands,
+            "figure_note": "GeoGebra 重绘图（脚本已存档，可再编辑）" if commands else "GeoGebra 重绘图"})
+        return jsonify({"ok": True, "figure_crops": [path], "figure_mode": "crop"})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return _err(e)
+
+
 @app.post("/api/sheets/<sid>/recrop-all")
 def api_recrop_all(sid):
     """整单重裁：按当前照片重新裁所有图形（照片方向变更/迁移后用）"""
@@ -335,6 +388,35 @@ def api_question_patch(qid):
         q.setdefault("analysis", {}).update(fields["analysis"])
     store.update(qid, **{k: q[k] for k in ("source", "type", "analysis") if k in q})
     return jsonify(store.get(qid))
+
+
+@app.post("/api/questions/<qid>/figure")
+def api_question_figure(qid):
+    """✎ v1.1a：入库题改图。body {png: dataURL, commands: […]|null}
+    - 覆盖原 figure_crop 文件（图源唯一权威，同 recrop_all；无图老题新建 <qid>_g.png）
+    - 清 figure_spec/figure_svg + 存 figure_ggb 脚本（永远可再编辑，D24）
+    - 练习记录/掌握度不受影响（按 id 追加）"""
+    try:
+        q = store.get(qid)
+        if not q:
+            return jsonify({"error": "不存在"}), 404
+        body = request.get_json(force=True, silent=True) or {}
+        img = _save_ggb_png(body.get("png"))
+        commands = body.get("commands") if isinstance(body.get("commands"), list) else None
+        inner = dict(q.get("question") or {})
+        path = inner.get("figure_crop")
+        if not path:
+            os.makedirs(store.CROP_DIR, exist_ok=True)
+            path = os.path.join(store.CROP_DIR, qid + "_g.png")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        img.save(path)
+        inner.update({"figure_crop": path, "figure_spec": None, "figure_ggb": commands})
+        store.update(qid, question=inner)
+        return jsonify({"ok": True, "figure_crop": path})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return _err(e)
 
 
 @app.post("/api/questions/export-pdf")

@@ -7,3 +7,5 @@ data/crops/
 out/
 # 注入式 API Key：网页设置落盘 / 开发者便利文件，均不入库
 data/ai_config.json
+# GeoGebra Math Apps Bundle：几十 MB 大资源按需拉取（tools/fetch_geogebra.sh），不入库
+static/vendor/geogebra/
