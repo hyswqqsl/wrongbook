@@ -34,11 +34,11 @@ GGB_PROMPT = """你是几何作图专家。根据下面的初中数学题干，�
 {question}"""
 
 
-def gen_commands(question, prev_errors=None, client=None, model=None):
-    """题干 → 命令列表；prev_errors = 前端 evalCommand 失败行（文本回路重试，不发图片）。
+def gen_commands(question, prev_errors=None, client=None, model=None, uri=None):
+    """题干(+可选原题图形照片) → 命令列表；prev_errors = 前端失败行（文本回路重试）。
 
-    抛异常 = 生成失败（调用方返回 500，前端提示）。
-    client/model 可注入（测试 stub 用）。
+    uri = 原题图形 data URI（v1.1.0e：有对照图就走视觉调用，布局/摆向与课本原图对齐）；
+    无 uri 纯文本。抛异常 = 生成失败（调用方返回 500，前端提示）。client/model 可注入（测试 stub 用）。
     """
     from common import make_client
     from reviewflow import ask_json_vision
@@ -48,11 +48,13 @@ def gen_commands(question, prev_errors=None, client=None, model=None):
     if prev_errors:
         fb = ("\n上一版命令中有以下行执行失败，请修正语法或引用顺序：\n- "
               + "\n- ".join(str(e)[:120] for e in prev_errors[:4]))
+    img_hint = ("\n附图是原题图形的照片：布局、摆向、点的相对位置尽量与图一致；\n"
+                "几何关系与数值仍以题干文字为准，照片模糊处不要臆造。") if uri else ""
     prompt = GGB_PROMPT.format(
-        whitelist="、".join(GGB_COMMAND_WHITELIST), question=question.strip()) + fb
+        whitelist="、".join(GGB_COMMAND_WHITELIST), question=question.strip()) + img_hint + fb
     if client is None:
-        client, model = make_client(vision=False)
-    data = ask_json_vision(client, model, prompt, None, max_tokens=8000)
+        client, model = make_client(vision=bool(uri))
+    data = ask_json_vision(client, model, prompt, uri, max_tokens=8000)
     cmds = [str(c).strip() for c in (data.get("commands") or []) if str(c).strip()]
     if not cmds:
         raise RuntimeError("模型未返回有效命令")

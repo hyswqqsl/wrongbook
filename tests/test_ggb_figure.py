@@ -38,21 +38,22 @@ def _data_url(w=80, h=60):
     return "data:image/png;base64," + base64.b64encode(_png_bytes(w, h)).decode()
 
 
+_recorded = {"uri": None}
+
+
 def _stub_client_returns(commands):
-    """造一个 stub：ggbflow.gen_commands 的 client 参数透传到 reviewflow.ask_json_vision。
-    直接 monkeypatch reviewflow.ask_json_vision 最简单。"""
+    """造一个 stub：替换 reviewflow.ask_json_vision，记录 prompt/uri 供断言（不发真实请求）。"""
     import reviewflow
 
     def fake_ask(client, model, prompt, uri, max_tokens=16000):
-        assert uri is None, "命令生成为纯文本调用，不应发送图片"
-        TestGenCommands.last_prompt = prompt
+        _recorded["prompt"] = prompt
+        _recorded["uri"] = uri
         return {"commands": commands}
 
     reviewflow.ask_json_vision = fake_ask
 
 
 class TestGenCommands(unittest.TestCase):
-    last_prompt = None
 
     def tearDown(self):
         import reviewflow
@@ -66,12 +67,25 @@ class TestGenCommands(unittest.TestCase):
         _stub_client_returns(["A=(0,0)", "B=(4,0)", "Segment(A,B)"])
         cmds = ggbflow.gen_commands("如图，AB=4 …", client="stub", model="stub")
         self.assertEqual(cmds, ["A=(0,0)", "B=(4,0)", "Segment(A,B)"])
-        self.assertIn("AB=4", TestGenCommands.last_prompt)
+        self.assertIn("AB=4", _recorded["prompt"])
+        self.assertIsNone(_recorded["uri"])   # 无对照图 → 纯文本调用
 
         _stub_client_returns(["A=(0,0)"])
         ggbflow.gen_commands("如图", prev_errors=["第3行: Segment(A,B)"], client="stub", model="stub")
-        self.assertIn("Segment(A,B)", TestGenCommands.last_prompt)   # 失败行进入重试 prompt
-        self.assertIn("执行失败", TestGenCommands.last_prompt)
+        self.assertIn("Segment(A,B)", _recorded["prompt"])   # 失败行进入重试 prompt
+        self.assertIn("执行失败", _recorded["prompt"])
+
+    def test_uri_sends_image_with_hint(self):
+        """v1.1.0e：有对照图 → 视觉调用（uri 透传 + prompt 布局对齐提示）"""
+        import ggbflow
+        import reviewflow
+        reviewflow._orig_ask = reviewflow.ask_json_vision
+        _stub_client_returns(["A=(0,0)"])
+        uri = "data:image/png;base64,iVBORw0KGgo="
+        ggbflow.gen_commands("如图", client="stub", model="stub", uri=uri)
+        self.assertEqual(_recorded["uri"], uri)
+        self.assertIn("附图", _recorded["prompt"])
+        self.assertIn("与图一致", _recorded["prompt"])
 
     def test_empty_question_rejected(self):
         import ggbflow
@@ -119,10 +133,35 @@ class TestGgbFigureApi(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.get_json()["commands"], ["A=(0,0)", "Segment(A,B)"])
 
+    def test_ggb_script_endpoint_with_ref_sends_vision(self):
+        """v1.1.0e：端点读 ref_crop 文件转 data URI → 视觉调用；文件不存在降级纯文本"""
+        import os
+        import store
+        import reviewflow
+        reviewflow._orig_ask = reviewflow.ask_json_vision
+        _stub_client_returns(["A=(0,0)"])
+        orig = os.path.join(store.CROP_DIR, "{0}_q1_0.png".format(self.sheet["id"]))
+        os.makedirs(store.CROP_DIR, exist_ok=True)
+        with open(orig, "wb") as f:
+            f.write(_png_bytes())
+        r = self.c.post("/api/ggb-script", json={"question": "如图", "ref_crop": orig})
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.get_json()["vision"])
+        self.assertTrue(_recorded["uri"].startswith("data:image/png;base64,"))
+        r2 = self.c.post("/api/ggb-script", json={"question": "如图", "ref_crop": "/no/such.png"})
+        self.assertEqual(r2.status_code, 200)
+        self.assertFalse(r2.get_json()["vision"])
+        self.assertIsNone(_recorded["uri"])
+
     def test_ggb_figure_saves_and_archives_script(self):
         import os
         import store
         sid, no = self.sheet["id"], 1
+        # 预置自动抓图 _0 文件（转录时已有）→ 导出后应存档为对照图 figure_ggb_ref
+        os.makedirs(store.CROP_DIR, exist_ok=True)
+        orig = os.path.join(store.CROP_DIR, "{0}_q1_0.png".format(sid))
+        with open(orig, "wb") as f:
+            f.write(_png_bytes())
         r = self.c.post("/api/sheets/{0}/questions/1/ggb-figure".format(sid),
                         json={"png": _data_url(), "commands": ["A=(0,0)"]})
         self.assertEqual(r.status_code, 200)
@@ -132,14 +171,16 @@ class TestGgbFigureApi(unittest.TestCase):
         q = store.get_sheet(sid)["questions"][0]
         self.assertEqual(q["figure_crops"], [path])
         self.assertEqual(q["figure_ggb"], ["A=(0,0)"])
+        self.assertEqual(q["figure_ggb_ref"], orig)   # 对照图自动推断为 _0
         self.assertIsNone(q["figure_spec"])
         self.assertEqual(q["figure_mode"], "crop")
         self.assertIn("GeoGebra", q["figure_note"])
-        # 幂等覆盖：再次导出 → 同一路径（不新增文件）
+        # 显式 ref_crop 优先于自动推断
         r2 = self.c.post("/api/sheets/{0}/questions/1/ggb-figure".format(sid),
-                         json={"png": _data_url(90, 70), "commands": ["A=(1,1)"]})
-        self.assertEqual(r2.get_json()["figure_crops"], [path])
-        self.assertEqual(store.get_sheet(sid)["questions"][0]["figure_ggb"], ["A=(1,1)"])
+                         json={"png": _data_url(90, 70), "commands": ["A=(1,1)"],
+                               "ref_crop": orig})
+        self.assertEqual(r2.get_json()["figure_crops"], [path])   # 幂等覆盖
+        self.assertEqual(store.get_sheet(sid)["questions"][0]["figure_ggb_ref"], orig)
 
     def test_ggb_figure_bad_png_rejected(self):
         r = self.c.post("/api/sheets/{0}/questions/1/ggb-figure".format(self.sheet["id"]),
@@ -175,6 +216,7 @@ class TestGgbFigureApi(unittest.TestCase):
         q = store.get(rec["id"])
         self.assertIsNone(q["question"]["figure_spec"])            # spec 清空（对齐 use_crop 语义）
         self.assertEqual(q["question"]["figure_ggb"], ["A=(2,2)"]) # 脚本存档 → 可再编辑
+        self.assertEqual(q["question"]["figure_ggb_ref"], old_path) # 对照图 = 覆盖前的原裁剪图
 
     def test_record_figure_creates_new_file_when_no_crop(self):
         import os

@@ -189,120 +189,6 @@
   },
   {
    "source": "B 提高能力",
-   "type": "single",
-   "question": {
-    "text": "如图，$AD$ 是等腰三角形 $ABC$ 的底边 $BC$ 上的中线，$BE$ 平分 $\\angle ABC$，交 $AD$ 于点 $E$。若 $AC=12$，$DE=3$，则 $\\triangle ABE$ 的面积是（ ）",
-    "choices": [
-     {
-      "key": "A",
-      "text": "16"
-     },
-     {
-      "key": "B",
-      "text": "18"
-     },
-     {
-      "key": "C",
-      "text": "32"
-     },
-     {
-      "key": "D",
-      "text": "36"
-     }
-    ],
-    "figure_spec": {
-     "points": [
-      {
-       "name": "A",
-       "x": 1.0,
-       "y": 2.0
-      },
-      {
-       "name": "B",
-       "x": 9.0,
-       "y": 2.0
-      },
-      {
-       "name": "C",
-       "x": 5.0,
-       "y": 10.0
-      },
-      {
-       "name": "D",
-       "x": 7.0,
-       "y": 6.0
-      },
-      {
-       "name": "E",
-       "x": 4.6,
-       "y": 4.4
-      }
-     ],
-     "segments": [
-      {
-       "a": "A",
-       "b": "B",
-       "dashed": false
-      },
-      {
-       "a": "B",
-       "b": "C",
-       "dashed": false
-      },
-      {
-       "a": "C",
-       "b": "A",
-       "dashed": false
-      },
-      {
-       "a": "A",
-       "b": "D",
-       "dashed": false
-      },
-      {
-       "a": "B",
-       "b": "E",
-       "dashed": false
-      }
-     ]
-    },
-    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/crops/d20261101-211823-e45041_q6_0.png"
-   },
-   "printed_answer": null,
-   "verified_answer": "B",
-   "verify_status": "pass",
-   "mistake_reason": {
-    "kind": "careless",
-    "note": ""
-   },
-   "analysis": {
-    "chapter": "第二章 特殊三角形",
-    "knowledge_points": [
-     "等腰三角形三线合一",
-     "三角形内角平分线定理（角平分线分对边成比例）",
-     "三角形面积公式"
-    ],
-    "pitfall": "容易把DE=3误看成AE=3，或用△ABD中角平分线定理时把AE:DE=AB:BD写反；计算△ABE面积时还要注意以AE为底、B到AD的距离为高。",
-    "difficulty": 2,
-    "key_idea": "由等腰三角形三线合一得AD⊥BC，在△ABD中用角平分线定理得AE·BD=AB·DE=36，所以S△ABE=1/2·AE·BD=18。"
-   },
-   "photo": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/photos/d20261101-211823-e45041.jpg",
-   "flags": {
-    "needs_review": false
-   },
-   "id": "20261101-212133-eabb64",
-   "created_at": "2026-11-01 21:21:33",
-   "practice": [
-    {
-     "at": "2026-11-02 16:00:54",
-     "correct": false,
-     "variant": "original"
-    }
-   ],
-   "mastered_at": null
-  },
-  {
-   "source": "B 提高能力",
    "type": "short",
    "question": {
     "text": "已知：如图，点 $D$，$E$ 在 $\\triangle ABC$ 的边 $BC$ 上，$AB=AC$，$AD=AE$。求证：$BD=CE$。",
@@ -708,7 +594,13 @@
    },
    "id": "20261101-214105-47aacd",
    "created_at": "2026-11-01 21:41:05",
-   "practice": [],
+   "practice": [
+    {
+     "at": "2026-11-02 16:10:20",
+     "correct": true,
+     "variant": "original"
+    }
+   ],
    "mastered_at": null
   },
   {
@@ -860,6 +752,78 @@
    },
    "id": "20261102-094629-7cd2d9",
    "created_at": "2026-11-02 09:46:29",
+   "practice": [],
+   "mastered_at": null
+  },
+  {
+   "source": "B 提高能力（练习册/试卷局部照片）",
+   "type": "single",
+   "question": {
+    "text": "如图，$AD$ 是等腰三角形 $ABC$ 的底边 $BC$ 上的中线，$BE$ 平分 $\\angle ABC$，交 $AD$ 于点 $E$。若 $AC=12$，$DE=3$，则 $\\triangle ABE$ 的面积是（　）",
+    "choices": [
+     {
+      "key": "A",
+      "text": "16"
+     },
+     {
+      "key": "B",
+      "text": "18"
+     },
+     {
+      "key": "C",
+      "text": "32"
+     },
+     {
+      "key": "D",
+      "text": "36"
+     }
+    ],
+    "figure_spec": null,
+    "figure_crop": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/crops/d20261104-180105-8ecf42_q6_g.png",
+    "figure_ggb": [
+     "A=(-12,0)",
+     "B=(8,0)",
+     "C=(0,16)",
+     "Polygon(A,B,C)",
+     "D=Midpoint(B,C)",
+     "sAD=Segment(A,D)",
+     "SetLineStyle(sAD,2)",
+     "lineAB = Segment(A, B)",
+     "E = Intersect(PerpendicularLine(C, lineAB), sAD)",
+     "sBE=Segment(B,E)",
+     "sAB=Segment(A,B)",
+     "sAE=Segment(A,E)",
+     "sED=Segment(E,D)",
+     "SetVisible(E,true)"
+    ]
+   },
+   "printed_answer": null,
+   "verified_answer": "B",
+   "verify_status": "pass",
+   "mistake_reason": {},
+   "analysis": {
+    "grade": "八年级上册",
+    "chapter": "第一章 三角形",
+    "kp_path": [
+     "第一章 三角形",
+     "1.7 角平分线的性质",
+     "1.7 角平分线的性质"
+    ],
+    "knowledge_points": [
+     "等腰三角形“三线合一”",
+     "三角形内角平分线定理",
+     "直角三角形面积与分割求面积"
+    ],
+    "pitfall": "容易忽略AD既是中线又是高，把BE误放到△ABC中用角平分线定理；突破口是在Rt△ABD中把BE看作∠ABD的平分线，用比例转化AE与BD，再求面积。",
+    "difficulty": 2,
+    "key_idea": "由三线合一得AD⊥BC，在Rt△ABD中对BE用角平分线定理，得到AE·BD=AB·DE=36，所以S△ABE=1/2·AE·BD=18。"
+   },
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/photos/d20261104-180105-8ecf42.jpg",
+   "flags": {
+    "needs_review": false
+   },
+   "id": "20261104-180245-16539e",
+   "created_at": "2026-11-04 18:02:45",
    "practice": [],
    "mastered_at": null
   }

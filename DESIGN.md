@@ -49,6 +49,14 @@
   用户实测又报 5 行失败，修正后 0 失败）；补 ZoomIn→setCoordSystem 翻译；
   人审题卡按钮收敛：**无图题不显示图形按钮**、「🖼自动抓取原图」按钮移除（转录时每题已自动抓图，
   框偏了用手动框选；/recrop API 保留备用）；GeoGebra 弹窗「重新生成」加全局遮罩（生成期间锁操作）
+- **V1.1.0d 反馈修复**：弹窗宽度改 `fit-content`（不再右侧留白）；**弹窗内嵌原题图形对照图**
+  （解决弹窗挡住左栏原图无法对比——新字段 `figure_ggb_ref` 存档首次重绘前的原图路径，
+  草稿期自动推断 _0/显式回传，入库后沿用覆盖前旧图；侧栏顶部缩略图，点击原图大小打开；
+  重开后对照仍可用，不随重绘丢失）
+- **V1.1.0e 反馈修复**：命令生成**附原题图形照片走视觉调用**（此前纯文本不看课本原图，
+  布局/摆向易偏——D13 另一半根源；prompt 要求布局/摆向/相对位置与图一致，几何关系仍以题干为准；
+  无对照图降级纯文本；端点回传 vision 标记）；
+  弹窗布局三改：题干条置顶（KaTeX 渲染）、两栏底部平齐（行高随对照图 560/420）、命令按钮三等分占满侧栏
 - **V1.1.0c**：翻译器正则只认 Set 前缀 → ShowLabel 漏翻（仍走 evalCommand 报假失败）；
   改查表匹配任意命令名，补 ZoomIn→setCoordSystem；用户 20 行脚本仿真验证全路由正确
 - **V1.1.0d**：打开弹窗**不再自动调 LLM**（空脚本时提示手动生成，存档脚本仍本地重放 0 token）；
@@ -433,7 +441,9 @@ POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
 - Prompt 要点：点名与题干大写字母一致；几何关系一律构造命令（Midpoint/PerpendicularBisector/
   AngleBisector/PerpendicularLine/ParallelLine/Circle/Intersect/Polygon…白名单），
   **禁止手算坐标**；辅助线 `SetLineStyle(…,2)` 虚线；只输出 `{"commands":[…]}`
-- 调用：`make_client(vision=False)`，temperature 0.2，json_object → plain 降级（复用 ask_json_vision 无图模式）
+- 调用：**有对照图走视觉调用**（v1.1.0e：附原题图形照片，prompt 要求布局/摆向/相对位置与图一致、
+  几何关系仍以题干为准；`make_client(vision=True)`），无对照图纯文本；
+  temperature 0.2，json_object → plain → nothink 降级（复用 ask_json_vision）
 - 手动重试回路：失败行标红后，人点「🤖重新生成」才回传 `prev_errors`（不重发图片）；
   自动重试已移除（v1.1.0b 用户反馈：省 token）
 

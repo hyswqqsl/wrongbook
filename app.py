@@ -251,13 +251,24 @@ def _save_ggb_png(data_url):
 
 @app.post("/api/ggb-script")
 def api_ggb_script():
-    """🧠 v1.1a：LLM 生成 GeoGebra 构造命令（纯文本，不调视觉；草稿/入库两场景共用）。
-    body {question, prev_errors?: […]} → {commands[]}；prev_errors 为前端执行失败行文本回路重试"""
+    """🧠 v1.1：LLM 生成 GeoGebra 构造命令（草稿/入库两场景共用）。
+    body {question, prev_errors?: […], ref_crop?: 原题图形路径} → {commands[], vision}
+    有 ref_crop → 读图转 data URI 走视觉调用（布局/摆向与课本原图对齐，v1.1.0e）；无则纯文本"""
     try:
+        import base64
         import ggbflow
         body = request.get_json(silent=True) or {}
-        commands = ggbflow.gen_commands(body.get("question") or "", prev_errors=body.get("prev_errors"))
-        return jsonify({"ok": True, "commands": commands})
+        ref = body.get("ref_crop")
+        uri = None
+        if isinstance(ref, str) and ref and os.path.exists(ref):
+            try:
+                with open(ref, "rb") as f:
+                    uri = "data:image/png;base64," + base64.b64encode(f.read()).decode()
+            except Exception:
+                uri = None   # 读图失败降级纯文本，不阻塞生成
+        commands = ggbflow.gen_commands(body.get("question") or "",
+                                        prev_errors=body.get("prev_errors"), uri=uri)
+        return jsonify({"ok": True, "commands": commands, "vision": bool(uri)})
     except Exception as e:
         return _err(e)
 
@@ -279,9 +290,14 @@ def api_ggb_figure(sid, no):
         os.makedirs(store.CROP_DIR, exist_ok=True)
         path = os.path.join(store.CROP_DIR, "{0}_q{1}_g.png".format(sid, no))
         img.save(path)
+        # 对照图存档（v1.1.0d）：弹窗内展示原题图形用；优先前端回传，否则自动推断同名 _0
+        ref = body.get("ref_crop") if isinstance(body.get("ref_crop"), str) and body.get("ref_crop") else None
+        if not ref:
+            cand = os.path.join(store.CROP_DIR, "{0}_q{1}_0.png".format(sid, no))
+            ref = cand if os.path.exists(cand) else (q.get("figure_ggb_ref") or None)
         store.patch_sheet_question(sid, no, {
             "figure_crops": [path], "figure_spec": None, "figure_svg": None,
-            "figure_mode": "crop", "figure_ggb": commands,
+            "figure_mode": "crop", "figure_ggb": commands, "figure_ggb_ref": ref,
             "figure_note": "GeoGebra 重绘图（脚本已存档，可再编辑）" if commands else "GeoGebra 重绘图"})
         return jsonify({"ok": True, "figure_crops": [path], "figure_mode": "crop"})
     except ValueError as e:
@@ -411,6 +427,13 @@ def api_question_figure(qid):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         img.save(path)
         inner.update({"figure_crop": path, "figure_spec": None, "figure_ggb": commands})
+        # 对照图存档：优先前端回传；否则沿用覆盖前的旧裁剪图（非 _g 才算原题图形）
+        ref = body.get("ref_crop") if isinstance(body.get("ref_crop"), str) and body.get("ref_crop") else None
+        prev_crop = (q.get("question") or {}).get("figure_crop")
+        if not ref and prev_crop and not prev_crop.endswith("_g.png"):
+            ref = prev_crop
+        if ref:
+            inner["figure_ggb_ref"] = ref   # 无 ref 时保留旧 figure_ggb_ref 不覆盖
         store.update(qid, question=inner)
         return jsonify({"ok": True, "figure_crop": path})
     except ValueError as e:
