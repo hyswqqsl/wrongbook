@@ -3470,6 +3470,922 @@
    "created_at": "2026-11-02 20:04:41",
    "status": "pending",
    "photo": "/Users/flysic/workspace/coding/juniorHigh/quiz-demo/wrongbook/data/users/test/photos/d20261102-200441-1715dd.jpg"
+  },
+  {
+   "source": "",
+   "photo_size": [
+    1600,
+    1200
+   ],
+   "provider_note": "glm-4.6v-flash",
+   "questions": [
+    {
+     "no": 12,
+     "type": "single",
+     "question": "已知两条线段的长为3 cm和4 cm，当第三条线段的长为___ cm时，这三条线段就能组成一个直角三角形。",
+     "choices": [
+      {
+       "key": "A",
+       "text": "2"
+      },
+      {
+       "key": "B",
+       "text": "8"
+      },
+      {
+       "key": "C",
+       "text": "2或8"
+      },
+      {
+       "key": "D",
+       "text": "10"
+      }
+     ],
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": false,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.7 探索勾股定理",
+      "kp": "勾股定理的逆定理"
+     }
+    },
+    {
+     "no": 13,
+     "type": "short",
+     "question": "如图，在△ABC中，AB=CB，∠ABC=90°。F为AB延长线上一点，点E在BC上，且BE=BF。(1) 求证：△ABE≌△CBF。(2) 若∠CAE=30°，求∠ACF的度数。",
+     "choices": null,
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.15,
+       0.7,
+       0.53,
+       0.92
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/crops/d20261104-153952-0b50c7_q13_0.png"
+     ],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "默认使用原题照片裁剪图（省 token，原图即权威图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.3 等腰三角形的性质定理",
+      "kp": "等腰三角形的性质定理（全等三角形的判定）"
+     }
+    }
+   ],
+   "id": "d20261104-153952-0b50c7",
+   "created_at": "2026-11-04 15:39:52",
+   "status": "pending",
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/photos/d20261104-153952-0b50c7.jpg"
+  },
+  {
+   "source": "第34页（练习册/试卷页面，页边可见题号16.）",
+   "photo_size": [
+    1600,
+    1200
+   ],
+   "provider_note": "deepseek-flash",
+   "questions": [
+    {
+     "no": 11,
+     "type": "single",
+     "question": "（题干上半部分被裁切）……为 $3$，则这个等腰三角形的腰长为（　）",
+     "choices": [
+      {
+       "key": "A",
+       "text": "2"
+      },
+      {
+       "key": "B",
+       "text": "8"
+      },
+      {
+       "key": "C",
+       "text": "2 或 8"
+      },
+      {
+       "key": "D",
+       "text": "10"
+      }
+     ],
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": false,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.2 等腰三角形",
+      "kp": "等腰三角形的概念"
+     }
+    },
+    {
+     "no": 12,
+     "type": "fill",
+     "question": "已知两条线段的长为 $3\\text{ cm}$ 和 $4\\text{ cm}$，当第三条线段的长为 $\\underline{\\quad\\quad}$ cm 时，这三条线段就能组成一个直角三角形。",
+     "choices": null,
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.7 探索勾股定理",
+      "kp": "2.7 探索勾股定理"
+     }
+    },
+    {
+     "no": 13,
+     "type": "short",
+     "question": "如图，在 $\\triangle ABC$ 中，$AB=CB$，$\\angle ABC=90^\\circ$。$F$ 为 $AB$ 延长线上一点，点 $E$ 在 $BC$ 上，且 $BE=BF$。\n（1）求证：$\\triangle ABE \\cong \\triangle CBF$。\n（2）若 $\\angle CAE=30^\\circ$，求 $\\angle ACF$ 的度数。",
+     "choices": null,
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.11,
+       0.32,
+       0.35,
+       0.59
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/crops/d20261104-154136-661e31_q13_0.png"
+     ],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "默认使用原题照片裁剪图（省 token，原图即权威图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第一章 三角形",
+      "section": "1.5 三角形全等的判定",
+      "kp": "三角形的稳定性"
+     }
+    }
+   ],
+   "id": "d20261104-154136-661e31",
+   "created_at": "2026-11-04 15:41:36",
+   "status": "pending",
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/photos/d20261104-154136-661e31.jpg"
+  },
+  {
+   "source": "第34页",
+   "photo_size": [
+    1600,
+    1200
+   ],
+   "provider_note": "deepseek-flash",
+   "questions": [
+    {
+     "no": 11,
+     "type": "single",
+     "question": "…为 $3$,则这个等腰三角形的腰长为",
+     "choices": [
+      {
+       "key": "A",
+       "text": "2"
+      },
+      {
+       "key": "B",
+       "text": "8"
+      },
+      {
+       "key": "C",
+       "text": "2 或 8"
+      },
+      {
+       "key": "D",
+       "text": "10"
+      }
+     ],
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": false,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.2 等腰三角形",
+      "kp": "等腰三角形的概念"
+     }
+    },
+    {
+     "no": 12,
+     "type": "fill",
+     "question": "已知两条线段的长为 $3\\text{ cm}$ 和 $4\\text{ cm}$,当第三条线段的长为 ____ $\\text{cm}$ 时,这三条线段就能组成一个直角三角形。",
+     "choices": null,
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.7 探索勾股定理",
+      "kp": "2.7 探索勾股定理"
+     }
+    },
+    {
+     "no": 13,
+     "type": "short",
+     "question": "如图,在 $\\triangle ABC$ 中,$AB=CB$,$\\angle ABC=90^\\circ$。$F$ 为 $AB$ 延长线上一点,点 $E$ 在 $BC$ 上,且 $BE=BF$。(1) 求证:$\\triangle ABE \\cong \\triangle CBF$。(2) 若 $\\angle CAE=30^\\circ$,求 $\\angle ACF$ 的度数。",
+     "choices": null,
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.14,
+       0.41,
+       0.35,
+       0.63
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/crops/d20261104-154735-186f0a_q13_0.png"
+     ],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "默认使用原题照片裁剪图（省 token，原图即权威图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第一章 三角形",
+      "section": "1.5 三角形全等的判定",
+      "kp": "三角形的稳定性"
+     }
+    }
+   ],
+   "id": "d20261104-154735-186f0a",
+   "created_at": "2026-11-04 15:47:35",
+   "status": "pending",
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/photos/d20261104-154735-186f0a.jpg"
+  },
+  {
+   "source": "",
+   "photo_size": [
+    1600,
+    1200
+   ],
+   "provider_note": "deepseek-flash",
+   "questions": [
+    {
+     "no": 15,
+     "type": "single",
+     "question": "（题干被裁切，可见部分）……为 3，则这个等腰三角形的底边长为（ ）",
+     "choices": [
+      {
+       "key": "A",
+       "text": "2"
+      },
+      {
+       "key": "B",
+       "text": "8"
+      },
+      {
+       "key": "C",
+       "text": "2 或 8"
+      },
+      {
+       "key": "D",
+       "text": "10"
+      }
+     ],
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": false,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.2 等腰三角形",
+      "kp": "等腰三角形的概念"
+     }
+    },
+    {
+     "no": 12,
+     "type": "fill",
+     "question": "已知两条线段的长为 $3\\ \\mathrm{cm}$ 和 $4\\ \\mathrm{cm}$，当第三条线段的长为 $\\underline{\\qquad}$ $\\mathrm{cm}$ 时，这三条线段就能组成一个直角三角形。",
+     "choices": null,
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.7 探索勾股定理",
+      "kp": "2.7 探索勾股定理"
+     }
+    },
+    {
+     "no": 13,
+     "type": "short",
+     "question": "如图，在 $\\triangle ABC$ 中，$AB=CB$，$\\angle ABC=90^\\circ$。$F$ 为 $AB$ 延长线上一点，点 $E$ 在 $BC$ 上，且 $BE=BF$。\n（1）求证：$\\triangle ABE\\cong\\triangle CBF$。\n（2）若 $\\angle CAE=30^\\circ$，求 $\\angle ACF$ 的度数。",
+     "choices": null,
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.13,
+       0.37,
+       0.33,
+       0.63
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/crops/d20261104-155651-ddb993_q13_0.png"
+     ],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "默认使用原题照片裁剪图（省 token，原图即权威图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第一章 三角形",
+      "section": "1.5 三角形全等的判定",
+      "kp": "三角形的稳定性"
+     }
+    }
+   ],
+   "id": "d20261104-155651-ddb993",
+   "created_at": "2026-11-04 15:56:51",
+   "status": "pending",
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/photos/d20261104-155651-ddb993.jpg"
+  },
+  {
+   "source": "数学练习册第34页",
+   "photo_size": [
+    1600,
+    1200
+   ],
+   "provider_note": "deepseek-flash",
+   "questions": [
+    {
+     "no": 0,
+     "type": "single",
+     "question": "…为 3，则这个等腰三角形的底边长为",
+     "choices": [
+      {
+       "key": "A",
+       "text": "2"
+      },
+      {
+       "key": "B",
+       "text": "8"
+      },
+      {
+       "key": "C",
+       "text": "2 或 8"
+      },
+      {
+       "key": "D",
+       "text": "10"
+      }
+     ],
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": false,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.2 等腰三角形",
+      "kp": "等腰三角形的概念"
+     }
+    },
+    {
+     "no": 12,
+     "type": "fill",
+     "question": "已知两条线段的长为 $3\\ \\mathrm{cm}$ 和 $4\\ \\mathrm{cm}$，当第三条线段的长为 $\\underline{\\qquad}$ $\\mathrm{cm}$ 时，这三条线段就能组成一个直角三角形。",
+     "choices": null,
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.7 探索勾股定理",
+      "kp": "2.7 探索勾股定理"
+     }
+    },
+    {
+     "no": 13,
+     "type": "short",
+     "question": "如图，在 $\\triangle ABC$ 中，$AB=CB$，$\\angle ABC=90^\\circ$。$F$ 为 $AB$ 延长线上一点，点 $E$ 在 $BC$ 上，且 $BE=BF$。\\n(1) 求证：$\\triangle ABE \\cong \\triangle CBF$。\\n(2) 若 $\\angle CAE=30^\\circ$，求 $\\angle ACF$ 的度数。",
+     "choices": null,
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.1,
+       0.36,
+       0.35,
+       0.68
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/crops/d20261104-155822-1c924f_q13_g.png"
+     ],
+     "selected": false,
+     "reason": null,
+     "edited": {
+      "question": "如图，在 $\\triangle ABC$ 中，$AB=CB$，$\\angle ABC=90^\\circ$。$F$ 为 $AB$ 延长线上一点，点 $E$ 在 $BC$ 上，且 $BE=BF$。\\n(1) 求证：$\\triangle ABE \\cong \\triangle CBF$。\\n(2) 若 $\\angle CAE=30^\\circ$，求 $\\angle ACF$ 的度数。"
+     },
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "GeoGebra 重绘图（脚本已存档，可再编辑）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第一章 三角形",
+      "section": "1.5 三角形全等的判定",
+      "kp": "三角形全等的判定"
+     },
+     "figure_ggb": [
+      "B=(0,0)",
+      "A=(4,0)",
+      "C=(0,4)",
+      "sAB=Segment(A,B)",
+      "sBC=Segment(B,C)",
+      "sCA=Segment(C,A)",
+      "P=Rotate(C,30°,A)",
+      "r1=Ray(A,P)",
+      "E=Intersect(r1,sBC)",
+      "F=Rotate(E,90°,B)",
+      "Segment(A,E)",
+      "Segment(C,F)",
+      "Segment(F,B)",
+      "Angle(C,A,E)",
+      "Angle(A,C,F)",
+      "SetPointSize(P,0)",
+      "ShowLabel(P,false)",
+      "SetLineStyle(r1,2)"
+     ]
+    }
+   ],
+   "id": "d20261104-155822-1c924f",
+   "created_at": "2026-11-04 15:58:22",
+   "status": "pending",
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/photos/d20261104-155822-1c924f.jpg"
+  },
+  {
+   "source": "数学练习册/试卷（第34页，含等腰三角形、勾股定理、全等三角形内容）",
+   "photo_size": [
+    1600,
+    1200
+   ],
+   "provider_note": "deepseek-flash",
+   "questions": [
+    {
+     "no": 11,
+     "type": "single",
+     "question": "……为 $3$，则这个等腰三角形的腰长为",
+     "choices": [
+      {
+       "key": "A",
+       "text": "$2$"
+      },
+      {
+       "key": "B",
+       "text": "$8$"
+      },
+      {
+       "key": "C",
+       "text": "$2$ 或 $8$"
+      },
+      {
+       "key": "D",
+       "text": "$10$"
+      }
+     ],
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": false,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.2 等腰三角形",
+      "kp": "等腰三角形的概念"
+     }
+    },
+    {
+     "no": 12,
+     "type": "fill",
+     "question": "已知两条线段的长为 $3\\text{ cm}$ 和 $4\\text{ cm}$，当第三条线段的长为 ______ $\\text{cm}$ 时，这三条线段就能组成一个直角三角形。",
+     "choices": null,
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.7 探索勾股定理",
+      "kp": "2.7 探索勾股定理"
+     }
+    },
+    {
+     "no": 13,
+     "type": "short",
+     "question": "如图，在 $\\triangle ABC$ 中，$AB=CB$，$\\angle ABC=90^\\circ$。$F$ 为 $AB$ 延长线上一点，点 $E$ 在 $BC$ 上，且 $BE=BF$。\n(1) 求证：$\\triangle ABE \\cong \\triangle CBF$。\n(2) 若 $\\angle CAE=30^\\circ$，求 $\\angle ACF$ 的度数。",
+     "choices": null,
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.09,
+       0.34,
+       0.34,
+       0.7
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/crops/d20261104-161459-3f5bdc_q13_0.png"
+     ],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "默认使用原题照片裁剪图（省 token，原图即权威图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第一章 三角形",
+      "section": "1.5 三角形全等的判定",
+      "kp": "三角形的稳定性"
+     }
+    }
+   ],
+   "id": "d20261104-161459-3f5bdc",
+   "created_at": "2026-11-04 16:14:59",
+   "status": "pending",
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/photos/d20261104-161459-3f5bdc.jpg"
+  },
+  {
+   "source": "数学练习册/试卷 第34页",
+   "photo_size": [
+    1600,
+    1200
+   ],
+   "provider_note": "deepseek-flash",
+   "questions": [
+    {
+     "no": 11,
+     "type": "single",
+     "question": "为 $3$，则这个等腰三角形的腰长为",
+     "choices": [
+      {
+       "key": "A",
+       "text": "2"
+      },
+      {
+       "key": "B",
+       "text": "8"
+      },
+      {
+       "key": "C",
+       "text": "2或8"
+      },
+      {
+       "key": "D",
+       "text": "10"
+      }
+     ],
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": false,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.2 等腰三角形",
+      "kp": "等腰三角形的概念"
+     }
+    },
+    {
+     "no": 12,
+     "type": "fill",
+     "question": "已知两条线段的长为 $3\\text{ cm}$ 和 $4\\text{ cm}$，当第三条线段的长为 ______ $\\text{cm}$ 时，这三条线段就能组成一个直角三角形。",
+     "choices": null,
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.7 探索勾股定理",
+      "kp": "2.7 探索勾股定理"
+     }
+    },
+    {
+     "no": 13,
+     "type": "short",
+     "question": "如图，在 $\\triangle ABC$ 中，$AB=CB$，$\\angle ABC=90^\\circ$。$F$ 为 $AB$ 延长线上一点，点 $E$ 在 $BC$ 上，且 $BE=BF$。\n(1) 求证：$\\triangle ABE\\cong\\triangle CBF$。\n(2) 若 $\\angle CAE=30^\\circ$，求 $\\angle ACF$ 的度数。",
+     "choices": null,
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.12,
+       0.41,
+       0.29,
+       0.65
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/crops/d20261104-164531-25c5ff_q13_0.png"
+     ],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "默认使用原题照片裁剪图（省 token，原图即权威图形）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第一章 三角形",
+      "section": "1.5 三角形全等的判定",
+      "kp": "三角形的稳定性"
+     }
+    }
+   ],
+   "id": "d20261104-164531-25c5ff",
+   "created_at": "2026-11-04 16:45:31",
+   "status": "pending",
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/photos/d20261104-164531-25c5ff.jpg"
+  },
+  {
+   "source": "数学练习册 第34页",
+   "photo_size": [
+    1600,
+    1200
+   ],
+   "provider_note": "deepseek-flash",
+   "questions": [
+    {
+     "no": 11,
+     "type": "single",
+     "question": "…为 $3$，则这个等腰三角形的底边长为",
+     "choices": [
+      {
+       "key": "A",
+       "text": "2"
+      },
+      {
+       "key": "B",
+       "text": "8"
+      },
+      {
+       "key": "C",
+       "text": "2 或 8"
+      },
+      {
+       "key": "D",
+       "text": "10"
+      }
+     ],
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": false,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.2 等腰三角形",
+      "kp": "等腰三角形的概念"
+     }
+    },
+    {
+     "no": 12,
+     "type": "fill",
+     "question": "已知两条线段的长为 $3\\text{ cm}$ 和 $4\\text{ cm}$，当第三条线段的长为 ______ $\\text{cm}$ 时，这三条线段就能组成一个直角三角形。",
+     "choices": null,
+     "has_figure": false,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [],
+     "figure_crops": [],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "none",
+     "figure_note": "",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第二章 特殊三角形",
+      "section": "2.7 探索勾股定理",
+      "kp": "2.7 探索勾股定理"
+     }
+    },
+    {
+     "no": 13,
+     "type": "short",
+     "question": "如图，在 $\\triangle ABC$ 中，$AB=CB$，$\\angle ABC=90^\\circ$。$F$ 为 $AB$ 延长线上一点，点 $E$ 在 $BC$ 上，且 $BE=BF$。\n（1）求证：$\\triangle ABE \\cong \\triangle CBF$。\n（2）若 $\\angle CAE=30^\\circ$，求 $\\angle ACF$ 的度数。",
+     "choices": null,
+     "has_figure": true,
+     "printed_answer": null,
+     "has_handwriting": true,
+     "figure_boxes": [
+      [
+       0.12,
+       0.42,
+       0.35,
+       0.62
+      ]
+     ],
+     "figure_crops": [
+      "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/crops/d20261104-165917-64bace_q13_g.png"
+     ],
+     "selected": false,
+     "reason": null,
+     "edited": null,
+     "figure_spec": null,
+     "figure_svg": null,
+     "figure_mode": "crop",
+     "figure_note": "GeoGebra 重绘图（脚本已存档，可再编辑）",
+     "grade": "八年级上册",
+     "kp_sel": {
+      "chapter": "第一章 三角形",
+      "section": "1.5 三角形全等的判定",
+      "kp": "三角形的稳定性"
+     },
+     "figure_ggb": [
+      "A=(4,0)",
+      "B=(0,0)",
+      "C=(0,4)",
+      "P=Rotate(C,30°,A)",
+      "sAP=Segment(A,P)",
+      "sBC=Segment(B,C)",
+      "E=Intersect(sAP,sBC)",
+      "F=Rotate(E,90°,B)",
+      "sAB=Segment(A,B)",
+      "sCA=Segment(C,A)",
+      "sBF=Segment(B,F)",
+      "sAE=Segment(A,E)",
+      "sCF=Segment(C,F)",
+      "SetVisible(P,false)",
+      "SetVisible(sAP,false)",
+      "ShowLabel(A,true)",
+      "ShowLabel(B,true)",
+      "ShowLabel(C,true)",
+      "ShowLabel(E,true)",
+      "ShowLabel(F,true)"
+     ]
+    }
+   ],
+   "id": "d20261104-165917-64bace",
+   "created_at": "2026-11-04 16:59:17",
+   "status": "pending",
+   "photo": "/Users/flysic/workspace/coding/juniorHigh/wrongbook/data/users/test/photos/d20261104-165917-64bace.jpg"
   }
  ]
 }

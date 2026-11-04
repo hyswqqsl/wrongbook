@@ -314,9 +314,11 @@ def recrop_all(sheet):
 
 
 def ask_json_vision(client, model, prompt, uri, max_tokens=16000):
-    """视觉问答：json_object → 纯文本 ×2（父项目降级经验；转录开思考保准确率）"""
+    """视觉问答：json_object → 纯文本 ×2 → 关思考纯文本（父项目降级经验；转录开思考保准确率）
+
+    第 4 级 nothink：D12 场景——思考链烧光 max_tokens 致 content=''，关思考重试（实测 645s→16s）。"""
     last = ""
-    for mode in ("json", "plain", "plain"):
+    for mode in ("json", "plain", "plain", "nothink"):
         try:
             content = [{"type": "text", "text": prompt}]
             if uri:
@@ -326,6 +328,8 @@ def ask_json_vision(client, model, prompt, uri, max_tokens=16000):
             if mode == "json":
                 resp = client.chat.completions.create(**kwargs, response_format={"type": "json_object"})
             else:
+                if mode == "nothink":
+                    kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
                 resp = client.chat.completions.create(**kwargs)
             content = (resp.choices[0].message.content or "").strip()
             last = content

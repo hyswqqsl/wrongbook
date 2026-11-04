@@ -1,0 +1,3 @@
+[      16ms] TypeError: Cannot read properties of undefined (reading 'inject')
+    at http://127.0.0.1:8899/static/_ggbtest.html:16:86
+[      25ms] [ERROR] Failed to load resource: the server responded with a status of 404 (NOT FOUND) @ http://127.0.0.1:8899/favicon.ico:0

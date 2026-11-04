@@ -7,4 +7,4 @@ cd "$(dirname "$0")"
 [ -f static/vendor/geogebra/deployggb.js ] || echo "⚠ GeoGebra bundle 未就绪，运行 tools/fetch_geogebra.sh 下载（仅影响图形重画功能）"
 URL="http://127.0.0.1:8899"
 ( sleep 1.2; open "$URL" ) >/dev/null 2>&1 &
-exec .venv/bin/python app.py
+exec .venv/bin/python app.py "$@"   # 透传参数：--debug 等

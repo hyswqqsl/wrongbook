@@ -37,6 +37,18 @@
   `tools/fetch_geogebra.sh` bundle 按需拉取（32MB 下载/116MB 解压，不入 git）；
   入库链 `figure_ggb` 随题存档（可再编辑源文件）；真实 E2E 验证通过（等腰直角三角形中线题 12 行命令全对）；
   新增测试 8 项（全量 118 项全绿）
+- **V1.1.0b 反馈修复**：**移除自动重试**（失败行只标红提示，重新生成由人手动点、才带 prev_errors 反馈——省 token）；
+  点遮罩不再关闭弹窗（仅「关闭 ✕」，防误触丢画法）；prompt 修正：SetLineStyle 必须作用于
+  已命名对象（sDE=Segment(D,E) 后再 SetLineStyle(sDE,2)），降低首失败率；
+  **去左侧 Algebra 栏**（ready 后 `setPerspective("G")`——params 里写对 geometry app 无效，Playwright 实测）+ 画布加宽 560×420；
+  **Set\* 样式命令翻译器**：web 版 evalCommand 不执行 Set\*（geometry/classic 实测均 false，构造命令正常）→
+  前端翻译为 Apps API 直调（setLineStyle/setPointSize/setColor/setVisible/setLabelVisible/setCaption；
+  API 方法返回 void，“不异常即成功”，XML 验证生效；SetPointSize(P,0) 语义翻译为隐藏）——
+  用户报错的 6 行 SetPointSize 复验全部通过
+- **V1.1.0c**：翻译器正则只认 Set 前缀 → ShowLabel 漏翻（仍走 evalCommand 报假失败）；
+  改查表匹配任意命令名，补 ZoomIn→setCoordSystem；用户 20 行脚本仿真验证全路由正确
+- **V1.1.0d**：打开弹窗**不再自动调 LLM**（空脚本时提示手动生成，存档脚本仍本地重放 0 token）；
+  布局修复：弹窗加宽 1080px、脚本栏 360px——画布+脚本同排、三按钮一行（原 880px 宽度不够触发 flex-wrap 掉行）
 
 ---
 
@@ -399,7 +411,7 @@ wrongbook/                 # 本项目（V1.0.1 起完全自包含，可独立�
       ▼
 POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
   → 前端 applet.evalCommand 逐行执行（失败行标红收集）
-  → 有失败？带错误文本自动重调 ggb-script（人不参与，纯文本回路）
+  → 有失败？标红提示，**不自动重试（省 token，v1.1.0b）**；人手改命令重执行，或手动点「🤖重新生成」带失败行反馈
   → 用户拖拽修正（自由点动 → 依赖对象联动，约束保持；可调线型样式）
   → 「导出」getScreenshotBase64(scale=2) → POST …/ggb-figure
   → 存 <sheet>_q<no>_g.png + figure_ggb；figure_crops=[该图]，figure_mode="crop"
@@ -418,7 +430,8 @@ POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
   AngleBisector/PerpendicularLine/ParallelLine/Circle/Intersect/Polygon…白名单），
   **禁止手算坐标**；辅助线 `SetLineStyle(…,2)` 虚线；只输出 `{"commands":[…]}`
 - 调用：`make_client(vision=False)`，temperature 0.2，json_object → plain 降级（复用 ask_json_vision 无图模式）
-- 重试回路：`prev_errors`（前端回传的失败命令行）注入重新生成——不重发图片，成本≈0
+- 手动重试回路：失败行标红后，人点「🤖重新生成」才回传 `prev_errors`（不重发图片）；
+  自动重试已移除（v1.1.0b 用户反馈：省 token）
 
 **前端（GeoGebra 本地化，对齐 V1.0.1 自包含原则）**：
 - Math Apps Bundle 自托管到 `static/vendor/geogebra/`（**不进 git**，体积几十 MB）；
@@ -569,7 +582,7 @@ POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
 | D20 | 发布给他人时不能携带/暴露开发者 API key | **注入式配置**：三层来源（网页「⚙ 设置」落盘 data/ai_config.json > 环境变量 > key.env 开发者便利文件），前两者均已 gitignore；`make_client` 统一注入（provider 缺省=用户选中引擎）；GLM 默认 glm-5.3-flash（原生多模态单模型，看图/解题同模型；视觉字段可改 glm-4.6v-flash 省钱）；key 前端只回显掩码，设置弹窗带「测试连接」（文本+视觉各一次最小真实调用） |
 | D21 | GeoGebra Apps 许可证仅限非商业用途 | 个人/教育用途合规；applet 保留官方署名；商业化前需向 GeoGebra 购买授权 |
 | D22 | Math Apps Bundle 体积大（下载 32MB/解压 116MB），不宜进 git | `static/vendor/geogebra/` 加入 gitignore；`tools/fetch_geogebra.sh` 一键拉取；run.sh 启动自检缺失提示（代码自包含、大资源按需取） |
-| D23 | LLM 命令脚本一次成功率非 100% | evalCommand 逐行回执 → 失败行文本反馈自动重试（不发图）；语法之外的理解错靠人审拖拽兜底——比"重试 LLM 猜坐标"便宜且快 |
+| D23 | LLM 命令脚本一次成功率非 100% | evalCommand 逐行回执 → 失败行标红提示；**不自动重试**（人手动决定是否带失败行反馈重新生成，v1.1.0b）；prompt 强制 SetLineStyle 先命名对象；理解错靠人审拖拽兜底 |
 | D24 | 入库后改图的覆盖策略 | 覆盖原 figure_crop 文件（图源唯一权威，同 recrop_all）；同时清 figure_spec/svg 并置 figure_mode="crop"（对齐 use_crop 语义）；figure_ggb 一并更新保证"永远可再编辑" |
 
 ## 11. 已拍板决策（v0.2 拍板，v0.5.2 沿用）

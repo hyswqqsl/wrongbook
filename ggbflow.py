@@ -24,7 +24,9 @@ GGB_PROMPT = """你是几何作图专家。根据下面的初中数学题干，�
    中点 Midpoint(B,C)、垂线 PerpendicularLine(D,A,B)、垂直平分线 PerpendicularBisector(A,B)、
    角平分线 AngleBisector(A,B,C)、平行线 ParallelLine(P,A,B)、圆 Circle(A,B)、
    交点 Intersect(l,Segment(A,B))、多边形 Polygon(A,B,C)
-3. 题干未提及的辅助线最后加 SetLineStyle(对象,2) 画虚线
+3. 需要虚线的辅助线：先给线段/直线命名（如 sDE=Segment(D,E)），再 SetLineStyle(sDE,2)；
+   SetLineStyle 第一个参数必须是已定义的对象名，禁止直接传 Segment(…) 等命令表达式；
+   需要隐藏的辅助点用 SetVisible(P,false)（不要用 SetPointSize(P,0)）
 4. 命令按依赖顺序排列（先定义后引用）；只用这些命令：{whitelist}
 5. 只输出 JSON（不要其他文字）：{{"commands":["A=(0,0)","B=(4,0)",…]}}
 
@@ -50,7 +52,7 @@ def gen_commands(question, prev_errors=None, client=None, model=None):
         whitelist="、".join(GGB_COMMAND_WHITELIST), question=question.strip()) + fb
     if client is None:
         client, model = make_client(vision=False)
-    data = ask_json_vision(client, model, prompt, None, max_tokens=4000)
+    data = ask_json_vision(client, model, prompt, None, max_tokens=8000)
     cmds = [str(c).strip() for c in (data.get("commands") or []) if str(c).strip()]
     if not cmds:
         raise RuntimeError("模型未返回有效命令")

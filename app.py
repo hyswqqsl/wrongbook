@@ -507,5 +507,7 @@ def api_out(p):
 
 
 if __name__ == "__main__":
-    print("AI错题本 → http://127.0.0.1:8899")
-    app.run(host="127.0.0.1", port=8899, debug=False)
+    # debug 模式：./run.sh --debug 或 FLASK_DEBUG=1 ./run.sh（改代码自动重载 + 出错页面带堆栈；勿在生产常开）
+    debug = "--debug" in sys.argv or os.environ.get("FLASK_DEBUG") == "1"
+    print("AI错题本 → http://127.0.0.1:8899" + ("（debug）" if debug else ""))
+    app.run(host="127.0.0.1", port=8899, debug=debug)
