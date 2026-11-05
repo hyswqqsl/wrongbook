@@ -347,48 +347,86 @@ def ask_json_vision(client, model, prompt, uri, max_tokens=16000):
     raise RuntimeError("转录失败（最后输出: {0!r}）".format(last[:60]))
 
 
-CLASSIFY_PROMPT = """你是初中数学教研专家。下面是【浙教版八年级上册】教材知识树，以及若干道数学题。
-给每道题判定年级和知识点归属：
-- grade：题目内容落在知识树内 → "八年级上册"；明显超出八上范围 → 按浙教版进度给
-  "九年级上册"（如二次函数/相似三角形/锐角三角函数）或"九年级下册"（如圆/解直角三角形/概率）；
-  无法判断 → "其他"
-- chapter/section/kp：grade 为"八年级上册"时，从知识树中选出最匹配的一组
-  （chapter 如"第一章 三角形"，section 如"1.5 三角形全等的判定"，kp 为该节下最匹配的知识点）；
-  其他年级给出你认为的教材归属，kp 可为空字符串
+CLASSIFY_PROMPT = """你是初中数学教研专家。给下面每道数学题做三项归类：
 
-知识树：
-{tree}
+- cat：从「专题分类清单」中选最匹配的一个专题类别（必须逐字输出清单中的类别完整名称）；都不合适输出"其他"
+- kps：从「细分知识点清单」中选出该题涉及的知识点，**最多 3 个**（不足 3 个就只写实际的）。严格遵守：
+  1) 每个知识点必须逐字抄写清单中的名称，禁止自己编造、改写或拼凑新名称
+  2) 先判断题目实际考查什么，优先从对应章节的知识点中选
+     （如"证明两个三角形全等"→ 从第一章选"全等三角形的性质"，而不是写清单中没有的
+       "全等三角形的判定"，也不是"等边三角形的判定定理"这类不相关条目）
+  3) 只有清单确实完全没有覆盖时，才允许输出最多一个简短的知识点名称
+- grade：题目所属年级（八年级上册/八年级下册/九年级上册/九年级下册/其他）
+
+专题分类清单：
+{cats}
+
+细分知识点清单（按章分组）：
+{kb_kps}
 
 题目列表：
 {questions}
 
 只输出 JSON（不要其他文字）：
-{{"questions":[{{"no":1,"grade":"八年级上册","chapter":"…","section":"…","kp":"…"}},…]}}"""
+{{"questions":[{{"no":1,"grade":"八年级上册","cat":"第1类 三边关系","kps":["三角形的三边关系","不等关系"]}},…]}}"""
 
 
-def classify_questions(client, model, questions, tree=None):
-    """转录后批量归类：每题 → (年级, 章节知识点)。纯文本 LLM 一次调用，失败返回 []"""
-    from kbtree import compact_summary, GRADE_OPTIONS
+def classify_questions(client, model, questions, cats=None, kb_kps=None):
+    """转录后批量归类：每题 → (年级, 专题类别, 细分知识点最多3个)。纯文本 LLM 一次调用，失败返回 []
+
+    v1.2k：kps 从内置教材 KB 细分知识点清单（kb_kps）中选，最多 3 个——受控词表，
+    LLM 每个输出 → 精确/包含匹配回清单名 → difflib 相似收敛（阈值 0.5）→
+    都不行丢弃（绝不保留清单外原文）；去重、超 3 个截断。
+    cats = [{"set_id","set_name","cat_id","cat_label"}]（专题类别清单）；
+    kb_kps = [{"kp","chapter"}]（教材 KB 扁平化细分知识点）。"""
+    import difflib
+    grade_opts = ["八年级上册", "八年级下册", "九年级上册", "九年级下册", "其他"]
+    cats = cats or []
+    kb_kps = kb_kps or []
     lines = "\n".join("{0}. {1}".format(q.get("no"), (q.get("question") or "")[:150])
                       for q in questions)
-    prompt = CLASSIFY_PROMPT.format(tree=compact_summary(tree), questions=lines)
+    # 细分知识点清单按章分组展示（帮助 LLM 理解语境，输出仍只给知识点名）
+    by_ch = {}
+    for it in kb_kps:
+        by_ch.setdefault(it.get("chapter", ""), []).append(it["kp"])
+    kb_block = "\n".join("【{0}】{1}".format(ch, "；".join(ks))
+                          for ch, ks in by_ch.items()) or "（无）"
+    prompt = CLASSIFY_PROMPT.format(cats="\n".join(c["cat_label"] for c in cats) or "（无）",
+                                    kb_kps=kb_block, questions=lines)
     try:
         data = ask_json_vision(client, model, prompt, None, max_tokens=4000)
     except Exception:
         return []
+    by_label = {c["cat_label"]: c for c in cats}
+    kp_names = {it["kp"] for it in kb_kps}
     out = []
     for c in (data.get("questions") or []):
         if not isinstance(c, dict):
             continue
-        grade = c.get("grade") if c.get("grade") in GRADE_OPTIONS else "八年级上册"
-        out.append({"no": c.get("no"), "grade": grade,
-                    "chapter": (c.get("chapter") or "").strip(),
-                    "section": (c.get("section") or "").strip(),
-                    "kp": (c.get("kp") or "").strip()})
+        grade = c.get("grade") if c.get("grade") in grade_opts else "八年级上册"
+        item = {"no": c.get("no"), "grade": grade, "set": None, "cat": None,
+                "kps": []}
+        m = by_label.get((c.get("cat") or "").strip())
+        if m:
+            item["set"], item["cat"] = m["set_id"], m["cat_id"]
+        # kps 受控（v1.2k）：每个输出 → 精确/包含匹配回清单名 → difflib 相似收敛（阈值 0.5）→
+        #   都不行丢弃（绝不保留清单外原文）；去重、最多 3 个
+        for raw in [str(k).strip() for k in (c.get("kps") or []) if str(k).strip()]:
+            hit = raw if raw in kp_names else None
+            if not hit:
+                hit = next((k for k in kp_names if k in raw or raw in k), None)
+            if not hit:
+                close = difflib.get_close_matches(raw, list(kp_names), n=1, cutoff=0.5)
+                hit = close[0] if close else ""
+            if hit and hit not in item["kps"]:
+                item["kps"].append(hit)
+            if len(item["kps"]) >= 3:
+                break
+        out.append(item)
     return out
 
 
-def transcribe_photo(photo_bytes, source_note="", provider=None):
+def transcribe_photo(def transcribe_photo(photo_bytes, source_note="", provider=None):
     """照片 → 草稿单（多题转录 + 几何题矢量图形 + 落盘）。返回草稿单 dict。
     视觉调用：provider 缺省用配置引擎；GLM 自动切视觉模型 glm-4.6v-flash。"""
     import figureflow
@@ -460,19 +498,29 @@ def transcribe_photo(photo_bytes, source_note="", provider=None):
         rec["figure_mode"], rec["figure_note"] = default_figure_fields(
             rec["question"], rec["has_figure"])
 
-    # ③ 年级/知识点自动归类（纯文本 LLM 批量一次；失败留空由人审手动选择）
+    # ③ 年级/专题类别/细分知识点自动归类（纯文本 LLM 批量一次；失败留空由前端显示兜底）
+    #    v1.2i：kp 从内置教材 KB 细分知识点清单中选（受控词表，与工作台知识点同口径）
     try:
-        import kbtree
-        tree = kbtree.build_tree()
-        cls = {c.get("no"): c for c in classify_questions(client, model, sheet["questions"], tree)}
+        import topics as _topics
+        import kbtree as _kbtree
+        cats = []
+        for s in _topics.load_topics()["sets"]:
+            for c in s["categories"]:
+                cats.append({"set_id": s["id"], "set_name": s["name"], "cat_id": c["id"],
+                             "cat_label": "第{0}类 {1}".format(c["no"], c["name"])})
+        kpt = _kbtree.knowledge_points()   # v1.2i：读精简知识点 json（首次自动从 KB 提炼落盘，不再每次解析两个大 json）
+        kb_kps = [{"kp": k, "chapter": ch["title"]}
+                  for ch in kpt["chapters"] for k in ch["kps"]]
+        cls = {c.get("no"): c for c in classify_questions(client, model, sheet["questions"], cats, kb_kps)}
         for rec in sheet["questions"]:
             c = cls.get(rec.get("no"))
             rec["grade"] = c.get("grade") if c else "八年级上册"
-            rec["kp_sel"] = ({k: c.get(k, "") for k in ("chapter", "section", "kp")}
-                             if c and c.get("chapter") else None)
+            rec["tp_sel"] = ({"set": c["set"], "cat": c["cat"]}
+                             if c and c.get("cat") else None)
+            rec["kp"] = (c.get("kp") or "") if c else ""   # v1.2i：细分知识点（受控清单，只读）
     except Exception:
         for rec in sheet["questions"]:
-            rec["grade"], rec["kp_sel"] = "八年级上册", None
+            rec["grade"], rec["tp_sel"], rec["kp"] = "八年级上册", None, ""
 
     from store import load_sheets, save_sheets
     db = load_sheets()

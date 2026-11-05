@@ -78,26 +78,102 @@ class TestKbTree(unittest.TestCase):
         self.assertIn("《第一章 三角形》", text)
 
 
-class TestClassifyQuestions(unittest.TestCase):
-    """classify_questions：LLM 输出归一化（不真调 LLM）"""
+class TestKnowledgePoints(unittest.TestCase):
+    """v1.2i：精简细分知识点清单（从 KB 提炼落盘，之后直读不再解析大 json）"""
 
-    def test_invalid_grade_falls_back(self):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        _write_kb(self.tmp, IDX)
+        kbtree.set_kb_dir(self.tmp)
+
+    def tearDown(self):
+        kbtree.set_kb_dir(None)
+
+    def test_extract_and_cache(self):
+        out = kbtree.knowledge_points()
+        self.assertEqual([c["title"] for c in out["chapters"]],
+                         ["第一章 三角形", "第二章 特殊三角形"])
+        all_kps = [k for c in out["chapters"] for k in c["kps"]]
+        self.assertIn("三角形内角和", all_kps)   # 假 KB 里的知识点条目
+        self.assertEqual(len(all_kps), len(set(all_kps)))   # 全局去重
+        # 落盘 + 二次调用直读缓存文件（不再碰大 json）
+        p = os.path.join(self.tmp, "knowledge_points.json")
+        self.assertTrue(os.path.exists(p))
+        self.assertEqual(os.path.getsize(p) < 10 * 1024, True)   # 精简（远小于大 json）
+        out2 = kbtree.knowledge_points()
+        self.assertEqual(out2, out)
+
+
+class TestClassifyQuestions(unittest.TestCase):
+    """classify_questions：LLM 输出归一化（不真调 LLM）—— v1.2b/i 专题大类 + KB 细分知识点"""
+
+    CATS = [{"set_id": "ts1", "set_name": "初二中考必考专题", "cat_id": "tc1",
+             "cat_label": "第1类 三边关系"},
+            {"set_id": "ts1", "set_name": "初二中考必考专题", "cat_id": "tc2",
+             "cat_label": "第6类 全等模型"}]
+
+    def test_grade_fallback_and_cat_mapping(self):
+        """v1.2i：kp 受控（内置 KB 细分知识点清单：精确/包含匹配回清单名）"""
         import reviewflow as rf
+        kb = [{"kp": "三角形内角和定理", "chapter": "第一章 三角形"},
+              {"kp": "角平分线的性质", "chapter": "第一章 三角形"}]
         rf_ask = rf.ask_json_vision
         rf.ask_json_vision = lambda *a, **kw: {"questions": [
-            {"no": 1, "grade": "随便写的", "chapter": "第一章 三角形",
-             "section": "1.1 认识三角形", "kp": "三角形内角和"},
-            {"no": 2, "grade": "九年级上册", "chapter": "", "section": "", "kp": ""},
+            {"no": 1, "grade": "随便写的", "cat": "第1类 三边关系", "kp": "三角形内角和定理"},   # 精确命中
+            {"no": 2, "grade": "九年级上册", "cat": "不存在的类别", "kp": "角平分线的性质定理"},  # 包含命中
+            {"no": 3, "grade": "八年级上册", "cat": "第1类 三边关系", "kp": "清单外的自由发挥"},   # 未命中 → 置空（只用清单内知识点）
             "非字典条目应被丢弃"]}
         try:
             out = rf.classify_questions(None, None,
-                                        [{"no": 1, "question": "q1"}, {"no": 2, "question": "q2"}])
+                                        [{"no": i, "question": "q"} for i in (1, 2, 3)],
+                                        cats=self.CATS, kb_kps=kb)
         finally:
             rf.ask_json_vision = rf_ask
-        self.assertEqual(len(out), 2)
+        self.assertEqual(len(out), 3)
         self.assertEqual(out[0]["grade"], "八年级上册")   # 非法 grade 回落
-        self.assertEqual(out[1]["grade"], "九年级上册")
-        self.assertEqual(out[1]["kp"], "")
+        self.assertEqual(out[0]["set"], "ts1")            # 类别名精确匹配回 id
+        self.assertEqual(out[0]["cat"], "tc1")
+        self.assertEqual(out[0]["kp"], "三角形内角和定理")  # 精确匹配
+        self.assertEqual(out[1]["kp"], "角平分线的性质")    # 包含匹配回清单名
+        self.assertIsNone(out[1]["cat"])                  # 未知类别 → 置 None
+        self.assertEqual(out[2]["kp"], "")  # 清单未覆盖 → 置空（前端显示「其他」）
+
+    def test_fuzzy_kp_convergence(self):
+        """清单外名称 difflib 相似收敛到清单内条目（如「全等三角形的判定」→全等相关条目），
+        完全无关则置空；绝不保留清单外原文（v1.2j）"""
+        import reviewflow as rf
+        kb = [{"kp": "三角形内角和定理", "chapter": "第一章 三角形"},
+              {"kp": "三角形内角和", "chapter": "第一章 三角形"}]
+        rf_ask = rf.ask_json_vision
+        rf.ask_json_vision = lambda *a, **kw: {"questions": [
+            {"no": 1, "cat": "第1类 三边关系", "kp": "三角形三个内角的和"},   # 语义近 → difflib 收敛
+            {"no": 2, "cat": "第1类 三边关系", "kp": "完全无关乱写xyz"}]}       # 无关 → 置空
+        try:
+            out = rf.classify_questions(None, None, [{"no": 1, "question": "q1"}, {"no": 2, "question": "q2"}],
+                                        cats=self.CATS, kb_kps=kb)
+        finally:
+            rf.ask_json_vision = rf_ask
+        self.assertIn(out[0]["kp"], ["三角形内角和定理", "三角形内角和"])   # 收敛到清单内
+        self.assertEqual(out[1]["kp"], "")   # 完全无关 → 置空
+
+    def test_prompt_contains_cat_labels(self):
+        import reviewflow as rf
+        seen = {}
+        def fake_ask(client, model, prompt, uri, max_tokens=4000):
+            seen["prompt"] = prompt
+            return {"questions": []}
+        rf_ask = rf.ask_json_vision
+        rf.ask_json_vision = fake_ask
+        try:
+            rf.classify_questions(None, None, [{"no": 1, "question": "q"}],
+                                  cats=self.CATS,
+                                  kb_kps=[{"kp": "三角形内角和定理", "chapter": "第一章 三角形"}])
+        finally:
+            rf.ask_json_vision = rf_ask
+        self.assertIn("第1类 三边关系", seen["prompt"])
+        self.assertIn("第6类 全等模型", seen["prompt"])
+        self.assertIn("三角形内角和定理", seen["prompt"])   # 细分知识点清单进入 prompt
+        self.assertIn("第一章 三角形", seen["prompt"])
 
 
 if __name__ == "__main__":

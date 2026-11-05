@@ -109,3 +109,38 @@ def compact_summary(tree=None):
             kps = "；".join(s["kps"][:6]) if s["kps"] else "（见教材）"
             lines.append("  %s：%s" % (s["title"], kps))
     return "\n".join(lines)
+
+
+# ---------- 精简细分知识点清单（v1.2i） ----------
+
+def _kp_path():
+    return os.path.join(_KB_DIR or os.path.join(BASE, "data", "kb"), "knowledge_points.json")
+
+
+def knowledge_points(force=False):
+    """精简细分知识点清单 → {"grade","chapters":[{"title","kps":[...]}]}
+
+    首次调用从教材 KB 大 json 提炼（build_tree → 去重），落盘 knowledge_points.json
+    （~2KB）；之后直接读精简文件，不再解析两个 ~300KB 的教材大 json（省解析时间，
+    prompt 也只塞这份精简清单）。KB 更新后可 force=True 重新提炼。
+    """
+    p = _kp_path()
+    if not force and os.path.exists(p):
+        with open(p, encoding="utf-8") as f:
+            return json.load(f)
+    tree = build_tree()
+    out = {"grade": tree.get("grade", ""), "chapters": []}
+    seen = set()
+    for ch in tree["chapters"]:
+        kps = []
+        for s in ch["sections"]:
+            for k in s["kps"]:
+                if k not in seen:   # 跨节/跨卷去重
+                    seen.add(k)
+                    kps.append(k)
+        if kps:
+            out["chapters"].append({"title": ch["title"], "kps": kps})
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    return out

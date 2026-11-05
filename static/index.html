@@ -161,8 +161,7 @@ details.kptree[open] summary{color:var(--ink)}
 <header>
   <h1>📐 AI错题本</h1>
   <nav>
-    <button data-tab="ingest" class="on">录入错题本</button>
-    <button data-tab="ingest-topic">录入专题</button>
+    <button data-tab="ingest" class="on">录入题目</button>
     <button data-tab="dash">工作台</button>
     <button data-tab="topics">专题</button>
   </nav>
@@ -224,10 +223,8 @@ function tex(el){if(window.renderMathInElement)renderMathInElement(el,{delimiter
 $$('nav button').forEach(b=>b.onclick=()=>{
   if(paperData&&!confirm('正在做题，是否退出？'))return;   // 做题中防误触（批改完成/放弃后不再拦）
   $$('nav button').forEach(x=>x.classList.toggle('on',x===b));
-  const tab=b.dataset.tab;
-  const sec=tab==='ingest-topic'?'ingest':tab;   // 两个录入入口共用一个 section，入口决定模式
-  if(tab==='ingest')setIngestMode('book');
-  if(tab==='ingest-topic')setIngestMode('topic');
+  const sec=b.dataset.tab;   // ingest|dash|topics（专题录入入口在专题页各类别内）
+  if(sec==='ingest')setIngestMode('book');
   ['ingest','dash','quiz','topics'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!==sec));
   if(sec==='dash')loadDash();
   if(sec==='topics')loadTopics();
@@ -235,15 +232,45 @@ $$('nav button').forEach(b=>b.onclick=()=>{
 
 /* ---------- Tab1 录入（排版机）—— 双入口：录入错题本 / 录入专题 ---------- */
 let sheets=[];
-let INGEST_MODE='book';   // 'book'=录入错题本（主） | 'topic'=录入专题（主）；另一侧为附加勾选
-function setIngestMode(m){
+let INGEST_MODE='book';   // 'book'=录入错题本（主） | 'topic'=录入专题（主，从专题页各类别进入）；另一侧为附加勾选
+let TP_INGEST_CAT=null;   // {set,cat} 从专题页进入时锁定的目标类别（转录后自动勾选存入该类）
+function tpLockLabel(){
+  if(!TP_INGEST_CAT)return '';
+  for(const s of (TOPICS&&TOPICS.sets||[]))for(const c of s.categories)
+    if(s.id===TP_INGEST_CAT.set&&c.id===TP_INGEST_CAT.cat)return `${s.name} · 第${c.no}类 ${c.name}`;
+  return '';
+}
+function setIngestMode(m,lockCat){
   INGEST_MODE=m;
+  TP_INGEST_CAT=(m==='topic'&&lockCat)?{...lockCat}:null;
   const t=$('#upload-title'),h=$('#upload-hint');
-  if(t)t.textContent=m==='book'?'上传错题照片':'上传专题例题照片';
+  if(t)t.textContent=m==='book'?'上传错题照片':'上传专题例题照片'+(TP_INGEST_CAT?`（存入 ${tpLockLabel()}）`:'');
   if(h)h.textContent=m==='book'
-    ?'一张或多张试卷/练习册照片；转录后逐题勾选入库并标注错因，可同时勾选存入专题'
-    :'一张或多张照片；转录后逐题勾选存入的专题类别，可同时勾选存入错题本';
-  if(sheets.length)renderReview();
+    ?'一张或多张试卷/练习册照片；转录后逐题勾选入库并标注错因'
+    :'一张或多张照片；转录后自动勾选存入目标专题类别，知识点由大模型分析';
+  renderReview();   // 无条件渲染：锁定条/空状态提示立即出现，不等转录
+}
+function tpLockChange(val){   // 锁定条上更换目标类别：已自动勾选的题同步换类
+  const i=val.indexOf(':');
+  TP_INGEST_CAT={set:val.slice(0,i),cat:val.slice(i+1)};
+  sheets.filter(s=>(s.mode||'book')==='topic').forEach(s=>s.questions.forEach(q=>{
+    if(q.dest_topic){q.dest_topic={...TP_INGEST_CAT};q.tp_sel={...TP_INGEST_CAT};}
+  }));
+  const t=$('#upload-title');
+  if(t)t.textContent='上传专题例题照片（存入 '+tpLockLabel()+'）';
+  const st=$('#upload-status');
+  if(st)st.textContent='';   // 锁定状态只在人审区 amber 条展示（避免重复）
+  renderReview();
+}
+function tpLockExit(){   // 退出锁定（保留已勾选状态，手动管理）
+  TP_INGEST_CAT=null;
+  renderReview();
+}
+function tpIngest(sid,cid){   // 专题页各类别的录入入口：切录入 tab + 锁定目标类别
+  setIngestMode('topic',{set:sid,cat:cid});
+  $$('nav button').forEach(x=>x.classList.toggle('on',x.dataset.tab==='ingest'));
+  ['ingest','dash','quiz','topics'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!=='ingest'));
+  window.scrollTo(0,0);
 }
 let imgVer=Date.now();   // 裁剪图缓存版本：重抓/重框后递增，强制浏览器刷新（文件名不变）
 /* ---------- 全屏遮罩（转录/录入期间锁屏） ---------- */
@@ -310,20 +337,32 @@ $('#btn-upload').onclick=async()=>{
       const fd=new FormData(); fd.append('photo',files[i]); if(note)fd.append('source',note);
       try{const r=await fetchT('/api/sheets',{method:'POST',body:fd},300000); const j=await r.json();
         if(j.error){$('#upload-status').textContent='❌ '+j.error;}
-        else{sheets.unshift(j); $('#upload-status').textContent=`✅ ${j.questions.length} 题已转录`; renderReview();}
+        else{j.mode=INGEST_MODE;
+          if(INGEST_MODE==='topic'&&TP_INGEST_CAT)   // 专题页录入：自动勾选存入锁定类别
+            j.questions.forEach(q=>{q.dest_topic={...TP_INGEST_CAT};q.tp_sel={...TP_INGEST_CAT};});
+          sheets.unshift(j); $('#upload-status').textContent=`✅ 已转录 ${j.questions.length} 题（尚未提交入库，核对无误后点下方「提交」）`; renderReview();}
       }catch(e){$('#upload-status').textContent='❌ '+e;}
     }
   }finally{hideOv(); pendingFiles=[]; renderThumbs();}
 };
 function renderReview(){
-  const selTotal=sheets.reduce((a,s)=>a+s.questions.filter(q=>q.selected||q.dest_topic).length,0);
-  const bookTotal=sheets.reduce((a,s)=>a+s.questions.filter(q=>q.selected).length,0);
-  const bar=sheets.length?`<div class="commitbar"><span>已选 <b>${selTotal}</b> 题（错题本 ${bookTotal} · 专题 ${selTotal-bookTotal}）· 共 ${sheets.length} 张照片</span>
+  // 双入口独立（v1.2b 反馈）：每个入口只看自己转录的照片
+  const visible=sheets.filter(s=>(s.mode||'book')===INGEST_MODE);
+  const selTotal=visible.reduce((a,s)=>a+s.questions.filter(q=>q.selected||q.dest_topic).length,0);
+  const bookTotal=visible.reduce((a,s)=>a+s.questions.filter(q=>q.selected).length,0);
+  const bar=visible.length?`<div class="commitbar"><span>已选 <b>${selTotal}</b> 题（错题本 ${bookTotal} · 专题 ${selTotal-bookTotal}）· 共 ${visible.length} 张照片</span>
     <button class="pri" onclick="commitAll(this)">提交</button></div>`:'';
-  $('#review-area').innerHTML=bar+sheets.map(sheet=>`
+  const lockBar=TP_INGEST_CAT?`<div class="commitbar" style="border-color:var(--amber)"><span>🎯 正在为「<b>${esc(tpLockLabel())}</b>」录入例题 · 转录后已自动勾选存入该类</span>
+    <select onchange="tpLockChange(this.value)" style="padding:4px 8px;border:1px solid var(--line);border-radius:6px;font:inherit">
+      ${(TOPICS&&TOPICS.sets||[]).map(set=>`<optgroup label="${esc(set.name)}">`+
+        set.categories.map(c=>`<option value="${set.id}:${c.id}"${TP_INGEST_CAT.set===set.id&&TP_INGEST_CAT.cat===c.id?' selected':''}>第${c.no}类 ${esc(c.name)}</option>`).join('')+
+        `</optgroup>`).join('')}
+    </select>
+    <button class="sec" onclick="tpLockExit()">退出锁定</button></div>`:'';
+  $('#review-area').innerHTML=lockBar+(bar+(visible.length?visible.map(sheet=>`
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div><b>人审视图</b> ${sheet.questions.length&&sheet.questions.every(q=>q.done)?'<span class="tag t-pass">✅ 已全部录入</span>':''} <span class="small">来源：${esc(sheet.source||'未标注')} · ${sheet.questions.length} 题 · 左：原图（与右侧逐题对照核对）</span></div>
+      <div><b>人审视图</b> ${sheet.questions.length&&sheet.questions.every(q=>q.done||q.skip)?'<span class="tag t-pass">✅ 已全部处置</span>':''} <span class="small">来源：${esc(sheet.source||'未标注')} · ${sheet.questions.length} 题 · 左：原图（与右侧逐题对照核对）</span></div>
     </div>
     <div class="review" style="margin-top:12px">
       <div class="photo-wrap" id="pw-${sheet.id}" onmousedown="startPick(event,'${sheet.id}')">
@@ -332,7 +371,8 @@ function renderReview(){
       </div>
       <div>${sheet.questions.map(q=>qCard(sheet,q)).join('')}</div>
     </div>
-  </div>`).join('');
+  </div>`).join('')
+    :'<div class="card" style="text-align:center;padding:24px;color:var(--sub)">本入口还没有转录的题目——先在上方上传照片点「转录」</div>'));
   $('#review-area').querySelectorAll('.qtext,.choices').forEach(tex);
 }
 function figBlock(sheet,q){
@@ -371,27 +411,25 @@ function flash(sid,no,msg){
 function qCard(sheet,q){
   const diff={single:'单选',multiple:'多选',fill:'填空',short:'问答'}[q.type]||q.type;
   const isBook=INGEST_MODE==='book';
-  const doneTag=q.done==='dup'?'<span class="tag t-review">⏭ 重复跳过</span>'
+  const shownQ=(q.edited&&q.edited.question)||q.question;   // 已手改则显示编辑后的题干
+  const doneTag=(q.edited&&q.edited.question?'<span class="tag t-review">✎ 已手改</span>':'')
+    +(q.done==='dup'?'<span class="tag t-review">⏭ 重复跳过</span>'
     :q.done==='skip'?'<span class="tag t-review">⏭ 不录入</span>'
-    :q.done?`<span class="tag t-pass">${({ingested:'✓ 已入库',topic:'✓ 已入专题',both:'✓ 已入库+专题'})[q.done]||''}</span>`:'';
+    :q.done?`<span class="tag t-pass">${({ingested:'✓ 已入库',topic:'✓ 已入专题',both:'✓ 已入库+专题'})[q.done]||''}</span>`:'');
+  // 知识点（v1.2i）：两模式统一=LLM 分析的单个细致知识点（只读不可改；不用专题大类名）
+  const kpHtml=`<b>${esc(q.kp||'其他')}</b> <span class="small">大模型分析，不可修改</span>`;
   const topicSel=(sid,no)=>`<select onchange="setDestTopic('${sid}',${no},this.value)" ${q.done?'disabled':''}>
         <option value="">请选类别</option>
         ${(TOPICS&&TOPICS.sets||[]).map(set=>`<optgroup label="${esc(set.name)}">`+
           set.categories.map(c=>`<option value="${set.id}:${c.id}"${q.dest_topic&&q.dest_topic.set===set.id&&q.dest_topic.cat===c.id?' selected':''}>第${c.no}类 ${esc(c.name)}（${({easy:'简单',medium:'中等',final:'压轴'})[c.difficulty]||''}）</option>`).join('')+
           `</optgroup>`).join('')}
       </select>`;
-  // 主勾选（qhead）：book 模式绑 selected；topic 模式绑 dest_topic（勾选自动预选第一个类别，可改）
+  // 主勾选（qhead）：book 模式绑 selected；topic 模式绑 dest_topic（重新勾选时优先跟随知识点，可改）
   const mainOn=isBook?!!q.selected:!!q.dest_topic;
   const mainChg=isBook
     ?`patchQ('${sheet.id}',${q.no},{selected:this.checked},null)`
     :`setTopicMain('${sheet.id}',${q.no},this.checked)`;
   const mainLabel=isBook?'✓ 存错题本':'✓ 存专题';
-  // 附加勾选：另一侧目的地（可多选）
-  const addOn=isBook?!!q.dest_topic:!!q.selected;
-  const addLabel=isBook?'同时存入专题':'同时存入错题本';
-  const addChg=isBook
-    ?`setTopicMain('${sheet.id}',${q.no},this.checked)`
-    :`patchQ('${sheet.id}',${q.no},{selected:this.checked},null)`;
   return `<div class="qcard ${q.selected||q.dest_topic?'sel':''}" id="qcard-${sheet.id}-${q.no}">
     <div class="qhead">
       <input type="checkbox" ${mainOn?'checked':''} ${q.done?'disabled':''} onchange="${mainChg}">
@@ -400,31 +438,27 @@ function qCard(sheet,q){
       ${doneTag}
       <span class="small">${mainOn?mainLabel:''}</span>
     </div>
-    <div class="qtext">${esc(q.question)}</div>
+    <div class="qedit-wrap">
+      <div class="qtext">${esc(shownQ)}</div>
+      ${q.done?'':`<div style="text-align:right;margin-top:4px"><button class="sec" onclick="editQ('${sheet.id}',${q.no})">✎ 修正</button></div>`}
+    </div>
     ${q.choices?`<div class="choices">${q.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:''}
     <div class="cls-row">
       年级：<select onchange="patchQ('${sheet.id}',${q.no},{grade:this.value},this)">
         ${['八年级上册','八年级下册','九年级上册','九年级下册','其他'].map(g=>`<option ${g===(q.grade||'八年级上册')?'selected':''}>${g}</option>`).join('')}
       </select>
-      知识点：<details class="kptree">
-        <summary>${esc(kpLabel(q.kp_sel)||'点击选择知识点')}</summary>
-        <div class="kptree-body">${kpTreeHtml(sheet.id,q.no,q.kp_sel)}</div>
-      </details>
+      知识点：${kpHtml}
     </div>
+    ${!isBook&&q.dest_topic?`<div class="cls-row">存入专题：${topicSel(sheet.id,q.no)} <span class="small">目标类别已由专题页锁定，可换</span></div>`:''}
     ${figBlock(sheet,q)}
     ${q.has_figure&&!q.figure_svg&&!(q.figure_crops||[]).length?`<div class="small" style="color:var(--red)">⚠ 未获得图形：入库后保留题干，可手动补图</div>`:''}
     ${q.figure_note?`<div class="small" style="color:var(--sub)">${esc(q.figure_note)}</div>`:''}
-    <div class="cls-row">
-      <label><input type="checkbox" ${addOn?'checked':''} ${q.done?'disabled':''} onchange="${addChg}"> ${addLabel}</label>
-      ${q.dest_topic?topicSel(sheet.id,q.no):''}
-      <span class="small">${isBook?'勾选后该题同时存入专题例题（零 AI，秒过）':'勾选后该题同时存入错题本（走质量链：验伪+分析）'}</span>
-    </div>
     ${q.printed_answer?`<div class="answer-line">照片答案：${esc(q.printed_answer)}</div>`:''}
     <div class="cls-row">
       🎥 视频讲解（可选）：
       ${q.video?`<span class="tag t-pass">已附视频</span>
-        <button class="sec" onclick="removeDraftVideo('${sheet.id}',${q.no})">移除</button>`
-        :`<button class="sec" onclick="document.getElementById('vf-${sheet.id}-${q.no}').click()">上传视频</button>`}
+        <button class="sec" style="font-size:13px;padding:5px 11px" onclick="removeDraftVideo('${sheet.id}',${q.no})">移除</button>`
+        :`<button class="sec" style="font-size:13px;padding:5px 11px" onclick="document.getElementById('vf-${sheet.id}-${q.no}').click()">🎥 上传视频</button>`}
       <input type="file" id="vf-${sheet.id}-${q.no}" accept="video/*" class="hidden" onchange="uploadDraftVideo('${sheet.id}',${q.no},this)">
       <span class="small" id="vstat-${sheet.id}-${q.no}">详情页/专题卡可播放</span>
     </div>
@@ -434,7 +468,6 @@ function qCard(sheet,q){
       <label><input type="radio" name="r-${sheet.id}-${q.no}" value="other" ${q.reason&&q.reason.kind==='other'?'checked':''} onchange="setReason('${sheet.id}',${q.no},'other')">其他</label>
       <input type="text" placeholder="备注（如：看错条件）" value="${esc(q.reason&&q.reason.note||'')}" onchange="setReasonNote('${sheet.id}',${q.no},this.value)">
     </div>
-    <div style="margin-top:6px"><button class="sec" onclick="editQ('${sheet.id}',${q.no})">✎ 编辑修正</button></div>
   </div>`;
 }
 function hlQ(box,qid){}
@@ -510,21 +543,32 @@ function setReason(sid,no,kind){const s=sheets.find(x=>x.id===sid),q=s.questions
 function setReasonNote(sid,no,note){const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
   q.reason={kind:(q.reason&&q.reason.kind)||'other',note};
   fetch(`/api/sheets/${sid}/questions/${no}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:q.reason})});}
-function setDestTopic(sid,no,val){   // 专题类别下拉（勾选态不变，只换类别）
+function setDestTopic(sid,no,val){   // 专题类别下拉（勾选态不变，只换类别）；归类跟随
   const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
   q.dest_topic=val?(()=>{const i=val.indexOf(':');return{set:val.slice(0,i),cat:val.slice(i+1)};})():null;
-  patchQ(sid,no,{dest_topic:q.dest_topic},null);
+  if(q.dest_topic)q.tp_sel={...q.dest_topic};   // 归类与存专题的类别保持一致（可再手改）
+  patchQ(sid,no,{dest_topic:q.dest_topic,tp_sel:q.tp_sel},null);
   renderReview();   // 刷新提交栏计数
 }
-function setTopicMain(sid,no,on){   // 「存专题」勾选（主或附加侧通用）：勾选自动预选第一个类别（可改）
+function setTpSel(sid,no,val){   // 保留兼容（旧引用）；知识点现为只读展示，不再提供手改入口
+  const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
+  q.tp_sel=val?(()=>{const i=val.indexOf(':');return{set:val.slice(0,i),cat:val.slice(i+1)};})():null;
+  patchQ(sid,no,{tp_sel:q.tp_sel},null);
+}
+function setTopicMain(sid,no,on){   // 「存专题」勾选（主或附加侧通用）：预选优先跟随大模型分析的知识点，可改
   const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
   if(on){
     if(!q.dest_topic){
-      const t=TOPICS&&TOPICS.sets[0];
-      if(t&&t.categories[0])q.dest_topic={set:t.id,cat:t.categories[0].id};
+      if(q.tp_sel&&q.tp_sel.set&&q.tp_sel.cat){
+        q.dest_topic={...q.tp_sel};   // 跟随知识点（同类）
+      }else{
+        const t=TOPICS&&TOPICS.sets[0];
+        if(t&&t.categories[0])q.dest_topic={set:t.id,cat:t.categories[0].id};
+      }
     }
+    if(q.dest_topic)q.tp_sel={...q.dest_topic};   // 归类跟随存专题的类别
   } else q.dest_topic=null;
-  patchQ(sid,no,{dest_topic:q.dest_topic},null);
+  patchQ(sid,no,{dest_topic:q.dest_topic,tp_sel:q.tp_sel},null);
   renderReview();
 }
 async function uploadDraftVideo(sid,no,input){   // v1.2：人审卡可选上传视频讲解
@@ -543,25 +587,37 @@ async function uploadDraftVideo(sid,no,input){   // v1.2：人审卡可选上传
 function removeDraftVideo(sid,no){patchQ(sid,no,{video:null},null);renderReview();}
 function editQ(sid,no){
   const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
+  if(q._editing)return;
+  q._editing=true;
   const card=document.getElementById(`qcard-${sid}-${no}`);
+  const wrap=card.querySelector('.qedit-wrap');   // 题干+右下角编辑按钮整体替换：编辑态里不再显示编辑修正按钮
   const t=(q.edited&&q.edited.question)||q.question;
-  card.querySelector('.qtext').innerHTML=`<textarea>${esc(t)}</textarea>
-    <div class="small" style="margin-top:4px">公式用 $..$ 包裹 LaTeX；保存后重新渲染</div>`;
-  const ta=card.querySelector('textarea'); ta.focus();
-  card.querySelector('.qtext').insertAdjacentHTML('afterend',
-    `<div style="margin-top:6px"><button class="pri" onclick="saveEdit('${sid}',${no})">保存</button></div>`);
+  wrap.innerHTML=`<textarea style="width:100%;min-height:110px;box-sizing:border-box;font:inherit;padding:6px;border:1px solid var(--blue);border-radius:6px">${esc(t)}</textarea>
+    <div class="small" style="margin-top:4px">公式用 $..$ 包裹 LaTeX；保存后重新渲染</div>
+    <div style="margin-top:6px;display:flex;gap:8px">
+      <button class="pri" onclick="saveEdit('${sid}',${no})">保存</button>
+      <button class="sec" onclick="cancelEdit('${sid}',${no})">取消</button>
+    </div>`;
+  wrap.querySelector('textarea').focus();
+}
+function cancelEdit(sid,no){   // 放弃编辑：重渲染恢复原文（编辑态消失，编辑修正按钮回来到右下角）
+  const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
+  q._editing=false;
+  renderReview();
 }
 async function saveEdit(sid,no){
   const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
   const t=document.querySelector(`#qcard-${sid}-${no} textarea`).value;
   q.edited={...(q.edited||{}),question:t};
+  q._editing=false;
   await fetch(`/api/sheets/${sid}/questions/${no}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({edited:q.edited})});
   renderReview();
 }
 /* 全局提交：一次处置所有选题（存错题本走质量链；存专题零 LLM），锁屏 → 完成横幅汇总 */
 async function commitAll(btn){
   const hasDest=q=>q.selected||q.dest_topic;
-  const jobs=sheets.filter(s=>s.questions.some(hasDest));
+  const visible=sheets.filter(s=>(s.mode||'book')===INGEST_MODE);   // 只提交当前入口的照片（双入口独立）
+  const jobs=visible.filter(s=>s.questions.some(hasDest));
   if(!jobs.length)return alert('先勾选错题本 或 选择「存入专题」目标');
   const noReason=jobs.flatMap(s=>s.questions.filter(q=>q.selected&&(!q.reason||!q.reason.kind)));
   if(noReason.length&&!confirm(`有 ${noReason.length} 题未标错因（存错题本需要），确定继续？`))return;
@@ -1149,47 +1205,7 @@ async function submitPaper(){
   window.scrollTo(0,0);
 }
 
-/* ---------- 知识点树（v0.7.1：浙教版八上 章/节/知识点） ---------- */
-let KB=null;
-async function loadKB(){
-  try{ KB=await (await fetch('/api/kb')).json(); }catch(e){}
-  if(sheets.length)renderReview();   // 树到位后重渲染已转录卡片
-  if(!document.getElementById('tab-dash').classList.contains('hidden'))loadDash();   // 刷新知识点筛选选项
-}
-function kpLabel(sel){
-  if(!sel||!sel.kp)return '';
-  return [sel.chapter,sel.section,sel.kp].filter(Boolean).join(' · ');
-}
-function kpTreeHtml(sid,no,sel){
-  if(!KB)return '<span class="small">知识库加载中…</span>';
-  return KB.chapters.map(c=>{
-    const chOpen=sel&&sel.chapter===c.title?' open':'';
-    return `<details class="kp-ch"${chOpen}>
-      <summary>《${esc(c.title)}》</summary>
-      ${c.sections.map(sn=>{
-        const secOpen=sel&&sel.section===sn.title?' open':'';
-        return `<details class="kp-sec"${secOpen}>
-          <summary>${esc(sn.title)}</summary>
-          ${sn.kps.map(k=>{
-            const on=sel&&sel.kp===k&&sel.section===sn.title?' on':'';
-            return `<div class="kp-item${on}" onclick="setKp('${sid}',${no},'${esc(c.title)}','${esc(sn.title)}','${esc(k)}',this)">▸ ${esc(k)}</div>`;
-          }).join('')}
-        </details>`;
-      }).join('')}
-    </details>`;
-  }).join('');
-}
-function setKp(sid,no,ch,sec,kp,el){
-  const sel={chapter:ch,section:sec,kp};
-  const s=sheets.find(x=>x.id===sid); const q=s&&s.questions.find(x=>x.no===no);
-  if(q)q.kp_sel=sel;
-  patchQ(sid,no,{kp_sel:sel},null);
-  const det=el.closest('details.kptree');
-  det.querySelector('summary').textContent=[ch,sec,kp].filter(Boolean).join(' · ');
-  det.querySelectorAll('.kp-item.on').forEach(x=>x.classList.remove('on'));
-  el.classList.add('on');
-  det.open=false;
-}
+/* ---------- 专题分类选择（v1.2b：知识点归类从教材 KB 三级树改为专题大类，与专题体系统一） ---------- */
 
 /* ---------- Tab 专题（V1.2：专题集 → 类别 → 典型例题 + 练习） ---------- */
 let TOPICS=null, TP_VIEW={set:null,cat:null};
@@ -1216,7 +1232,7 @@ function renderTopics(){
   area.innerHTML=`<div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <b style="font-size:16px">📚 专题练习</b>
-      <span class="small">例题在「录入」转录后选「存入专题」添加；做错可手动存入错题本</span>
+      <span class="small">点各类别的「＋录入」上传照片转录添加；做错可手动存入错题本</span>
       <button class="sec" style="margin-left:auto" onclick="tpNewSet()">＋新建专题集</button>
     </div>
     ${TOPICS.sets.map(set=>{
@@ -1238,7 +1254,8 @@ function renderTopics(){
 function catCardHtml(c,setId){
   const ready=(c.examples||[]).filter(e=>e.practice&&e.practice.ready).length;
   return `<div class="tp-cat" onclick="event.stopPropagation();tpOpenCat('${setId}','${c.id}')">
-    <div style="display:flex;align-items:center;gap:6px"><b>第${c.no}类</b><span class="tag t-med">${c.points}分</span></div>
+    <div style="display:flex;align-items:center;gap:6px"><b>第${c.no}类</b><span class="tag t-med">${c.points}分</span>
+      <button class="sec" style="margin-left:auto;font-size:12px;padding:3px 8px" onclick="event.stopPropagation();tpIngest('${setId}','${c.id}')" title="上传照片转录，自动存入该类">＋录入</button></div>
     <div style="margin-top:3px;font-size:14px">${esc(c.name)}</div>
     <div style="margin-top:5px;font-size:12.5px;color:var(--sub)">${TP_DIFF[c.difficulty]||''} · 例题 ${(c.examples||[]).length}${ready?` · 🏆${ready}`:''}</div>
   </div>`;
@@ -1253,7 +1270,7 @@ function renderSetView(area,set){
       <button class="sec" onclick="tpDelSet('${set.id}','${esc(set.name)}')">删除专题集</button>
     </div>
     <div class="tp-grid">${set.categories.map(c=>catCardHtml(c,set.id)).join('')||'<div class="small">还没有类别，点「＋新增类别」创建</div>'}</div>
-    <div class="small" style="margin-top:12px">加例题：到「录入」上传照片转录 → 题卡上选「存入专题」到此类别 → 提交（零 AI 调用）</div>
+    <div class="small" style="margin-top:12px">加例题：点各类别卡的「＋录入」（或进入类别后点「＋录入例题」），上传照片转录即自动存入该类</div>
   </div>`;
 }
 function exCardHtml(set,cat,e){
@@ -1286,9 +1303,10 @@ function renderCatDetail(area,set,cat){
       <button class="sec" onclick="tpOpenSet('${set.id}')">← ${esc(set.name)}</button>
       <b style="font-size:16px">第${cat.no}类 ${esc(cat.name)}</b>
       <span class="tag t-med">${cat.points}分</span><span class="tag t-easy">${TP_DIFF[cat.difficulty]||''}</span>
-      ${(cat.examples||[]).length?`<button class="pri" style="margin-left:auto" onclick="tpPracticeCat('${set.id}','${cat.id}')">▶ 整类练习（${cat.examples.length} 题）</button>`:''}
+      <button class="pri" style="margin-left:auto" onclick="tpIngest('${set.id}','${cat.id}')">＋录入例题</button>
+      ${(cat.examples||[]).length?`<button class="pri" onclick="tpPracticeCat('${set.id}','${cat.id}')">▶ 整类练习（${cat.examples.length} 题）</button>`:''}
     </div>
-    ${(cat.examples||[]).map(e=>exCardHtml(set,cat,e)).join('')||'<div class="small" style="margin-top:10px">还没有例题：到「录入」上传照片转录后，题卡选「存入专题」到此类别</div>'}
+    ${(cat.examples||[]).map(e=>exCardHtml(set,cat,e)).join('')||'<div class="small" style="margin-top:10px">还没有例题：点右上「＋录入例题」上传照片转录，自动存入本类</div>'}
   </div>`;
   area.querySelectorAll('.qtext,.choices,.tp-ana').forEach(tex);
 }
@@ -1459,9 +1477,8 @@ async function addUser(){
   location.reload();   // 新用户题库为空，已自动切换
 }
 loadUsers();
-loadKB();
 loadAiConfig();
-loadTopics();   // 专题数据预载（录入页题卡「存入专题」下拉需要）
+loadTopics();   // 专题数据预载（录入页「专题分类」与「同时存入专题」下拉都需要）
 if(sessionStorage.getItem('after-switch')==='dash'){   // 切换用户后：直达工作台（V1.0.3e）
   sessionStorage.removeItem('after-switch');
   document.querySelector('nav button[data-tab=dash]').click();   // click 内含 loadDash

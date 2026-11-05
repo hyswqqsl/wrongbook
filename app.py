@@ -135,7 +135,7 @@ def api_sheet_patch(sid, no):
     allowed = {k: fields[k] for k in
                ("selected", "reason", "edited", "question", "choices", "printed_answer",
                 "figure_mode", "figure_spec", "figure_svg", "figure_crops", "figure_note",
-                "grade", "kp_sel", "dest_topic", "video", "skip")
+                "grade", "kp_sel", "tp_sel", "dest_topic", "video", "skip")
                if k in fields}
     s = store.patch_sheet_question(sid, no, allowed)
     if not s:

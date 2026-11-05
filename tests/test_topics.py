@@ -355,6 +355,32 @@ class TestCommitFlow(unittest.TestCase):
         self.assertTrue(sh["questions"][1].get("skip"))
         self.assertEqual(sh["status"], "processed")   # 全部处置完
 
+    def test_tp_sel_drives_chapter(self):
+        """v1.2b/e 专题分类归类：tp_sel → analysis.chapter=纯名称（去「第N类」前缀），kp_path=[集名, 名称, ""]"""
+        _stub_llm()
+        cat = self.cat
+        sid = self.sid
+        sheet = _mk_sheet([self._draft_q(1, Q1, selected=True,
+                                         tp_sel={"set": sid, "cat": cat["id"]})])
+        pipeline.ingest_selected(sheet)
+        rec = store.load()["questions"][0]
+        an = rec["analysis"]
+        self.assertEqual(an["chapter"], cat["name"])   # v1.2e：知识点纯名称
+        self.assertEqual(an["kp_path"][0], "初二中考必考专题")
+        self.assertEqual(an["kp_path"][1], an["chapter"])
+        self.assertEqual(an["difficulty"], 2)   # LLM 分析仍跑（difficulty 来自 LLM 分析，非类别难度）
+
+    def test_kp_sel_legacy_still_works(self):
+        """旧草稿兼容：无 tp_sel 时 kp_sel 仍生效"""
+        _stub_llm()
+        sheet = _mk_sheet([self._draft_q(1, Q1, selected=True,
+                                         kp_sel={"chapter": "第一章 三角形",
+                                                 "section": "1.1 认识三角形", "kp": "内角和"})])
+        pipeline.ingest_selected(sheet)
+        rec = store.load()["questions"][0]
+        self.assertEqual(rec["analysis"]["chapter"], "第一章 三角形")
+        self.assertEqual(rec["analysis"]["kp_path"], ["第一章 三角形", "1.1 认识三角形", "内角和"])
+
 
 class TestApi(unittest.TestCase):
     def setUp(self):

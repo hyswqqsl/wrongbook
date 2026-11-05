@@ -241,14 +241,32 @@ def ingest_selected(sheet, provider=None):
         report.append("[分析] {0} · 难度{1} · {2}".format(
             an.get("chapter"), an.get("difficulty"), "/".join(an.get("knowledge_points") or [])))
 
-        # ④ 年级/知识点（人审树形选择的值为权威；缺省回落 LLM 分析结果）
+        # ④ 归类（v1.2b：专题大类优先，与专题体系统一；kp_sel 为旧草稿兼容，缺省回落 LLM 分析）
+        tp_sel = q.get("tp_sel") or {}
         kp_sel = q.get("kp_sel") or {}
         grade = q.get("grade") or "八年级上册"
-        chapter = (kp_sel.get("chapter") or an.get("chapter") or "其他")
-        report.append("[归类] {0} · {1}{2}{3}".format(
-            grade, chapter,
-            " " + kp_sel["section"] if kp_sel.get("section") else "",
-            " · " + kp_sel["kp"] if kp_sel.get("kp") else ""))
+        cat_label, set_name = None, None
+        if tp_sel.get("set") and tp_sel.get("cat"):
+            try:
+                import topics as _topics
+                s, c = _topics.find_category(tp_sel["set"], tp_sel["cat"])
+                if c:
+                    cat_label = c["name"]   # v1.2e：知识点纯名称（去「第N类」前缀）
+                    set_name = s["name"]
+            except Exception:
+                pass
+        if cat_label:
+            chapter = cat_label
+            kp_path = [set_name or "", cat_label, ""]
+        elif kp_sel.get("chapter"):
+            chapter = kp_sel["chapter"]
+            kp_path = [kp_sel.get("chapter", ""), kp_sel.get("section", ""),
+                       kp_sel.get("kp", "")]
+        else:
+            chapter = an.get("chapter") or "其他"
+            kp_path = []
+        report.append("[归类] {0} · {1}{2}".format(
+            grade, chapter, "（{0}）".format(set_name) if set_name else ""))
 
         rec = store.add({
             "source": sheet.get("source") or "",
@@ -260,8 +278,7 @@ def ingest_selected(sheet, provider=None):
             "mistake_reason": reason,
             "analysis": {"grade": grade,
                          "chapter": chapter,
-                         "kp_path": ([kp_sel.get("chapter", ""), kp_sel.get("section", ""),
-                                      kp_sel.get("kp", "")] if kp_sel else []),
+                         "kp_path": kp_path,
                          "knowledge_points": an.get("knowledge_points") or [],
                          "pitfall": an.get("pitfall") or "",
                          "difficulty": max(1, min(3, int(an.get("difficulty") or 2))),
