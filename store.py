@@ -228,9 +228,10 @@ def update(qid, **fields):
 
 
 def remove(qid):
-    """删除题目：JSON 记录 + 连带图片清理。
+    """删除题目：JSON 记录 + 连带图片/视频清理。
     - figure_crop（裁剪图）：直接删文件，并从草稿单引用中同步清理（避免已处理草稿渲染坏图）
     - photo（原图）：同一张照片可产多题，仅当剩余题目与草稿单都无引用时才删
+    - video（视频讲解 v1.2）：可能被错题/专题例题/草稿共用，无任何引用才删文件
     返回是否删除"""
     _init_once()
     db = load()
@@ -257,7 +258,34 @@ def remove(qid):
                 os.remove(photo)
             except OSError:
                 pass
+    # ---- 视频讲解清理（v1.2，交叉引用：其余题目/未处置草稿单/专题例题） ----
+    video = target.get("video")
+    if video and os.path.exists(video):
+        used_by_q = any(q.get("video") == video for q in db["questions"])
+        if not used_by_q and not video_draft_ref(video) and not _topics_video_ref(video):
+            try:
+                os.remove(video)
+            except OSError:
+                pass
     return True
+
+
+def video_draft_ref(video):
+    """视频是否仍被【未处置】草稿单题引用（已处置的题不会再提交，引用不阻塞清理）"""
+    return any(q.get("video") == video
+               for sh in load_sheets().get("sheets", [])
+               for q in sh.get("questions", [])
+               if not (q.get("ingested_id") or q.get("skipped_dup")
+                       or q.get("topic_example_id") or q.get("topic_dup_of")))
+
+
+def _topics_video_ref(video):
+    """视频是否仍被专题例题引用（惰性导入避免循环依赖；异常时宁可不删）"""
+    try:
+        import topics
+        return topics.video_referenced(video)
+    except Exception:
+        return True
 
 
 def _scrub_crop_refs(crop):

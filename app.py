@@ -12,7 +12,7 @@ import ai_config
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=os.path.join(BASE, "static"), static_url_path="/static")
-app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024   # 视频讲解上传可达数百 MB（v1.2）
 
 
 def _err(e):
@@ -135,7 +135,7 @@ def api_sheet_patch(sid, no):
     allowed = {k: fields[k] for k in
                ("selected", "reason", "edited", "question", "choices", "printed_answer",
                 "figure_mode", "figure_spec", "figure_svg", "figure_crops", "figure_note",
-                "grade", "kp_sel")
+                "grade", "kp_sel", "dest_topic", "video", "skip")
                if k in fields}
     s = store.patch_sheet_question(sid, no, allowed)
     if not s:
@@ -494,6 +494,137 @@ def api_delete(qid):
     return jsonify({"ok": ok})
 
 
+# ---------- 专题（V1.2：专题集 → 类别 → 典型例题 + 每用户练习） ----------
+
+@app.get("/api/topics")
+def api_topics():
+    """专题全集（含例题 + 当前用户练习统计 + spec 渲染 SVG）"""
+    try:
+        import topics
+        return jsonify(topics.view())
+    except Exception as e:
+        return _err(e)
+
+
+@app.post("/api/topics/sets")
+def api_topics_set_create():
+    try:
+        import topics
+        body = request.get_json(force=True)
+        return jsonify(topics.add_set(body.get("name", "")))
+    except Exception as e:
+        return _err(e)
+
+
+@app.delete("/api/topics/sets/<sid>")
+def api_topics_set_delete(sid):
+    try:
+        import topics
+        return jsonify({"ok": topics.delete_set(sid)})
+    except Exception as e:
+        return _err(e)
+
+
+@app.post("/api/topics/sets/<sid>/categories")
+def api_topics_cat_create(sid):
+    try:
+        import topics
+        b = request.get_json(force=True)
+        return jsonify(topics.add_category(sid, b.get("name", ""), b.get("points", 3),
+                                           b.get("difficulty", "medium"), b.get("no")))
+    except Exception as e:
+        return _err(e)
+
+
+@app.patch("/api/topics/sets/<sid>/categories/<cid>")
+def api_topics_cat_patch(sid, cid):
+    try:
+        import topics
+        b = request.get_json(force=True)
+        return jsonify(topics.patch_category(sid, cid, b))
+    except Exception as e:
+        return _err(e)
+
+
+@app.delete("/api/topics/sets/<sid>/categories/<cid>")
+def api_topics_cat_delete(sid, cid):
+    try:
+        import topics
+        return jsonify({"ok": topics.delete_category(sid, cid)})
+    except Exception as e:
+        return _err(e)
+
+
+@app.delete("/api/topics/examples/<eid>")
+def api_topics_example_delete(eid):
+    try:
+        import topics
+        return jsonify({"ok": topics.delete_example(eid)})
+    except Exception as e:
+        return _err(e)
+
+
+@app.patch("/api/topics/examples/<eid>")
+def api_topics_example_patch(eid):
+    """手编例题：video（视频讲解路径）/answer/analysis/text/choices"""
+    try:
+        import topics
+        b = request.get_json(force=True)
+        return jsonify(topics.patch_example(eid, b))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return _err(e)
+
+
+_VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"}
+
+
+@app.post("/api/videos")
+def api_video_upload():
+    """通用视频讲解上传（v1.2，可选）：multipart file → data/videos/<id>.<ext>
+    返回 {path}；路径可写入草稿题（随提交进错题本/专题例题）或直接 PATCH 例题。"""
+    try:
+        f = request.files.get("file")
+        if not f:
+            return jsonify({"error": "缺少文件"}), 400
+        ext = os.path.splitext(f.filename or "")[1].lower()
+        if ext not in _VIDEO_EXTS:
+            return jsonify({"error": "仅支持 " + "/".join(sorted(_VIDEO_EXTS))}), 400
+        vdir = os.path.join(store._data_dir(), "videos")
+        os.makedirs(vdir, exist_ok=True)
+        import time as _t, uuid as _u
+        name = _t.strftime("v%Y%m%d-%H%M%S-") + _u.uuid4().hex[:6] + ext
+        fp = os.path.join(vdir, name)
+        f.save(fp)
+        return jsonify({"path": fp, "size": os.path.getsize(fp)})
+    except Exception as e:
+        return _err(e)
+
+
+@app.post("/api/topics/examples/<eid>/practice")
+def api_topics_example_practice(eid):
+    """记一次例题练习 {correct} → {streak, ready, count, correct}"""
+    try:
+        import topics
+        b = request.get_json(force=True)
+        return jsonify(topics.record_practice(eid, bool(b.get("correct"))))
+    except Exception as e:
+        return _err(e)
+
+
+@app.post("/api/topics/examples/<eid>/to-book")
+def api_topics_example_to_book(eid):
+    """做错的例题手动存入错题本（默认错因=不会，可后续在工作台手改）"""
+    try:
+        import topics
+        b = request.get_json(force=True, silent=True) or {}
+        reason = b.get("reason") if isinstance(b.get("reason"), dict) else None
+        return jsonify(topics.to_book(eid, reason))
+    except Exception as e:
+        return _err(e)
+
+
 # ---------- 用户管理（v0.7：按用户隔离题库/草稿单/照片） ----------
 
 @app.get("/api/users")
@@ -536,6 +667,7 @@ def api_out(p):
 
 if __name__ == "__main__":
     # debug 模式：./run.sh --debug 或 FLASK_DEBUG=1 ./run.sh（改代码自动重载 + 出错页面带堆栈；勿在生产常开）
+    # threaded=True（v1.2）：质量链 LLM 调用可达 1~3 分钟，串行模式会卡死全站请求
     debug = "--debug" in sys.argv or os.environ.get("FLASK_DEBUG") == "1"
     print("AI错题本 → http://127.0.0.1:8899" + ("（debug）" if debug else ""))
-    app.run(host="127.0.0.1", port=8899, debug=debug)
+    app.run(host="127.0.0.1", port=8899, debug=debug, threaded=True)

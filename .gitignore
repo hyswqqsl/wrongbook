@@ -11,5 +11,10 @@ data/ai_config.json
 data/users/
 data/users.json
 data/*.bak
+# 专题数据（专题集/例题/图形）：同用户数据约定，不入库（v1.2）
+data/topics.json
+data/topic_crops/
+# 视频讲解（可选上传，大文件）：不入库（v1.2）
+data/videos/
 # GeoGebra Math Apps Bundle：几十 MB 大资源按需拉取（tools/fetch_geogebra.sh），不入库
 static/vendor/geogebra/

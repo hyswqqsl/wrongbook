@@ -31,19 +31,26 @@ VERIFY_PROMPT = """你是严格的数学审题专家。请独立解答下面的�
 ok=false 表示题目矛盾/欠定/无解，此时 answer 填"无法确定"。"""
 
 
-def _ask_text_json(client, model, prompt, image_uri=None, max_tokens=8000):
+def _ask_text_json(client, model, prompt, image_uri=None, max_tokens=16000):
+    """文本问答：json_object → 纯文本 ×2 → 关思考（D12 老方子，v1.2 对齐 reviewflow/ggbflow）。
+
+    v1.2 修复：原 8000 max_tokens + 三级降级——DeepSeek 思考链烧光预算致 content='',
+    每次都等满响应（实测验伪+分析拖到 2~3 分钟/题，提交遮罩久转）。
+    现预算翻倍 + 第 4 级 nothink（关思考重试，实测 645s→16s），timeout 300→120s 快速失败。"""
     import base64
     content = [{"type": "text", "text": prompt}]
     if image_uri:
         content.append({"type": "image_url", "image_url": {"url": image_uri}})
     last = ""
-    for mode in ("json", "plain", "plain"):
+    for mode in ("json", "plain", "plain", "nothink"):
         try:
-            kwargs = dict(model=model, timeout=300, temperature=0.3, max_tokens=max_tokens,
+            kwargs = dict(model=model, timeout=120, temperature=0.3, max_tokens=max_tokens,
                           messages=[{"role": "user", "content": content}])
             if mode == "json":
                 resp = client.chat.completions.create(**kwargs, response_format={"type": "json_object"})
             else:
+                if mode == "nothink":
+                    kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
                 resp = client.chat.completions.create(**kwargs)
             txt = (resp.choices[0].message.content or "").strip()
             last = txt
@@ -51,7 +58,10 @@ def _ask_text_json(client, model, prompt, image_uri=None, max_tokens=8000):
                 continue
             m = re.search(r"\{.*\}", txt, re.S)
             if m:
-                return json.loads(m.group(0))
+                try:
+                    return json.loads(m.group(0))
+                except json.JSONDecodeError:
+                    continue
         except Exception:
             continue
     raise RuntimeError("LLM 调用失败（最后输出: {0!r}）".format(last[:60]))
@@ -100,21 +110,39 @@ def resolve_figure_spec(q, text, vectorize=None, client=None, model=None):
 
 
 def ingest_selected(sheet, provider=None):
-    """人审提交：sheet 中 selected=True 的题逐个走质量链入库。
-    返回 {results: [{no, id?|skipped?, report[]}], sheet_id}
+    """人审提交：sheet 中 selected=True（存错题本）/ dest_topic（存专题）的题逐个处置。
+    返回 {results: [{no, id?|skipped?|topic_id?, report[]}], sheet_id}
+
+    v1.2 起每题可双目的地（可多选）：
+    - dest_topic（存入专题）：零 LLM —— 题干/图形/答案已由排版机+人审定稿，
+      专题归类由人点选，直接落库（图形复制进全局 topic_crops）
+    - selected（存错题本）：走完整质量链（查重/图形/验伪/分析）
+    - 两边都选：先存专题再走错题本链；仅选题但未配 AI 引擎 → 报错提示
 
     v0.6.2 起第⓪步先查题库去重：与已入库题重复的直接跳过（不调 LLM、不入库），
     结果在 results 中标 skipped=True + duplicate_of，由前端完成提示汇总展示。
+    （查重只守错题本：重复题仍可存专题）
 
-    v0.6.3 起按题记录处置（ingested_id / skipped_dup 写回草稿单题上）：
+    v0.6.3 起按题记录处置（ingested_id / skipped_dup / topic_example_id 写回草稿单题上）：
     一张照片可分多次提交，每次只处理当次勾选的题；所有题都有处置结果后
     草稿单才标记 processed，否则保持 pending（剩余题仍可再勾选再提交）。
     """
-    client, model = make_client(provider, vision=True)   # 链内可能补向量化（视觉调用）
+    import topics
+    client = None
+    model = None
     results = []
     skipped_ids = []
     for q in sheet["questions"]:
-        if not q.get("selected"):
+        dest_topic = q.get("dest_topic") or None
+        selected = q.get("selected")
+        # 显式跳过（v1.2：每题必须明确处置去向；跳过也算已处置，不阻塞 processed）
+        if q.get("skip"):
+            results.append({"no": q.get("no"), "skipped_manual": True,
+                            "report": ["[跳过] 不录入"]})
+            store.patch_sheet_question(sheet["id"], q.get("no"),
+                                       {"selected": False, "skip": True})
+            continue
+        if not selected and not dest_topic:
             continue
         report = []
         text = q["question"]
@@ -123,11 +151,45 @@ def ingest_selected(sheet, provider=None):
         choices = q.get("edited", {}).get("choices") if isinstance(q.get("edited"), dict) else None
         choices = choices or q.get("choices")
 
+        # ⓪-A 存入专题（零 LLM，v1.2）：排版机+人审已定稿，直接落库
+        topic_id = None
+        if dest_topic:
+            crops = q.get("figure_crops") or []
+            try:
+                ex = topics.add_example(
+                    dest_topic.get("set"), dest_topic.get("cat"), text,
+                    choices=choices, answer=q.get("printed_answer") or "",
+                    ex_type=q.get("type") or "fill",
+                    crop_src=(crops or [None])[0], ggb=q.get("figure_ggb"),
+                    spec=q.get("figure_spec"),
+                    source=sheet.get("source") or "", video=q.get("video"))
+                topic_id = ex["id"]
+                report.append("[专题] 已存入（图形随例题存档）")
+                store.patch_sheet_question(sheet["id"], q.get("no"),
+                                           {"topic_example_id": topic_id})
+            except topics.DuplicateExample as e:
+                report.append("[专题] 与该类已有例题重复，跳过（" + e.eid + "）")
+                # 同样算已处置：不阻塞草稿单完成（与错题本 skipped_dup 同语义）
+                store.patch_sheet_question(sheet["id"], q.get("no"),
+                                           {"topic_dup_of": e.eid})
+            except Exception as e:
+                report.append("[专题] 存入失败：" + str(e)[:120])
+
+        if not selected:
+            results.append({"no": q.get("no"), "topic_id": topic_id, "report": report})
+            continue
+
+        # 错题本链需要 LLM（验伪/分析/补向量化）→ 惰性构造（仅存专题不建客户端）
+        if client is None:
+            client, model = make_client(provider, vision=True)
+
         # ⓪ 题库查重：重复题不入库（同批次先入库的题也能被后面题目查到）
         dup = store.find_duplicate(text)
         if dup:
-            results.append({"no": q.get("no"), "skipped": True, "duplicate_of": dup["id"],
-                            "report": ["[去重] 与已入库题 {0} 重复，跳过".format(dup["id"])]})
+            report.insert(0, "[去重] 与已入库题 {0} 重复，跳过".format(dup["id"]))
+            results.append({"no": q.get("no"), "skipped": True,
+                            "duplicate_of": dup["id"], "topic_id": topic_id,
+                            "report": report})
             skipped_ids.append(dup["id"])
             store.patch_sheet_question(sheet["id"], q.get("no"),
                                        {"selected": False, "skipped_dup": dup["id"]})
@@ -205,17 +267,21 @@ def ingest_selected(sheet, provider=None):
                          "difficulty": max(1, min(3, int(an.get("difficulty") or 2))),
                          "key_idea": an.get("key_idea") or ""},
             "photo": sheet.get("photo"),
+            "video": q.get("video"),   # v1.2：可选视频讲解（人审卡上传），详情页可播放
             "flags": {"needs_review": status == "bad_question"},
         })
         report.append("[入库] " + rec["id"])
-        results.append({"no": q.get("no"), "id": rec["id"], "report": report})
+        results.append({"no": q.get("no"), "id": rec["id"], "topic_id": topic_id,
+                        "report": report})
         store.patch_sheet_question(sheet["id"], q.get("no"),
                                    {"selected": False, "ingested_id": rec["id"]})
 
     ingested_ids = [r["id"] for r in results if r.get("id")]
     sheet_now = store.get_sheet(sheet["id"]) or sheet
     remaining = [q for q in sheet_now.get("questions", [])
-                 if not (q.get("ingested_id") or q.get("skipped_dup"))]
+                 if not (q.get("ingested_id") or q.get("skipped_dup")
+                         or q.get("topic_example_id") or q.get("topic_dup_of")
+                         or q.get("skip"))]
     # 还有未处置的题 → 保持 pending（用户可继续勾选提交）；全部处置完 → processed
     store.set_sheet_status(sheet["id"], "processed" if not remaining else "pending", {
         "ingested": ingested_ids, "skipped_duplicates": skipped_ids})

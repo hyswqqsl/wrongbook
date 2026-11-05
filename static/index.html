@@ -129,6 +129,13 @@ details.kptree[open] summary{color:var(--ink)}
 .kp-item{padding:3px 10px 3px 20px;font-size:13px;cursor:pointer;border-radius:5px}
 .kp-item:hover{background:#eef3ff}
 .kp-item.on{background:var(--blue);color:#fff}
+/* 专题（V1.2） */
+.tp-set{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px;background:#fdfdff}
+.tp-set:hover{box-shadow:0 0 0 1px var(--blue);cursor:pointer}
+.tp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:10px}
+.tp-cat{border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;background:#fff}
+.tp-cat:hover{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
+.tp-ana-wrap{margin-top:6px}
 /* 做题（试卷式）选项 */
 .pq-opt{display:block;padding:4px 8px;border-radius:6px;cursor:pointer}
 .pq-opt:hover{background:#eef3ff}
@@ -154,8 +161,10 @@ details.kptree[open] summary{color:var(--ink)}
 <header>
   <h1>📐 AI错题本</h1>
   <nav>
-    <button data-tab="ingest" class="on">录入（排版机）</button>
+    <button data-tab="ingest" class="on">录入错题本</button>
+    <button data-tab="ingest-topic">录入专题</button>
     <button data-tab="dash">工作台</button>
+    <button data-tab="topics">专题</button>
   </nav>
   <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
     <span class="small">用户</span>
@@ -166,10 +175,10 @@ details.kptree[open] summary{color:var(--ink)}
 </header>
 <main>
 
-<!-- ========== Tab1 录入（排版机） ========== -->
+<!-- ========== Tab1 录入（双入口：录入错题本 / 录入专题，入口由菜单决定） ========== -->
 <section id="tab-ingest">
   <div class="card">
-    <b>上传错题照片</b>　<span class="small">一张或多张试卷/练习册照片；系统自动转录全部题目并抓取图形，再由你勾选入库</span>
+    <b id="upload-title">上传错题照片</b>　<span id="upload-hint" class="small">一张或多张试卷/练习册照片；转录后逐题勾选入库并标注错因，可同时勾选存入专题</span>
     <div id="drop-area" title="点击选择文件；也可拖拽或粘贴">
       <div id="drop-hint" style="text-align:center;padding:18px 12px">
         <div style="font-size:32px;line-height:1.2">🖼️</div>
@@ -193,6 +202,9 @@ details.kptree[open] summary{color:var(--ink)}
 <!-- ========== Tab2 工作台 ========== -->
 <section id="tab-dash" class="hidden"></section>
 
+<!-- ========== Tab 专题（V1.2：专题集 → 类别 → 典型例题 + 练习） ========== -->
+<section id="tab-topics" class="hidden"><div id="topics-area" class="card">加载中…</div></section>
+
 <!-- ========== 做题与批改（不入菜单：工作台勾选→开始做题 进入） ========== -->
 <section id="tab-quiz" class="hidden">
   <div class="card" id="quiz-box">加载中…</div>
@@ -212,17 +224,38 @@ function tex(el){if(window.renderMathInElement)renderMathInElement(el,{delimiter
 $$('nav button').forEach(b=>b.onclick=()=>{
   if(paperData&&!confirm('正在做题，是否退出？'))return;   // 做题中防误触（批改完成/放弃后不再拦）
   $$('nav button').forEach(x=>x.classList.toggle('on',x===b));
-  ['ingest','dash','quiz'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!==b.dataset.tab));
-  if(b.dataset.tab==='dash')loadDash();
+  const tab=b.dataset.tab;
+  const sec=tab==='ingest-topic'?'ingest':tab;   // 两个录入入口共用一个 section，入口决定模式
+  if(tab==='ingest')setIngestMode('book');
+  if(tab==='ingest-topic')setIngestMode('topic');
+  ['ingest','dash','quiz','topics'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!==sec));
+  if(sec==='dash')loadDash();
+  if(sec==='topics')loadTopics();
 });
 
-/* ---------- Tab1 排版机 ---------- */
+/* ---------- Tab1 录入（排版机）—— 双入口：录入错题本 / 录入专题 ---------- */
 let sheets=[];
+let INGEST_MODE='book';   // 'book'=录入错题本（主） | 'topic'=录入专题（主）；另一侧为附加勾选
+function setIngestMode(m){
+  INGEST_MODE=m;
+  const t=$('#upload-title'),h=$('#upload-hint');
+  if(t)t.textContent=m==='book'?'上传错题照片':'上传专题例题照片';
+  if(h)h.textContent=m==='book'
+    ?'一张或多张试卷/练习册照片；转录后逐题勾选入库并标注错因，可同时勾选存入专题'
+    :'一张或多张照片；转录后逐题勾选存入的专题类别，可同时勾选存入错题本';
+  if(sheets.length)renderReview();
+}
 let imgVer=Date.now();   // 裁剪图缓存版本：重抓/重框后递增，强制浏览器刷新（文件名不变）
 /* ---------- 全屏遮罩（转录/录入期间锁屏） ---------- */
 function showOv(t){$('#ov-text').textContent=t;$('#overlay').classList.remove('hidden');}
 function setOv(t){$('#ov-text').textContent=t;}
 function hideOv(){$('#overlay').classList.add('hidden');}
+/* 带超时的 fetch（v1.2）：慢请求永不无限转圈；超时 abort → catch 显示明确错误 */
+function fetchT(url,opt={},ms=120000){
+  const ctl=new AbortController();
+  const t=setTimeout(()=>ctl.abort(),ms);
+  return fetch(url,{...opt,signal:ctl.signal}).finally(()=>clearTimeout(t));
+}
 /* ---------- 图片待传队列：拖拽 / 粘贴 / 点选 三入口统一入队 ---------- */
 let pendingFiles=[];
 function addFiles(list){
@@ -275,7 +308,7 @@ $('#btn-upload').onclick=async()=>{
     for(let i=0;i<files.length;i++){
       setOv(`转录中（${i+1}/${files.length}）… 约20-60秒，请勿关闭页面`);
       const fd=new FormData(); fd.append('photo',files[i]); if(note)fd.append('source',note);
-      try{const r=await fetch('/api/sheets',{method:'POST',body:fd}); const j=await r.json();
+      try{const r=await fetchT('/api/sheets',{method:'POST',body:fd},300000); const j=await r.json();
         if(j.error){$('#upload-status').textContent='❌ '+j.error;}
         else{sheets.unshift(j); $('#upload-status').textContent=`✅ ${j.questions.length} 题已转录`; renderReview();}
       }catch(e){$('#upload-status').textContent='❌ '+e;}
@@ -283,9 +316,10 @@ $('#btn-upload').onclick=async()=>{
   }finally{hideOv(); pendingFiles=[]; renderThumbs();}
 };
 function renderReview(){
-  const selTotal=sheets.reduce((a,s)=>a+s.questions.filter(q=>q.selected).length,0);
-  const bar=sheets.length?`<div class="commitbar"><span>已勾选 <b>${selTotal}</b> 题 · 共 ${sheets.length} 张照片</span>
-    <button class="pri" onclick="commitAll(this)">提交入库</button></div>`:'';
+  const selTotal=sheets.reduce((a,s)=>a+s.questions.filter(q=>q.selected||q.dest_topic).length,0);
+  const bookTotal=sheets.reduce((a,s)=>a+s.questions.filter(q=>q.selected).length,0);
+  const bar=sheets.length?`<div class="commitbar"><span>已选 <b>${selTotal}</b> 题（错题本 ${bookTotal} · 专题 ${selTotal-bookTotal}）· 共 ${sheets.length} 张照片</span>
+    <button class="pri" onclick="commitAll(this)">提交</button></div>`:'';
   $('#review-area').innerHTML=bar+sheets.map(sheet=>`
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
@@ -336,13 +370,35 @@ function flash(sid,no,msg){
 }
 function qCard(sheet,q){
   const diff={single:'单选',multiple:'多选',fill:'填空',short:'问答'}[q.type]||q.type;
-  return `<div class="qcard ${q.selected?'sel':''}" id="qcard-${sheet.id}-${q.no}">
+  const isBook=INGEST_MODE==='book';
+  const doneTag=q.done==='dup'?'<span class="tag t-review">⏭ 重复跳过</span>'
+    :q.done==='skip'?'<span class="tag t-review">⏭ 不录入</span>'
+    :q.done?`<span class="tag t-pass">${({ingested:'✓ 已入库',topic:'✓ 已入专题',both:'✓ 已入库+专题'})[q.done]||''}</span>`:'';
+  const topicSel=(sid,no)=>`<select onchange="setDestTopic('${sid}',${no},this.value)" ${q.done?'disabled':''}>
+        <option value="">请选类别</option>
+        ${(TOPICS&&TOPICS.sets||[]).map(set=>`<optgroup label="${esc(set.name)}">`+
+          set.categories.map(c=>`<option value="${set.id}:${c.id}"${q.dest_topic&&q.dest_topic.set===set.id&&q.dest_topic.cat===c.id?' selected':''}>第${c.no}类 ${esc(c.name)}（${({easy:'简单',medium:'中等',final:'压轴'})[c.difficulty]||''}）</option>`).join('')+
+          `</optgroup>`).join('')}
+      </select>`;
+  // 主勾选（qhead）：book 模式绑 selected；topic 模式绑 dest_topic（勾选自动预选第一个类别，可改）
+  const mainOn=isBook?!!q.selected:!!q.dest_topic;
+  const mainChg=isBook
+    ?`patchQ('${sheet.id}',${q.no},{selected:this.checked},null)`
+    :`setTopicMain('${sheet.id}',${q.no},this.checked)`;
+  const mainLabel=isBook?'✓ 存错题本':'✓ 存专题';
+  // 附加勾选：另一侧目的地（可多选）
+  const addOn=isBook?!!q.dest_topic:!!q.selected;
+  const addLabel=isBook?'同时存入专题':'同时存入错题本';
+  const addChg=isBook
+    ?`setTopicMain('${sheet.id}',${q.no},this.checked)`
+    :`patchQ('${sheet.id}',${q.no},{selected:this.checked},null)`;
+  return `<div class="qcard ${q.selected||q.dest_topic?'sel':''}" id="qcard-${sheet.id}-${q.no}">
     <div class="qhead">
-      <input type="checkbox" ${q.selected?'checked':''} ${q.done?'disabled':''} onchange="patchQ('${sheet.id}',${q.no},{selected:this.checked},this)">
+      <input type="checkbox" ${mainOn?'checked':''} ${q.done?'disabled':''} onchange="${mainChg}">
       <b>第${q.no}题</b><span class="tag t-med">${diff}</span>
       ${q.has_handwriting?'<span class="tag t-review">有手写</span>':''}
-      ${q.done==='ingested'?'<span class="tag t-pass">✓ 已入库</span>':q.done==='dup'?'<span class="tag t-review">⏭ 重复跳过</span>':''}
-      <span class="small">${q.selected?'✓ 入库':''}</span>
+      ${doneTag}
+      <span class="small">${mainOn?mainLabel:''}</span>
     </div>
     <div class="qtext">${esc(q.question)}</div>
     ${q.choices?`<div class="choices">${q.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:''}
@@ -358,7 +414,20 @@ function qCard(sheet,q){
     ${figBlock(sheet,q)}
     ${q.has_figure&&!q.figure_svg&&!(q.figure_crops||[]).length?`<div class="small" style="color:var(--red)">⚠ 未获得图形：入库后保留题干，可手动补图</div>`:''}
     ${q.figure_note?`<div class="small" style="color:var(--sub)">${esc(q.figure_note)}</div>`:''}
+    <div class="cls-row">
+      <label><input type="checkbox" ${addOn?'checked':''} ${q.done?'disabled':''} onchange="${addChg}"> ${addLabel}</label>
+      ${q.dest_topic?topicSel(sheet.id,q.no):''}
+      <span class="small">${isBook?'勾选后该题同时存入专题例题（零 AI，秒过）':'勾选后该题同时存入错题本（走质量链：验伪+分析）'}</span>
+    </div>
     ${q.printed_answer?`<div class="answer-line">照片答案：${esc(q.printed_answer)}</div>`:''}
+    <div class="cls-row">
+      🎥 视频讲解（可选）：
+      ${q.video?`<span class="tag t-pass">已附视频</span>
+        <button class="sec" onclick="removeDraftVideo('${sheet.id}',${q.no})">移除</button>`
+        :`<button class="sec" onclick="document.getElementById('vf-${sheet.id}-${q.no}').click()">上传视频</button>`}
+      <input type="file" id="vf-${sheet.id}-${q.no}" accept="video/*" class="hidden" onchange="uploadDraftVideo('${sheet.id}',${q.no},this)">
+      <span class="small" id="vstat-${sheet.id}-${q.no}">详情页/专题卡可播放</span>
+    </div>
     <div class="reason-row ${q.selected?'':'hidden'}" id="reason-${sheet.id}-${q.no}">
       错因：<label><input type="radio" name="r-${sheet.id}-${q.no}" value="careless" ${q.reason&&q.reason.kind==='careless'?'checked':''} onchange="setReason('${sheet.id}',${q.no},'careless')">马虎</label>
       <label><input type="radio" name="r-${sheet.id}-${q.no}" value="unknown" ${q.reason&&q.reason.kind==='unknown'?'checked':''} onchange="setReason('${sheet.id}',${q.no},'unknown')">不会</label>
@@ -441,6 +510,37 @@ function setReason(sid,no,kind){const s=sheets.find(x=>x.id===sid),q=s.questions
 function setReasonNote(sid,no,note){const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
   q.reason={kind:(q.reason&&q.reason.kind)||'other',note};
   fetch(`/api/sheets/${sid}/questions/${no}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:q.reason})});}
+function setDestTopic(sid,no,val){   // 专题类别下拉（勾选态不变，只换类别）
+  const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
+  q.dest_topic=val?(()=>{const i=val.indexOf(':');return{set:val.slice(0,i),cat:val.slice(i+1)};})():null;
+  patchQ(sid,no,{dest_topic:q.dest_topic},null);
+  renderReview();   // 刷新提交栏计数
+}
+function setTopicMain(sid,no,on){   // 「存专题」勾选（主或附加侧通用）：勾选自动预选第一个类别（可改）
+  const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
+  if(on){
+    if(!q.dest_topic){
+      const t=TOPICS&&TOPICS.sets[0];
+      if(t&&t.categories[0])q.dest_topic={set:t.id,cat:t.categories[0].id};
+    }
+  } else q.dest_topic=null;
+  patchQ(sid,no,{dest_topic:q.dest_topic},null);
+  renderReview();
+}
+async function uploadDraftVideo(sid,no,input){   // v1.2：人审卡可选上传视频讲解
+  const f=input.files[0]; if(!f)return;
+  const st=document.getElementById(`vstat-${sid}-${no}`);
+  st.textContent='上传中…（视频较大，请稍候）';
+  const fd=new FormData(); fd.append('file',f);
+  try{
+    const j=await (await fetch('/api/videos',{method:'POST',body:fd})).json();
+    if(j.error){st.textContent='❌ '+j.error;return;}
+    patchQ(sid,no,{video:j.path},null);
+    st.textContent='✅ 已附视频讲解';
+    renderReview();
+  }catch(e){st.textContent='❌ '+e;}
+}
+function removeDraftVideo(sid,no){patchQ(sid,no,{video:null},null);renderReview();}
 function editQ(sid,no){
   const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
   const card=document.getElementById(`qcard-${sid}-${no}`);
@@ -458,34 +558,43 @@ async function saveEdit(sid,no){
   await fetch(`/api/sheets/${sid}/questions/${no}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({edited:q.edited})});
   renderReview();
 }
-/* 全局提交：一次录入所有勾选题（跨多张照片），锁屏 → 完成横幅汇总（含查重跳过） */
+/* 全局提交：一次处置所有选题（存错题本走质量链；存专题零 LLM），锁屏 → 完成横幅汇总 */
 async function commitAll(btn){
-  const jobs=sheets.filter(s=>s.questions.some(q=>q.selected));
-  if(!jobs.length)return alert('先勾选要入库的错题');
+  const hasDest=q=>q.selected||q.dest_topic;
+  const jobs=sheets.filter(s=>s.questions.some(hasDest));
+  if(!jobs.length)return alert('先勾选错题本 或 选择「存入专题」目标');
   const noReason=jobs.flatMap(s=>s.questions.filter(q=>q.selected&&(!q.reason||!q.reason.kind)));
-  if(noReason.length&&!confirm(`有 ${noReason.length} 题未标错因，确定继续？`))return;
-  showOv('录入中…');
-  const agg={ingested:[],skipped:[],errors:[]};
+  if(noReason.length&&!confirm(`有 ${noReason.length} 题未标错因（存错题本需要），确定继续？`))return;
+  showOv('录入中…（存错题本需走质量链：LLM 验伪+分析，约 0.5~2 分钟/题；仅存专题秒过）');
+  const agg={ingested:[],skipped:[],topics:[],errors:[]};
   try{
     for(let i=0;i<jobs.length;i++){
-      setOv(`录入中… 第 ${i+1}/${jobs.length} 张照片（已入库 ${agg.ingested.length} 题，跳过重复 ${agg.skipped.length} 题）`);
+      setOv(`录入中… 第 ${i+1}/${jobs.length} 张照片（错题本 ${agg.ingested.length} · 专题 ${agg.topics.length} · 跳过重复 ${agg.skipped.length}）——请勿关闭页面`);
       try{
-        const r=await fetch(`/api/sheets/${jobs[i].id}/commit`,{method:'POST'}); const j=await r.json();
+        const r=await fetchT(`/api/sheets/${jobs[i].id}/commit`,{method:'POST'},180000); const j=await r.json();
         if(j.error){agg.errors.push(j.error);continue;}
         (j.results||[]).forEach(x=>{
           const q=jobs[i].questions.find(v=>v.no===x.no);
-          if(x.skipped){agg.skipped.push(`第${x.no}题 与已入库题 ${x.duplicate_of} 重复，未重复录入`);
-            if(q){q.done='dup'; q.selected=false;}}                      // 该题处置完成
+          if(q&&x.topic_id){q.dest_topic_done=true;agg.topics.push(x.no);}
+          if(x.skipped_manual){if(q){q.done='skip';q.selected=false;q.skip=false;q.dest_topic=null;}}
+          else if(x.skipped){agg.skipped.push(`第${x.no}题 与已入库题 ${x.duplicate_of} 重复，未重复录入`);
+            if(q){q.done='dup'; q.selected=false;}}
           else if(x.id){agg.ingested.push({no:x.no,id:x.id,report:x.report||[]});
-            if(q){q.done='ingested'; q.selected=false;}}
+            if(q){q.done=q.dest_topic_done?'both':'ingested'; q.selected=false;}}
+          else if(x.topic_id&&q){q.done='topic'; q.selected=false;}
         });
         // 照片不整体结束：未处理的题保持可勾选，可再次提交（v0.6.3）
-      }catch(e){agg.errors.push(String(e));}
+      }catch(e){
+        agg.errors.push(e&&e.name==='AbortError'
+          ?'请求超时——后台可能仍在处理，稍后到「工作台」查看结果；请勿对同一张草稿单重复点提交'
+          :String(e));
+      }
     }
   }finally{hideOv();}
   // 不隐藏题目列表：保留显示直到下次点「转录」再清空
-  renderReview();
+  renderReview(); loadTopics();   // 刷新专题数据（新增例题同步到专题 Tab 与下拉）
   $('#upload-status').textContent='✅ 已入库 '+agg.ingested.length+' 题'+
+    (agg.topics.length?`，存入专题 ${agg.topics.length} 题`:'')+
     (agg.skipped.length?`，跳过重复 ${agg.skipped.length} 题`:'')+
     (agg.errors.length?`，失败 ${agg.errors.length} 张`:'');
   showResult(agg);
@@ -493,11 +602,12 @@ async function commitAll(btn){
 function showResult(a){
   const el=$('#result-banner');
   let html=`<h3>✅ 录入完成</h3><div>入库 <b>${a.ingested.length}</b> 题`+
+    (a.topics.length?` · 存入专题 <b>${a.topics.length}</b> 题（第${a.topics.join('、')}题）`:'')+
     (a.skipped.length?` · 跳过重复 <b>${a.skipped.length}</b> 题`:'')+
     (a.errors.length?` · 失败 ${a.errors.length} 张`:'')+'</div>';
   if(a.skipped.length)html+=`<div class="small" style="margin-top:4px">⏭ ${a.skipped.map(esc).join('；')}</div>`;
   if(a.errors.length)html+=`<div class="small" style="color:var(--red);margin-top:4px">❌ ${a.errors.map(esc).join('；')}</div>`;
-  if(a.ingested.length)html+=`<details style="margin-top:6px"><summary class="small" style="cursor:pointer">录入详情</summary>`+
+  if(a.ingested.length)html+=`<details style="margin-top:6px"><summary class="small" style="cursor:pointer">错题本录入详情</summary>`+
     a.ingested.map(x=>`<div class="small" style="margin-top:6px"><b>第${x.no}题 → ${x.id}</b><br>${x.report.map(esc).join('<br>')}</div>`).join('')+'</details>';
   html+=`<div style="margin-top:8px;text-align:right"><button class="sec" onclick="document.getElementById('result-banner').classList.add('hidden')">知道了</button></div>`;
   el.innerHTML=html; el.classList.remove('hidden');
@@ -703,6 +813,8 @@ async function showQModal(qid){
     <div class="qtext">${esc((q.question||{}).text||'')}</div>
     ${(q.question||{}).choices?`<div class="choices">${q.question.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:''}
     ${fig}
+    ${q.video?`<details class="tp-ana-wrap"><summary class="small" style="cursor:pointer;color:var(--blue)">🎥 视频讲解</summary>
+      <video controls preload="metadata" src="/data/${q.video.replace(/^.*data\//,'')}" style="width:100%;max-width:560px;margin-top:6px;border-radius:8px"></video></details>`:''}
     <div class="qm-sec"><b>答案</b>：${esc(q.verified_answer||'（无）')}
       ${q.verify_status==='conflict'?'<span class="tag t-conflict">与照片答案冲突</span>':q.verify_status==='pass'?'<span class="tag t-pass">已验伪</span>':''}
       ${q.printed_answer&&q.printed_answer!==q.verified_answer?`<span class="small">（照片印刷答案：${esc(q.printed_answer)}）</span>`:''}</div>
@@ -929,6 +1041,9 @@ function gradeFill(my,ans){
 /* ---------- 做题（试卷式）：勾选题目一次列出，作答后统一批改 ---------- */
 async function showPaper(ids){
   const qs=await Promise.all(ids.map(id=>fetch('/api/questions/'+id).then(r=>r.json())));
+  renderPaper(qs,'数学错题练习卷');
+}
+function renderPaper(qs,title){   // v1.2：错题本与专题例题共用渲染（title 用于打印头）
   paperData=qs;
   const body=qs.map((q,i)=>{
     const an=q.analysis||{};
@@ -961,7 +1076,7 @@ async function showPaper(ids){
         <button class="pri" onclick="submitPaper()">✅ 完成并批改</button>
         <button class="sec" onclick="quitPaper()">放弃</button></span></div>
     <div class="print-head">
-      <h2>数学错题练习卷</h2>
+      <h2>${esc(title||'数学错题练习卷')}</h2>
       <div class="pline">共 ${qs.length} 题 · 班级＿＿＿＿　姓名＿＿＿＿　日期＿＿＿＿</div>
     </div>
     <div id="paper-summary"></div>
@@ -997,14 +1112,14 @@ async function submitPaper(){
     else{my=div.querySelector('.pq-short')?div.querySelector('.pq-short').value:'';
       correct=gradeShort(my,ans);}
     const wrongBefore=(q.practice||[]).filter(p=>!p.correct).length;
-    const r=await (await fetch(`/api/questions/${q.id}/practice`,
+    const r=await (await fetch(q.__topic?`/api/topics/examples/${q.id}/practice`:`/api/questions/${q.id}/practice`,
       {method:'POST',headers:{'Content-Type':'application/json'},
        body:JSON.stringify({correct})})).json();
     if(correct)ok++;
     if(!correct)((an.kp_path||[]).slice(2,3).concat(an.knowledge_points||[])).forEach(k=>{if(k)wrongKps[k]=(wrongKps[k]||0)+1;});
     const stk=r.streak||0;
     const badges=[
-      r.ready?'<span class="badge">✅ 建议归档</span>':`<span class="small">连对 ${stk}/3</span>`,
+      r.ready?`<span class="badge">${q.__topic?'🏆 已掌握（连对3次）':'✅ 建议归档'}</span>`:`<span class="small">连对 ${stk}/3</span>`,
       (!correct&&wrongBefore>=1)?'<span class="tag t-conflict">⚠ 重复做错</span>':'',
       my===''?'<span class="tag t-review">未作答</span>':`<span class="small">你的答案：${esc(my)}</span>`].join(' ');
     div.querySelector('.pq-res').innerHTML=`
@@ -1012,7 +1127,9 @@ async function submitPaper(){
         <b>${correct?'✅ 正确':'❌ 错误'}</b>　正确答案：<b>${esc(ans)||'（无）'}</b>
         <div style="margin-top:4px">状态：${badges}</div>
         <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">
-          ${r.ready?`<button class="pri" onclick="masterQ('${q.id}')">📦 归档</button>`:''}</div></div>`;
+          ${r.ready&&!q.__topic?`<button class="pri" onclick="masterQ('${q.id}')">📦 归档</button>`:''}
+          ${!correct&&q.__topic?`<button class="sec" onclick="tpToBook('${q.id}',this)">📥 存入错题本</button>`:''}
+        </div></div>`;
   }
   const n=divs.length, score=n?Math.round(ok/n*100):0;
   let comment;
@@ -1072,6 +1189,170 @@ function setKp(sid,no,ch,sec,kp,el){
   det.querySelectorAll('.kp-item.on').forEach(x=>x.classList.remove('on'));
   el.classList.add('on');
   det.open=false;
+}
+
+/* ---------- Tab 专题（V1.2：专题集 → 类别 → 典型例题 + 练习） ---------- */
+let TOPICS=null, TP_VIEW={set:null,cat:null};
+const TP_DIFF={easy:'🟢 简单',medium:'🟡 中等',final:'🔴 压轴'};
+async function loadTopics(){
+  try{TOPICS=await (await fetch('/api/topics')).json();}catch(e){return;}
+  if(!document.getElementById('tab-topics').classList.contains('hidden'))renderTopics();
+}
+function renderTopics(){
+  const area=$('#topics-area');
+  if(!TOPICS){area.innerHTML='<div class="card">加载中…</div>';return;}
+  if(TP_VIEW.set){
+    const set=TOPICS.sets.find(s=>s.id===TP_VIEW.set);
+    if(!set){TP_VIEW={set:null,cat:null};}
+    else{
+      if(TP_VIEW.cat){
+        const cat=set.categories.find(c=>c.id===TP_VIEW.cat);
+        if(cat)return renderCatDetail(area,set,cat);
+        TP_VIEW.cat=null;
+      }
+      return renderSetView(area,set);
+    }
+  }
+  area.innerHTML=`<div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <b style="font-size:16px">📚 专题练习</b>
+      <span class="small">例题在「录入」转录后选「存入专题」添加；做错可手动存入错题本</span>
+      <button class="sec" style="margin-left:auto" onclick="tpNewSet()">＋新建专题集</button>
+    </div>
+    ${TOPICS.sets.map(set=>{
+      const ne=set.categories.reduce((a,c)=>a+c.examples.length,0);
+      const nm=set.categories.reduce((a,c)=>a+c.examples.filter(e=>e.practice&&e.practice.ready).length,0);
+      return `<div class="tp-set" onclick="tpOpenSet('${set.id}')">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b style="font-size:15.5px">${esc(set.name)}</b>
+          <span class="tag t-med">${set.categories.length} 类</span>
+          <span class="tag t-easy">例题 ${ne}</span>
+          ${nm?`<span class="tag t-pass">🏆 已掌握 ${nm}</span>`:''}
+          <span style="margin-left:auto"></span>
+          <button class="sec" onclick="event.stopPropagation();tpDelSet('${set.id}','${esc(set.name)}')">删除</button>
+        </div>
+        <div class="tp-grid">${set.categories.map(c=>catCardHtml(c,set.id)).join('')}</div>
+      </div>`;}).join('')||'<div class="small" style="margin-top:10px">还没有专题集</div>'}
+  </div>`;
+}
+function catCardHtml(c,setId){
+  const ready=(c.examples||[]).filter(e=>e.practice&&e.practice.ready).length;
+  return `<div class="tp-cat" onclick="event.stopPropagation();tpOpenCat('${setId}','${c.id}')">
+    <div style="display:flex;align-items:center;gap:6px"><b>第${c.no}类</b><span class="tag t-med">${c.points}分</span></div>
+    <div style="margin-top:3px;font-size:14px">${esc(c.name)}</div>
+    <div style="margin-top:5px;font-size:12.5px;color:var(--sub)">${TP_DIFF[c.difficulty]||''} · 例题 ${(c.examples||[]).length}${ready?` · 🏆${ready}`:''}</div>
+  </div>`;
+}
+function renderSetView(area,set){
+  area.innerHTML=`<div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button class="sec" onclick="tpBack()">← 全部专题</button>
+      <b style="font-size:16px">${esc(set.name)}</b>
+      <span style="margin-left:auto"></span>
+      <button class="sec" onclick="tpNewCat('${set.id}')">＋新增类别</button>
+      <button class="sec" onclick="tpDelSet('${set.id}','${esc(set.name)}')">删除专题集</button>
+    </div>
+    <div class="tp-grid">${set.categories.map(c=>catCardHtml(c,set.id)).join('')||'<div class="small">还没有类别，点「＋新增类别」创建</div>'}</div>
+    <div class="small" style="margin-top:12px">加例题：到「录入」上传照片转录 → 题卡上选「存入专题」到此类别 → 提交（零 AI 调用）</div>
+  </div>`;
+}
+function exCardHtml(set,cat,e){
+  const p=e.practice||{};
+  const fig=e.figure_svg?`<figure style="margin:8px 0;text-align:center"><div class="figsvg">${e.figure_svg}</div></figure>`
+    :(e.figure_crop?`<figure style="margin:8px 0;text-align:center"><img src="/data/${e.figure_crop.replace(/^.*data\//,'')}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:260px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
+  return `<div class="qcard" id="tpex-${e.id}">
+    <div class="qhead"><b>例题</b>
+      <span class="tag t-med">${({single:'单选',multiple:'多选',fill:'填空',short:'问答'})[e.type]||e.type}</span>
+      ${p.ready?'<span class="tag t-pass">🏆 已掌握</span>':p.count?`<span class="small">练过 ${p.count} 次 · 连对 ${p.streak}/3</span>`:'<span class="small">未练过</span>'}
+      <span style="margin-left:auto"></span>
+      <button class="sec" onclick="tpPracticeOne('${set.id}','${cat.id}','${e.id}')">📝 练习此题</button>
+      <button class="sec" onclick="document.getElementById('tvf-${e.id}').click()" title="上传/替换视频讲解">${e.video?'🎥 换视频':'🎥 传视频'}</button>
+      <input type="file" id="tvf-${e.id}" accept="video/*" class="hidden" onchange="tpUploadVideo('${e.id}',this)">
+      <button class="sec" onclick="tpToBook('${e.id}',this)">📥 存入错题本</button>
+      <button class="sec" onclick="tpDelExample('${e.id}')">✕</button>
+    </div>
+    <div class="qtext">${esc(e.text)}</div>
+    ${e.choices?`<div class="choices">${e.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:''}
+    ${fig}
+    ${(e.answer||e.analysis)?`<details class="tp-ana-wrap"><summary class="small" style="cursor:pointer;color:var(--blue)">答案与解析（先做再看）</summary>
+      <div class="ans tp-ana" style="margin-top:6px">答案：<b>${esc(e.answer)||'（无）'}</b>${e.analysis?`<div style="margin-top:4px">${esc(e.analysis)}</div>`:''}</div></details>`:''}
+    ${e.video?`<details class="tp-ana-wrap"><summary class="small" style="cursor:pointer;color:var(--blue)">🎥 视频讲解</summary>
+      <video controls preload="metadata" src="/data/${e.video.replace(/^.*data\//,'')}" style="width:100%;max-width:560px;margin-top:6px;border-radius:8px"></video></details>`:''}
+  </div>`;
+}
+function renderCatDetail(area,set,cat){
+  area.innerHTML=`<div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button class="sec" onclick="tpOpenSet('${set.id}')">← ${esc(set.name)}</button>
+      <b style="font-size:16px">第${cat.no}类 ${esc(cat.name)}</b>
+      <span class="tag t-med">${cat.points}分</span><span class="tag t-easy">${TP_DIFF[cat.difficulty]||''}</span>
+      ${(cat.examples||[]).length?`<button class="pri" style="margin-left:auto" onclick="tpPracticeCat('${set.id}','${cat.id}')">▶ 整类练习（${cat.examples.length} 题）</button>`:''}
+    </div>
+    ${(cat.examples||[]).map(e=>exCardHtml(set,cat,e)).join('')||'<div class="small" style="margin-top:10px">还没有例题：到「录入」上传照片转录后，题卡选「存入专题」到此类别</div>'}
+  </div>`;
+  area.querySelectorAll('.qtext,.choices,.tp-ana').forEach(tex);
+}
+function tpOpenSet(id){TP_VIEW={set:id,cat:null};renderTopics();}
+function tpOpenCat(sid,cid){TP_VIEW={set:sid,cat:cid};renderTopics();}
+function tpBack(){TP_VIEW={set:null,cat:null};renderTopics();}
+async function tpReload(){TOPICS=await (await fetch('/api/topics')).json();renderTopics();}
+function tpNewSet(){
+  const n=prompt('专题集名称（如：初二上学期期末必考）：');if(!n)return;
+  fetch('/api/topics/sets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})}).then(tpReload);
+}
+function tpDelSet(id,name){
+  if(!confirm(`删除专题集「${name}」？其下所有类别与例题将一并删除，不可恢复！`))return;
+  fetch('/api/topics/sets/'+id,{method:'DELETE'}).then(()=>{tpBack();tpReload();});
+}
+function tpNewCat(sid){
+  const n=prompt('类别名称（如：三边关系）：');if(!n)return;
+  const p=prompt('分值（如：3）：','3');if(p===null)return;
+  const d=prompt('难度：easy=简单 / medium=中等 / final=压轴','medium');if(d===null)return;
+  if(!['easy','medium','final'].includes(d))return alert('难度必须是 easy / medium / final');
+  fetch(`/api/topics/sets/${sid}/categories`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,points:+p||3,difficulty:d})}).then(tpReload);
+}
+function tpDelExample(eid){
+  if(!confirm('删除该例题（图形文件一并删除）？'))return;
+  fetch('/api/topics/examples/'+eid,{method:'DELETE'}).then(()=>tpReload());
+}
+async function tpToBook(eid,btn){
+  if(!confirm('存入错题本？\n错因默认记「不会」，可在工作台详情里修改。'))return;
+  const r=await (await fetch(`/api/topics/examples/${eid}/to-book`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json();
+  if(r.error)return alert('❌ '+r.error);
+  if(btn){btn.textContent='✅ 已入错题本';btn.disabled=true;}
+}
+async function tpUploadVideo(eid,input){   // v1.2：例题卡上传/替换视频讲解
+  const f=input.files[0]; if(!f)return;
+  if(!confirm(`上传视频讲解（${(f.size/1048576).toFixed(1)} MB）？上传完成前请勿关闭页面。`))return;
+  const fd=new FormData(); fd.append('file',f);
+  try{
+    const j=await (await fetch('/api/videos',{method:'POST',body:fd})).json();
+    if(j.error)return alert('❌ '+j.error);
+    const r=await (await fetch(`/api/topics/examples/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({video:j.path})})).json();
+    if(r.error)return alert('❌ '+r.error);
+    tpReload();
+  }catch(e){alert('❌ '+e);}
+}
+function tpPracticeOne(sid,cid,eid){
+  const set=TOPICS.sets.find(s=>s.id===sid),cat=set.categories.find(c=>c.id===cid);
+  tpEnterPaper([cat.examples.find(e=>e.id===eid)],set,cat);
+}
+function tpPracticeCat(sid,cid){
+  const set=TOPICS.sets.find(s=>s.id===sid),cat=set.categories.find(c=>c.id===cid);
+  tpEnterPaper(cat.examples,set,cat);
+}
+function tpEnterPaper(exs,set,cat){   // 专题例题 → 做题页（复用批改/连对/掌握）
+  if(paperData&&!confirm('正在做题，是否退出？'))return;
+  const items=exs.map(e=>({__topic:true,id:e.id,type:e.type,verified_answer:e.answer,
+    question:{text:e.text,choices:e.choices,figure_crop:e.figure_crop,figure_spec:e.figure_spec},
+    figure_svg:e.figure_svg,
+    analysis:{difficulty:{easy:1,medium:2,final:3}[cat.difficulty]||2,
+              chapter:`${set.name}·${cat.name}`,knowledge_points:[]}}));
+  $$('nav button').forEach(x=>x.classList.remove('on'));
+  ['ingest','dash','topics'].forEach(t=>$('#tab-'+t).classList.add('hidden'));
+  $('#tab-quiz').classList.remove('hidden');
+  renderPaper(items,`${set.name} · 第${cat.no}类${cat.name}`);
+  window.scrollTo(0,0);
 }
 
 /* ---------- AI 引擎设置（注入式 key：仅存服务端 data/ai_config.json，前端只见掩码） ---------- */
@@ -1180,6 +1461,7 @@ async function addUser(){
 loadUsers();
 loadKB();
 loadAiConfig();
+loadTopics();   // 专题数据预载（录入页题卡「存入专题」下拉需要）
 if(sessionStorage.getItem('after-switch')==='dash'){   // 切换用户后：直达工作台（V1.0.3e）
   sessionStorage.removeItem('after-switch');
   document.querySelector('nav button[data-tab=dash]').click();   // click 内含 loadDash
