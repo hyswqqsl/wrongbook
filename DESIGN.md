@@ -173,6 +173,15 @@
   禁用输入+「✎编辑」（启用后「✅保存/取消」），「移除」弹 confirm（人审卡/例题卡同款）。
   ③ 例题卡删除按钮 ✕ → 「🗑 删除」（confirm 文案对齐 crop 交叉引用保护语义）。
   测试 170 项全绿
+- **V1.2s 提交入库异步化**：**根除提交卡转圈超时**（§12 v1.2 同源问题的彻底解）——质量链
+  （验伪+分析，慢引擎下每题可达数分钟）不再挂在同步 HTTP 里：`POST /api/sheets/<sid>/commit`
+  立即返回并转后台线程执行（`_commit_jobs` 进程内任务表 + threading.Lock；同 sheet
+  running 中重复提交 → **409**，根治"重复点提交"隐患）；新增
+  `GET /api/commit-status/<sid>` 轮询进度（错题本/专题/跳过计数 + 当前题号 + 已用时）；
+  前端遮罩改为轮询驱动（1.5s 间隔，单张兜底 20 分钟，服务重启丢 job 15s 后友好提示）；
+  pipeline.ingest_selected 增加 progress 回调（每题处置后触发）。
+  修复实现中的死锁：`_commit_job_gc` 在持锁块内重复加非重入锁（faulthandler 栈转储定位）。
+  测试 172 项全绿（含异步 job 完成回读 / 运行中 409 拒绝重复提交）
 
 ---
 
@@ -835,6 +844,7 @@ POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
   根因组合：① pipeline `_ask_text_json` 未对齐 v1.1 的 D12 修复（8000 tokens 被思考链烧光，三级降级每级都等满响应）；
   ② dev server 串行（threaded 默认 False），慢请求占住全站；③ 前端 fetch 无超时，慢=永久转圈。
   修复：pipeline 预算翻倍 16000 + 第 4 级 nothink 降级 + timeout 300→120s；`app.run(threaded=True)`；
+  （该问题已于 v1.2s 彻底解决：提交异步化 + 进度轮询，同步 HTTP 不再长挂，见版本历史）
   前端 `fetchT()` 超时保护（提交 180s/转录 300s）+ 遮罩文案写明预期时长 + AbortError 友好提示。
   **附带数据事故**：排查中冒烟实例清理命令误删真实 `data/topics.json`/`topic_crops`/`videos`/用户练习文件。
   恢复：错题本记录完好未损，从其记录重建专题例题（保持 id 与草稿引用链一致）、图形从用户 crops 拷回；

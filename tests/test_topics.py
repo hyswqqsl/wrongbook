@@ -527,6 +527,76 @@ class TestExampleAnalysis(unittest.TestCase):
         self.assertEqual(ex2["pitfall"], "忘证相等就用性质")
 
 
+class TestAsyncCommit(unittest.TestCase):
+    """v1.2r 异步提交：POST 立即返回 job，后台线程执行，GET 轮询进度/结果；
+    同 sheet 运行中重复提交 → 409（根治"重复点提交"隐患）"""
+
+    def setUp(self):
+        self.tmp = _temp_all()
+        self.sid = topics.load_topics()["sets"][0]["id"]
+        self.cat = topics.load_topics()["sets"][0]["categories"][0]
+        from app import app
+        self.c = app.test_client()
+
+    def test_commit_returns_immediately_and_job_completes(self):
+        _stub_llm()
+        sheet = _mk_sheet([self._dq(1, Q1, selected=True)])
+        r = self.c.post(f"/api/sheets/{sheet['id']}/commit")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.get_json().get("state"), "running")
+        # 轮询至完成（stub LLM 秒级）
+        import time as _t
+        for _ in range(50):
+            st = self.c.get(f"/api/commit-status/{sheet['id']}").get_json()
+            if st["state"] in ("done", "error"):
+                break
+            _t.sleep(0.05)
+        self.assertEqual(st["state"], "done")
+        self.assertEqual(len(st["results"]), 1)
+        self.assertEqual(st["ingested"], 1)
+        self.assertTrue(st["results"][0].get("id"))   # 题目已入库带 id
+
+    def test_duplicate_commit_while_running_rejected(self):
+        _stub_llm()
+        sheet = _mk_sheet([self._dq(1, Q1, selected=True)])
+        import pipeline as _pl
+        real = _pl.ingest_selected
+        blocked = __import__("threading").Event()
+        release = __import__("threading").Event()
+
+        def slow_ingest(sheet, provider=None, progress=None):
+            blocked.set()
+            release.wait(10)
+            return real(sheet, provider, progress)
+
+        _pl.ingest_selected = slow_ingest
+        try:
+            r1 = self.c.post(f"/api/sheets/{sheet['id']}/commit")
+            self.assertEqual(r1.status_code, 200)
+            blocked.wait(5)
+            r2 = self.c.post(f"/api/sheets/{sheet['id']}/commit")
+            self.assertEqual(r2.status_code, 409)
+            self.assertTrue(r2.get_json().get("running"))
+            release.set()
+            import time as _t
+            for _ in range(100):
+                st = self.c.get(f"/api/commit-status/{sheet['id']}").get_json()
+                if st["state"] in ("done", "error"):
+                    break
+                _t.sleep(0.05)
+            self.assertEqual(st["state"], "done")
+        finally:
+            _pl.ingest_selected = real
+
+    def _dq(self, no, text, **kw):
+        q = {"no": no, "type": "single", "question": text,
+             "choices": [{"key": "A", "text": "3"}, {"key": "B", "text": "8"}],
+             "printed_answer": "B", "has_figure": False,
+             "figure_crops": [], "selected": True}
+        q.update(kw)
+        return q
+
+
 class TestCropSharedProtection(unittest.TestCase):
     """v1.2q 图形交叉引用保护：to_book 的错题与专题例题共享 topic_crops 文件，
     删任一方不得丢另一方图形（q20261106-111019 图形丢失事故回归）"""

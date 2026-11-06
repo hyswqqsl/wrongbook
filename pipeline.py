@@ -109,9 +109,12 @@ def resolve_figure_spec(q, text, vectorize=None, client=None, model=None):
     return spec
 
 
-def ingest_selected(sheet, provider=None):
+def ingest_selected(sheet, provider=None, progress=None):
     """人审提交：sheet 中 selected=True（存错题本）/ dest_topic（存专题）的题逐个处置。
     返回 {results: [{no, id?|skipped?|topic_id?, report[]}], sheet_id}
+
+    v1.2r：progress 回调（每处置完一题触发一次）——异步提交时前端轮询展示实时进度
+    （错题本/专题/跳过重复计数 + 当前题号）；同步调用不传即可。
 
     v1.2 起每题可双目的地（可多选）：
     - dest_topic（存入专题）：零 LLM —— 题干/图形/答案已由排版机+人审定稿，
@@ -132,6 +135,18 @@ def ingest_selected(sheet, provider=None):
     model = None
     results = []
     skipped_ids = []
+
+    def _tick(no=None):
+        """进度回调（v1.2r 异步提交）：汇总当前处置计数"""
+        if progress:
+            try:
+                progress({"no": no,
+                          "ingested": sum(1 for r in results if r.get("id")),
+                          "topics": sum(1 for r in results if r.get("topic_id")),
+                          "skipped": len(skipped_ids)})
+            except Exception:
+                pass
+
     for q in sheet["questions"]:
         dest_topic = q.get("dest_topic") or None
         selected = q.get("selected")
@@ -141,6 +156,7 @@ def ingest_selected(sheet, provider=None):
                             "report": ["[跳过] 不录入"]})
             store.patch_sheet_question(sheet["id"], q.get("no"),
                                        {"selected": False, "skip": True})
+            _tick(q.get("no"))
             continue
         if not selected and not dest_topic:
             continue
@@ -178,6 +194,7 @@ def ingest_selected(sheet, provider=None):
 
         if not selected:
             results.append({"no": q.get("no"), "topic_id": topic_id, "report": report})
+            _tick(q.get("no"))
             continue
 
         # 错题本链需要 LLM（验伪/分析/补向量化）→ 惰性构造（仅存专题不建客户端）
@@ -194,6 +211,7 @@ def ingest_selected(sheet, provider=None):
             skipped_ids.append(dup["id"])
             store.patch_sheet_question(sheet["id"], q.get("no"),
                                        {"selected": False, "skipped_dup": dup["id"]})
+            _tick(q.get("no"))
             continue
 
         # ① 图形：尊重人审期的用户选择（详见 resolve_figure_spec）
@@ -299,6 +317,7 @@ def ingest_selected(sheet, provider=None):
                         "report": report})
         store.patch_sheet_question(sheet["id"], q.get("no"),
                                    {"selected": False, "ingested_id": rec["id"]})
+        _tick(q.get("no"))
 
     ingested_ids = [r["id"] for r in results if r.get("id")]
     sheet_now = store.get_sheet(sheet["id"]) or sheet

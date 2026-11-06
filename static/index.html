@@ -652,27 +652,45 @@ async function commitAll(btn){
   if(noReason.length&&!confirm(`有 ${noReason.length} 题未标错因（存错题本需要），确定继续？`))return;
   showOv('录入中…（存错题本需走质量链：LLM 验伪+分析，约 0.5~2 分钟/题；仅存专题秒过）');
   const agg={ingested:[],skipped:[],topics:[],errors:[]};
+  const applyResults=(sheet,j)=>{
+    (j.results||[]).forEach(x=>{
+      const q=sheet.questions.find(v=>v.no===x.no);
+      if(q&&x.topic_id){q.dest_topic_done=true;agg.topics.push(x.no);}
+      if(x.skipped_manual){if(q){q.done='skip';q.selected=false;q.skip=false;q.dest_topic=null;}}
+      else if(x.skipped){agg.skipped.push(`第${x.no}题 与已入库题 ${x.duplicate_of} 重复，未重复录入`);
+        if(q){q.done='dup'; q.selected=false;}}
+      else if(x.id){agg.ingested.push({no:x.no,id:x.id,report:x.report||[]});
+        if(q){q.done=q.dest_topic_done?'both':'ingested'; q.selected=false;}}
+      else if(x.topic_id&&q){q.done='topic'; q.selected=false;}
+    });
+  };
   try{
     for(let i=0;i<jobs.length;i++){
-      setOv(`录入中… 第 ${i+1}/${jobs.length} 张照片（错题本 ${agg.ingested.length} · 专题 ${agg.topics.length} · 跳过重复 ${agg.skipped.length}）——请勿关闭页面`);
+      // v1.2r 异步提交：POST 立即返回，轮询进度（HTTP 不再长挂，无超时问题）
+      const t0=Date.now();
       try{
-        const r=await fetchT(`/api/sheets/${jobs[i].id}/commit`,{method:'POST'},180000); const j=await r.json();
+        const r=await fetchT(`/api/sheets/${jobs[i].id}/commit`,{method:'POST'},30000); const j=await r.json();
         if(j.error){agg.errors.push(j.error);continue;}
-        (j.results||[]).forEach(x=>{
-          const q=jobs[i].questions.find(v=>v.no===x.no);
-          if(q&&x.topic_id){q.dest_topic_done=true;agg.topics.push(x.no);}
-          if(x.skipped_manual){if(q){q.done='skip';q.selected=false;q.skip=false;q.dest_topic=null;}}
-          else if(x.skipped){agg.skipped.push(`第${x.no}题 与已入库题 ${x.duplicate_of} 重复，未重复录入`);
-            if(q){q.done='dup'; q.selected=false;}}
-          else if(x.id){agg.ingested.push({no:x.no,id:x.id,report:x.report||[]});
-            if(q){q.done=q.dest_topic_done?'both':'ingested'; q.selected=false;}}
-          else if(x.topic_id&&q){q.done='topic'; q.selected=false;}
-        });
+        // 轮询：每 1.5s 拉一次进度；单张兜底上限 20 分钟（服务重启丢 job 时给出友好提示）
+        while(true){
+          await new Promise(res=>setTimeout(res,1500));
+          const sj=await (await fetch(`/api/commit-status/${jobs[i].id}`)).json();
+          const secs=Math.round((Date.now()-t0)/1000);
+          if(sj.state==='done'||sj.state==='error'){
+            if(sj.state==='error')agg.errors.push('录入失败：'+(sj.error||'未知错误'));
+            else applyResults(jobs[i],sj);
+            break;
+          }
+          if(sj.state==='idle'){   // 服务重启导致 job 丢失
+            if(secs>15){agg.errors.push('服务已重启，本张录入中断——请稍后到「工作台」确认结果后重新勾选提交');break;}
+            continue;             // 刚提交瞬间可能尚未注册，继续等
+          }
+          setOv(`录入中… 第 ${i+1}/${jobs.length} 张照片 · 当前第${sj.cur_no??'?'}题（错题本 ${agg.ingested.length+sj.ingested} · 专题 ${agg.topics.length+sj.topics} · 跳过重复 ${agg.skipped.length+sj.skipped}）· 已用时 ${secs}s ——请勿关闭页面`);
+          if(secs>1200){agg.errors.push('等待超 20 分钟已停止轮询——后台可能仍在处理，稍后到「工作台」查看结果');break;}
+        }
         // 照片不整体结束：未处理的题保持可勾选，可再次提交（v0.6.3）
       }catch(e){
-        agg.errors.push(e&&e.name==='AbortError'
-          ?'请求超时——后台可能仍在处理，稍后到「工作台」查看结果；请勿对同一张草稿单重复点提交'
-          :String(e));
+        agg.errors.push(String(e));
       }
     }
   }finally{hideOv();}

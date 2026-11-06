@@ -334,18 +334,63 @@ def api_recrop_all(sid):
         return _err(e)
 
 
+# ---- 异步提交（v1.2r）：质量链（LLM 验伪+分析）每题可达数分钟，同步 HTTP 必超时——
+# 改为后台线程执行 + 前端轮询进度；同 sheet 运行中拒绝重复提交（根治"重复点提交"隐患）
+_commit_jobs = {}          # {sid: job dict}（进程内；服务重启丢失 → 前端轮询兜底超时提示）
+_commit_lock = __import__("threading").Lock()
+_COMMIT_KEEP = 30          # 保留最近 N 个已完成 job（供前端读取结果）
+
+
+def _commit_job_gc():
+    """清理多余已完成 job（调用方必须已持有 _commit_lock；Lock 不可重入）"""
+    dones = [k for k, v in _commit_jobs.items() if v.get("state") in ("done", "error")]
+    if len(dones) > _COMMIT_KEEP:
+        for k in sorted(dones, key=lambda k: _commit_jobs[k].get("started", 0))[:-_COMMIT_KEEP]:
+            _commit_jobs.pop(k, None)
+
+
 @app.post("/api/sheets/<sid>/commit")
 def api_sheet_commit(sid):
-    try:
-        import pipeline
-        sheet = store.get_sheet(sid)
-        if not sheet:
-            return jsonify({"error": "不存在"}), 404
-        if sheet.get("status") == "processed":
-            return jsonify({"error": "该草稿单已处理"}), 400
-        return jsonify(pipeline.ingest_selected(sheet))
-    except Exception as e:
-        return _err(e)
+    import pipeline
+    sheet = store.get_sheet(sid)
+    if not sheet:
+        return jsonify({"error": "不存在"}), 404
+    if sheet.get("status") == "processed":
+        return jsonify({"error": "该草稿单已处理"}), 400
+    with _commit_lock:
+        job = _commit_jobs.get(sid)
+        if job and job.get("state") == "running":
+            return jsonify({"error": "该照片正在录入中，请勿重复提交", "running": True}), 409
+        job = {"state": "running", "started": __import__("time").time(),
+               "ingested": 0, "topics": 0, "skipped": 0, "cur_no": None,
+               "results": None, "error": None}
+        _commit_jobs[sid] = job
+        _commit_job_gc()
+
+    def _run():
+        try:
+            def _progress(d):
+                job["ingested"], job["topics"], job["skipped"] = d.get("ingested", 0), d.get("topics", 0), d.get("skipped", 0)
+                job["cur_no"] = d.get("no")
+            res = pipeline.ingest_selected(sheet, progress=_progress)
+            job["results"] = res.get("results")
+            job["state"] = "done"
+        except Exception as e:
+            job["error"] = str(e)[:300]
+            job["state"] = "error"
+
+    __import__("threading").Thread(target=_run, daemon=True).start()
+    return jsonify({"job": sid, "state": "running"})
+
+
+@app.get("/api/commit-status/<sid>")
+def api_commit_status(sid):
+    with _commit_lock:
+        job = _commit_jobs.get(sid)
+        if not job:
+            return jsonify({"state": "idle"})
+        return jsonify({k: job.get(k) for k in
+                        ("state", "ingested", "topics", "skipped", "cur_no", "error", "results")})
 
 
 @app.get("/api/sheets/<sid>/docx")
