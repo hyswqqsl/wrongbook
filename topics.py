@@ -304,7 +304,8 @@ def _category_dup(cat, text, threshold=0.92):
 
 
 def add_example(sid, cid, text, choices=None, answer=None, ex_type="fill",
-                analysis="", crop_src=None, ggb=None, spec=None, source="", video=None):
+                analysis="", crop_src=None, ggb=None, spec=None, source="", video=None,
+                kps=None):
     """新增例题（pipeline 从草稿题组装；crop 文件复制进全局 topic_crops）"""
     db = load_topics()
     s, cat = _find_cat_in(db, sid, cid)
@@ -321,7 +322,10 @@ def add_example(sid, cid, text, choices=None, answer=None, ex_type="fill",
           "text": text, "choices": choices or None, "answer": (answer or "").strip(),
           "analysis": analysis or "", "figure_crop": _copy_crop(crop_src, eid),
           "figure_ggb": ggb, "figure_spec": spec, "source": source or "",
-          "video": video}
+          "video": video,
+          # v1.2q：与错题本详情同口径（转录期受控 kps；思路/易错由分析补全）
+          "kps": [k for k in (kps or []) if k][:3],
+          "key_idea": "", "pitfall": ""}
     cat["examples"].append(ex)
     save_topics(db)
     return ex
@@ -333,13 +337,58 @@ class DuplicateExample(Exception):
         super().__init__("与已有例题 " + eid + " 重复")
 
 
+# 专题例题按需分析（v1.2q）：仅存专题走 0 LLM 快速入库（D25），思路/易错点/知识点
+# 由人点「🤖 分析」按需生成（一次纯文本调用）；kps 受控收敛到教材 KB 清单。
+ANALYZE_PROMPT = """你是初中数学教研专家。下面是一道典型例题（可能含多个小问）及其答案。
+请给出面向复习的分析：
+
+- key_idea：核心思路/破题点（1~2 句，讲"怎么想"、关键辅助线或模型，不写完整过程）
+- pitfall：易错点（学生在这道题上最容易错的一处，1 句，具体到动作）
+- kps：该题考查的知识点，从【知识点清单】中**逐字**选 1~3 个（禁止编造清单外名称）
+
+例题：
+{question}
+
+答案：{answer}
+
+知识点清单：{kplist}
+
+只输出 JSON（不要其他文字）：
+{{"key_idea":"…","pitfall":"…","kps":["…"]}}"""
+
+
+def analyze_example(eid):
+    """例题按需分析：LLM 生成思路/易错点 + 受控知识点，写回例题（覆盖旧值）。"""
+    s, c, e = find_example(eid)
+    if not e:
+        raise ValueError("例题不存在")
+    from common import make_client
+    import reviewflow as rf
+    import kbtree
+    client, model = make_client(None)
+    kb_kps = [{"kp": k, "chapter": ch["title"]}
+              for ch in kbtree.knowledge_points().get("chapters", []) for k in ch["kps"]]
+    prompt = ANALYZE_PROMPT.format(
+        question=(e["text"] or "")[:900],
+        answer=(e.get("answer") or "（无）")[:200],
+        kplist="；".join(it["kp"] for it in kb_kps) or "（无）")
+    data = rf.ask_json_vision(client, model, prompt, None, max_tokens=4000)
+    fields = {"key_idea": str(data.get("key_idea") or "").strip()[:200],
+              "pitfall": str(data.get("pitfall") or "").strip()[:200],
+              "kps": rf.converge_kps(data.get("kps"), kb_kps)}
+    if not fields["key_idea"] and not fields["pitfall"] and not fields["kps"]:
+        raise RuntimeError("分析结果为空（模型未按格式输出）")
+    return patch_example(eid, fields)
+
+
 def patch_example(eid, fields):
     """手编例题（video/analysis/answer/text 等）；返回更新后的例题"""
     db = load_topics()
     s, c, e = _find_example_in(db, eid)
     if not e:
         raise ValueError("例题不存在")
-    for k in ("text", "answer", "analysis", "video", "choices"):
+    for k in ("text", "answer", "analysis", "video", "choices",
+              "key_idea", "pitfall", "kps"):   # v1.2q：与错题本详情同口径
         if k in fields:
             e[k] = fields[k]
     save_topics(db)

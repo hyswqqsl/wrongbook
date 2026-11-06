@@ -565,6 +565,18 @@ def api_topics_example_delete(eid):
         return _err(e)
 
 
+@app.post("/api/topics/examples/<eid>/analyze")
+def api_topics_example_analyze(eid):
+    """🤖 v1.2q：例题按需分析（思路/易错点/受控知识点）——纯文本 LLM 一次调用"""
+    try:
+        import topics
+        return jsonify(topics.analyze_example(eid))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return _err(e)
+
+
 @app.patch("/api/topics/examples/<eid>")
 def api_topics_example_patch(eid):
     """手编例题：video（视频讲解路径）/answer/analysis/text/choices"""

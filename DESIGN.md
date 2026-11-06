@@ -164,6 +164,15 @@
   ② 详情弹窗「✎改图」按钮移除（`/api/questions/<id>/figure` API 保留备用）。
   ③ 视频链接改**面板内联输入**（人审卡/例题卡 onchange 即存，清空=移除；不再弹 prompt）。
   测试 167 项全绿（含 TestCropSharedProtection 事故场景回归）
+- **V1.2r 例题分析补齐 + 视频交互细化**：① 专题例题与错题本详情**同口径**——数据模型扩
+  kps/key_idea/pitfall；双目的地入库时错题本链的分析结果**自动回写专题例题**
+  （0 额外 token）；仅存专题的例题走「🤖 AI 分析」**按需生成**（新端点
+  POST /api/topics/examples/<id>/analyze，纯文本 LLM 一次调用，kps 受控收敛复用
+  reviewflow.converge_kps）；例题卡新增知识点 tag、「💡思路与易错点」折叠块。
+  ② 视频链接交互细化：**不再 onchange 自动写库**——无视频=粘贴+「➕添加」，已有=
+  禁用输入+「✎编辑」（启用后「✅保存/取消」），「移除」弹 confirm（人审卡/例题卡同款）。
+  ③ 例题卡删除按钮 ✕ → 「🗑 删除」（confirm 文案对齐 crop 交叉引用保护语义）。
+  测试 170 项全绿
 
 ---
 

@@ -162,7 +162,8 @@ def ingest_selected(sheet, provider=None):
                     ex_type=q.get("type") or "fill",
                     crop_src=(crops or [None])[0], ggb=q.get("figure_ggb"),
                     spec=q.get("figure_spec"),
-                    source=sheet.get("source") or "", video=q.get("video"))
+                    source=sheet.get("source") or "", video=q.get("video"),
+                    kps=q.get("kps"))   # v1.2q：转录期受控知识点随例题存档
                 topic_id = ex["id"]
                 report.append("[专题] 已存入（图形随例题存档）")
                 store.patch_sheet_question(sheet["id"], q.get("no"),
@@ -282,6 +283,17 @@ def ingest_selected(sheet, provider=None):
             "video": q.get("video"),   # v1.2：可选视频讲解（人审卡上传），详情页可播放
             "flags": {"needs_review": status == "bad_question"},
         })
+        # v1.2q：双目的地时把错题本链的分析结果回写专题例题（思路/易错/受控kps），0 额外 token
+        if topic_id:
+            try:
+                import topics as _t
+                _t.patch_example(topic_id, {
+                    "key_idea": an.get("key_idea") or "",
+                    "pitfall": an.get("pitfall") or "",
+                    "kps": kps_ctl})
+                report.append("[专题] 例题已带思路/易错点/知识点分析")
+            except Exception:
+                pass
         report.append("[入库] " + rec["id"])
         results.append({"no": q.get("no"), "id": rec["id"], "topic_id": topic_id,
                         "report": report})

@@ -422,23 +422,35 @@ def classify_questions(client, model, questions, cats=None, kb_kps=None):
         m = by_label.get((c.get("cat") or "").strip())
         if m:
             item["set"], item["cat"] = m["set_id"], m["cat_id"]
-        # kps 受控（v1.2k）：每个输出 → 精确/包含匹配回清单名 → difflib 相似收敛（阈值 0.5）→
-        #   都不行丢弃（绝不保留清单外原文）；去重、最多 3 个
+        # kps 受控（v1.2k，收敛逻辑见 converge_kps）
+        item["kps"] = converge_kps(c.get("kps"), kb_kps)
         # chapter（v1.2o）：首个命中 kp 所属的教材章（工作台章节结构 = knowledge_points.json）
-        for raw in [str(k).strip() for k in (c.get("kps") or []) if str(k).strip()]:
-            hit = raw if raw in kp_names else None
-            if not hit:
-                hit = next((k for k in kp_names if k in raw or raw in k), None)
-            if not hit:
-                close = difflib.get_close_matches(raw, list(kp_names), n=1, cutoff=0.5)
-                hit = close[0] if close else ""
-            if hit and hit not in item["kps"]:
-                item["kps"].append(hit)
-                if not item["chapter"]:
-                    item["chapter"] = kp_chapter.get(hit, "")
-            if len(item["kps"]) >= 3:
+        for hit in item["kps"]:
+            if kp_chapter.get(hit):
+                item["chapter"] = kp_chapter[hit]
                 break
         out.append(item)
+    return out
+
+
+def converge_kps(raw_list, kb_kps, cap=3):
+    """v1.2q：LLM 输出的知识点 → 受控收敛（精确/包含匹配回清单名 → difflib 相似收敛
+    阈值 0.5 → 都不行丢弃，绝不保留清单外原文）；去重、最多 cap 个。
+    kb_kps = [{"kp","chapter"}]；classify_questions 与专题例题分析共用。"""
+    import difflib
+    kp_names = {it["kp"] for it in (kb_kps or [])}
+    out = []
+    for raw in [str(k).strip() for k in (raw_list or []) if str(k).strip()]:
+        hit = raw if raw in kp_names else None
+        if not hit:
+            hit = next((k for k in kp_names if k in raw or raw in k), None)
+        if not hit:
+            close = difflib.get_close_matches(raw, list(kp_names), n=1, cutoff=0.5)
+            hit = close[0] if close else ""
+        if hit and hit not in out:
+            out.append(hit)
+        if len(out) >= cap:
+            break
     return out
 
 

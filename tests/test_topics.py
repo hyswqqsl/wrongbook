@@ -465,6 +465,68 @@ class TestApi(unittest.TestCase):
         self.assertFalse(os.path.exists(ex["figure_crop"]))
 
 
+class TestExampleAnalysis(unittest.TestCase):
+    """v1.2q 例题分析（思路/易错点/受控知识点）与错题本详情同口径"""
+
+    def setUp(self):
+        self.tmp = _temp_all()
+        self.sid = topics.load_topics()["sets"][0]["id"]
+        self.cat = topics.load_topics()["sets"][0]["categories"][0]
+        from app import app
+        self.c = app.test_client()
+
+    def test_add_and_patch_analysis_fields(self):
+        """add_example 带 kps；patch_example 允许 key_idea/pitfall/kps"""
+        ex = topics.add_example(self.sid, self.cat["id"], Q1, answer="B", kps=["角平分线的性质"])
+        self.assertEqual(ex["kps"], ["角平分线的性质"])
+        r = self.c.patch(f"/api/topics/examples/{ex['id']}",
+                         json={"key_idea": "双角平分线夹角模型", "pitfall": "漏了直角", "kps": ["角平分线的性质"]})
+        j = r.get_json()
+        self.assertEqual(j["key_idea"], "双角平分线夹角模型")
+        self.assertEqual(j["pitfall"], "漏了直角")
+        self.assertEqual(j["kps"], ["角平分线的性质"])
+
+    def test_dual_destination_backfills_example_analysis(self):
+        """双目的地：错题本链分析完成后回写专题例题（思路/易错/受控kps，0 额外 token）"""
+        _stub_llm()
+        sheet = _mk_sheet([{"no": 1, "type": "single", "question": Q1,
+                            "choices": [{"key": "A", "text": "3"}],
+                            "printed_answer": "B", "has_figure": False,
+                            "figure_crops": [], "selected": True,
+                            "kps": ["角平分线的性质"],
+                            "dest_topic": {"set": self.sid, "cat": self.cat["id"]}}])
+        out = pipeline.ingest_selected(sheet)
+        ex = topics.find_example(out["results"][0]["topic_id"])[2]
+        self.assertEqual(ex["key_idea"], "k")            # stub 分析输出 key_idea="k"
+        self.assertEqual(ex["pitfall"], "y")
+        self.assertIn("角平分线的性质", ex["kps"])
+        self.assertTrue(any("例题已带思路" in line for line in out["results"][0]["report"]))
+
+    def test_analyze_endpoint_stubbed(self):
+        """🤖 分析端点：stub LLM 输出 → 受控 kps 收敛 → 写回例题"""
+        ex = topics.add_example(self.sid, self.cat["id"], Q1, answer="B")
+        import reviewflow as rf
+        real_ask = rf.ask_json_vision
+        kb = [{"kp": "角平分线的性质", "chapter": "第一章 三角形"}]
+        rf.ask_json_vision = lambda *a, **kw: {"key_idea": "见角平分线想对称",
+                                               "pitfall": "忘证相等就用性质",
+                                               "kps": ["角平分线的性质定理"]}
+        import kbtree
+        real_kp = kbtree.knowledge_points
+        kbtree.knowledge_points = lambda: {"grade": "八上", "chapters": [
+            {"title": "第一章 三角形", "kps": ["角平分线的性质"]}]}
+        try:
+            r = self.c.post(f"/api/topics/examples/{ex['id']}/analyze")
+            j = r.get_json()
+        finally:
+            rf.ask_json_vision = real_ask
+            kbtree.knowledge_points = real_kp
+        self.assertEqual(j["key_idea"], "见角平分线想对称")
+        self.assertEqual(j["kps"], ["角平分线的性质"])   # 「角平分线的性质定理」包含匹配回清单名
+        ex2 = topics.find_example(ex["id"])[2]
+        self.assertEqual(ex2["pitfall"], "忘证相等就用性质")
+
+
 class TestCropSharedProtection(unittest.TestCase):
     """v1.2q 图形交叉引用保护：to_book 的错题与专题例题共享 topic_crops 文件，
     删任一方不得丢另一方图形（q20261106-111019 图形丢失事故回归）"""
