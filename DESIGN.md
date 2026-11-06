@@ -125,6 +125,20 @@
   （精确 → 包含 → difflib 相似收敛阈值0.5 → 置空），**绝不显示清单外原文**；
   实测「全等三角形的判定」→收敛到全等相关条目、「将军饮马」等无关词置空；
   清单可直接手编 knowledge_points.json 补条目（立即生效）；测试 153 项全绿
+- **V1.2k 知识点受控多选**：classify 升级输出 **kps 数组**（最多 3 个）——LLM 每个输出
+  仍走受控收敛（精确 → 包含 → difflib 阈值0.5 → 丢弃），去重+截断；题卡用 tag 展示
+  （旧草稿回落单 kp）；入库 **analysis.knowledge_points 优先用受控 kps**，
+  LLM 自由分析仅作无 kps 旧草稿的兑底；新增 test_kps_cap_three 等（含去重/截断）
+- **V1.2l 章节二级复合名**：入库 `analysis.chapter` 升级为「**专题集 · 类别**」二级名，
+  `kp_path=[集名, "第N类 名", ""]`（与手动迁移后的存量格式一致，如「初二上学期期中专题 · 全等的性质与判定」）；
+  工作台章节分布/筛选按二级名聚合，教材章节名兑底路径不变
+- **V1.2m 考点标题行清洗**：转录 LLM 有时把卷面「【考点N】xxx（N分）」栏头并进题干，
+  同一题带/不带前缀两份转录查重不中 → 重复入库；新增 `reviewflow.strip_kaoqian_title()`
+  转录后统一剥掉（仅匹配题干开头的完整栏头，全/半角括号均可；普通「（8分）」分值标注、
+  无分值裸【考点】不剥——宁保勿剥）
+- **V1.2n 章节二级迁移工具**：`tools/migrate_chapter.py`（一次性、幂等）——历史单名
+  chapter 在 topics.json 中反查所属集 → 升级二级复合名；含「 · 」跳过、找不到同名类别保持原样；
+  当前库无待迁数据（存量已手迁）；全量 **160 项测试全绿**
 
 ---
 
@@ -176,7 +190,7 @@ wrongbook/                 # 本项目（V1.0.1 起完全自包含，可独立�
 ├── stats.py               # 工作台统计
 ├── serve.sh               # Terminal.app 常驻启动（脱离 IDE shell 生命周期）
 ├── tests/                 # 回归测试 57 项（图形链/纠正三入口/EXIF方向/整单重裁/入库图形源）
-├── tools/                 # 历史数据迁移：EXIF转正 / 错位裁剪图模板匹配恢复
+├── tools/                 # 历史数据迁移：EXIF转正 / 错位裁剪图模板匹配恢复 / 章节二级迁移(v1.2n)
 ├── static/
 │   ├── index.html         # 单页工作台（原生JS + KaTeX本地渲染）
 │   └── vendor/katex/      # KaTeX 本地文件（离线可用）
@@ -300,7 +314,9 @@ wrongbook/                 # 本项目（V1.0.1 起完全自包含，可独立�
         questions: [ {no, text, choices, has_figure, figure_boxes, figure_crops[],
                       figure_spec, figure_svg, figure_mode, figure_note,
                       printed_answer, has_handwriting,
+                      grade, tp_sel, kps[], kp,            // v1.2c/k：归类（受控知识点≤3，只读）
                       selected: false, reason: null, edited_text: null} ] }
+      - 题干转录后统一剥掉卷面「【考点N】xxx（N分）」栏头（v1.2m，防查重不中重复入库）
 ```
 
 **图形来源分层（v0.6 定稿：原图为主，SVG 按需）**：
@@ -695,7 +711,7 @@ POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
 | ~~出卷端到端~~ | ~~8题针对卷~~ | **V1.0.3 移除该功能，测试随之取消** |
 | 统计正确性 | 手工构造小库对账 dashboard 数字（含错因分布） | 全对 |
 | Web 冒烟 | 启动服务 curl 各端点 + 浏览器走查4 Tab | 全通 |
-| 回归套件 | `pytest tests/`（图形链/纠正入口/EXIF方向/整单重裁/入库图形源/查重/多用户/知识树/AI引擎配置/GeoGebra图形/专题+视频） | 147 项全绿（v1.2 含专题 27 项） |
+| 回归套件 | `pytest tests/`（图形链/纠正入口/EXIF方向/整单重裁/入库图形源/查重/多用户/知识树/AI引擎配置/GeoGebra图形/专题+视频/考点清洗/知识点受控） | 160 项全绿 |
 
 > v0.7.2 工作台：错题列表补章节/难度/知识点列+公式渲染+「查看」详情弹窗（全部信息/练习历史）；统计图默认折叠
 > 数据事故记录：v0.7 上线当天 test_dedup 因未开 set_test_mode 覆盖真实题库，已从 .bak 恢复并全测试加保险（bfe510b）

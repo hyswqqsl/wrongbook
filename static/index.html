@@ -33,7 +33,7 @@ button:disabled{opacity:.45;cursor:wait}
 input[type=file],input[type=text],input[type=date],select{font:inherit}
 .tag{display:inline-block;font-size:12px;border-radius:6px;padding:1px 8px;margin-right:6px;vertical-align:1px}
 .t-easy{background:#e6f4ea;color:#1e7e43}.t-med{background:#fff4e0;color:#9a6700}.t-hard{background:#fdeaea;color:#b3261e}
-.t-conflict{background:#fdeaea;color:#b3261e}.t-pass{background:#e6f4ea;color:#1e7e43}.t-review{background:#eee;color:#555}
+.t-conflict{background:#fdeaea;color:#b3261e}.t-pass{background:#e6f4ea;color:#1e7e43}.t-review{background:#eee;color:#555}.t-kp{background:#e8f0fe;color:#1a56db}
 .bignum{display:flex;gap:26px;margin-bottom:8px}
 .bignum div{text-align:center}.bignum b{display:block;font-size:34px}
 .bignum span{color:var(--sub);font-size:13px}
@@ -416,8 +416,10 @@ function qCard(sheet,q){
     +(q.done==='dup'?'<span class="tag t-review">⏭ 重复跳过</span>'
     :q.done==='skip'?'<span class="tag t-review">⏭ 不录入</span>'
     :q.done?`<span class="tag t-pass">${({ingested:'✓ 已入库',topic:'✓ 已入专题',both:'✓ 已入库+专题'})[q.done]||''}</span>`:'');
-  // 知识点（v1.2i）：两模式统一=LLM 分析的单个细致知识点（只读不可改；不用专题大类名）
-  const kpHtml=`<b>${esc(q.kp||'其他')}</b> <span class="small">大模型分析，不可修改</span>`;
+  // 知识点（v1.2k）：两模式统一=LLM 分析的受控细分知识点（最多3个，只读不可改；不用专题大类名）
+  const kpArr=(q.kps&&q.kps.length?q.kps:(q.kp?[q.kp]:[]));   // 旧草稿回落单 kp
+  const kpHtml=(kpArr.length?kpArr.map(k=>`<span class="tag t-kp">${esc(k)}</span>`).join(''):'<b>其他</b>')
+    +' <span class="small">大模型分析，不可修改</span>';
   const topicSel=(sid,no)=>`<select onchange="setDestTopic('${sid}',${no},this.value)" ${q.done?'disabled':''}>
         <option value="">请选类别</option>
         ${(TOPICS&&TOPICS.sets||[]).map(set=>`<optgroup label="${esc(set.name)}">`+

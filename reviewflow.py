@@ -38,6 +38,18 @@ TRANSCRIBE_PROMPT = """你是数学试卷数字化专家。图片是一张数学
    "printed_answer":"B","has_handwriting":true},…]}"""
 
 
+def strip_kaoqian_title(text):
+    """剥掉卷面考点栏头（v1.2m）：转录 LLM 有时把「【考点N】xxx（N分）」栏头并进题干，
+    造成同一题带/不带前缀两份转录查重不中 → 重复入库。转录后统一剥掉。
+
+    规则：仅匹配题干开头的完整栏头（【考点…】+ 标题 + （N分），全/半角括号均可）；
+    普通「（8分）」分值标注、无分值的裸【考点】不剥（宁保勿剥）。"""
+    if not text:
+        return text
+    return re.sub(r"^【考点[^】]{0,20}】\s*[^（()】]{0,30}[（(]\s*\d+\s*分\s*[）)]\s*",
+                  "", text).lstrip()
+
+
 def preprocess(photo_bytes):
     """照片 → 压缩后的 JPEG data URI（最长边1600，q85）
 
@@ -426,7 +438,7 @@ def classify_questions(client, model, questions, cats=None, kb_kps=None):
     return out
 
 
-def transcribe_photo(def transcribe_photo(photo_bytes, source_note="", provider=None):
+def transcribe_photo(photo_bytes, source_note="", provider=None):
     """照片 → 草稿单（多题转录 + 几何题矢量图形 + 落盘）。返回草稿单 dict。
     视觉调用：provider 缺省用配置引擎；GLM 自动切视觉模型 glm-4.6v-flash。"""
     import figureflow
@@ -458,7 +470,8 @@ def transcribe_photo(def transcribe_photo(photo_bytes, source_note="", provider=
         rec = {
             "no": q.get("no"),
             "type": t if t in ("single", "multiple", "fill", "short") else "fill",
-            "question": str(q.get("question") or "").strip(),
+            # v1.2m：剥掉转录混入的「【考点N】xxx（N分）」栏头（查重对齐，见 strip_kaoqian_title）
+            "question": strip_kaoqian_title(str(q.get("question") or "").strip()),
             "choices": q.get("choices") if isinstance(q.get("choices"), list) else None,
             "has_figure": bool(q.get("has_figure")) or bool(re.search(r"如图|下图", q.get("question") or "")),
             "printed_answer": q.get("printed_answer"),
@@ -517,10 +530,12 @@ def transcribe_photo(def transcribe_photo(photo_bytes, source_note="", provider=
             rec["grade"] = c.get("grade") if c else "八年级上册"
             rec["tp_sel"] = ({"set": c["set"], "cat": c["cat"]}
                              if c and c.get("cat") else None)
-            rec["kp"] = (c.get("kp") or "") if c else ""   # v1.2i：细分知识点（受控清单，只读）
+            kps = [k for k in (c.get("kps") or []) if k][:3] if c else []   # v1.2k：最多3个（受控清单）
+            rec["kps"] = kps
+            rec["kp"] = kps[0] if kps else ""   # 兼容旧草稿/展示兜底：首个细分知识点（只读）
     except Exception:
         for rec in sheet["questions"]:
-            rec["grade"], rec["tp_sel"], rec["kp"] = "八年级上册", None, ""
+            rec["grade"], rec["tp_sel"], rec["kps"], rec["kp"] = "八年级上册", None, [], ""
 
     from store import load_sheets, save_sheets
     db = load_sheets()

@@ -356,7 +356,8 @@ class TestCommitFlow(unittest.TestCase):
         self.assertEqual(sh["status"], "processed")   # 全部处置完
 
     def test_tp_sel_drives_chapter(self):
-        """v1.2b/e 专题分类归类：tp_sel → analysis.chapter=纯名称（去「第N类」前缀），kp_path=[集名, 名称, ""]"""
+        """v1.2l 专题分类归类：tp_sel → analysis.chapter=二级复合名「集 · 类别」，
+        kp_path=[集名, 第N类名, ""]（与 tools/migrate_chapter.py 迁移后格式一致）"""
         _stub_llm()
         cat = self.cat
         sid = self.sid
@@ -365,10 +366,29 @@ class TestCommitFlow(unittest.TestCase):
         pipeline.ingest_selected(sheet)
         rec = store.load()["questions"][0]
         an = rec["analysis"]
-        self.assertEqual(an["chapter"], cat["name"])   # v1.2e：知识点纯名称
+        self.assertEqual(an["chapter"], "初二中考必考专题 · " + cat["name"])   # v1.2l：二级复合名
         self.assertEqual(an["kp_path"][0], "初二中考必考专题")
-        self.assertEqual(an["kp_path"][1], an["chapter"])
+        self.assertEqual(an["kp_path"][1], "第{0}类 {1}".format(cat["no"], cat["name"]))
+        self.assertEqual(an["kp_path"][2], "")
         self.assertEqual(an["difficulty"], 2)   # LLM 分析仍跑（difficulty 来自 LLM 分析，非类别难度）
+
+    def test_kps_controlled_land_in_knowledge_points(self):
+        """v1.2k 转录期受控 kps → analysis.knowledge_points（LLM 自由分析仅作兜底）"""
+        _stub_llm()
+        cat = self.cat
+        sid = self.sid
+        sheet = _mk_sheet([self._draft_q(1, Q1, selected=True,
+                                         tp_sel={"set": sid, "cat": cat["id"]},
+                                         kps=["等腰三角形的性质", "三线合一"])])
+        pipeline.ingest_selected(sheet)
+        an = store.load()["questions"][0]["analysis"]
+        self.assertEqual(an["knowledge_points"], ["等腰三角形的性质", "三线合一"])
+        # 无受控 kps 的旧草稿 → 回落 LLM 自由分析（stub 输出 knowledge_points=["x"]；换题避免查重跳过）
+        sheet2 = _mk_sheet([self._draft_q(1, Q2, selected=True,
+                                          tp_sel={"set": sid, "cat": cat["id"]})])
+        pipeline.ingest_selected(sheet2)
+        an2 = store.load()["questions"][-1]["analysis"]   # 第二次入库追加在库尾
+        self.assertEqual(an2["knowledge_points"], ["x"])
 
     def test_kp_sel_legacy_still_works(self):
         """旧草稿兼容：无 tp_sel 时 kp_sel 仍生效"""
