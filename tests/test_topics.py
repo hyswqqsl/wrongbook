@@ -355,22 +355,45 @@ class TestCommitFlow(unittest.TestCase):
         self.assertTrue(sh["questions"][1].get("skip"))
         self.assertEqual(sh["status"], "processed")   # 全部处置完
 
-    def test_tp_sel_drives_chapter(self):
-        """v1.2l 专题分类归类：tp_sel → analysis.chapter=二级复合名「集 · 类别」，
-        kp_path=[集名, 第N类名, ""]（与 tools/migrate_chapter.py 迁移后格式一致）"""
+    def test_chapter_from_kb_structure(self):
+        """v1.2o：chapter 回归教材章（knowledge_points.json 结构）——转录期受控 kp 反查所属章，
+        kp_path=[章, "", 首kp]；专题类别（tp_sel）不再写工作台章节"""
+        _stub_llm()
+        cat = self.cat
+        sid = self.sid
+        sheet = _mk_sheet([self._draft_q(1, Q1, selected=True,
+                                         tp_sel={"set": sid, "cat": cat["id"]},
+                                         chapter="第一章 三角形",
+                                         kps=["全等三角形的性质", "三线合一"])])
+        pipeline.ingest_selected(sheet)
+        an = store.load()["questions"][0]["analysis"]
+        self.assertEqual(an["chapter"], "第一章 三角形")            # 教材章（非专题类别）
+        self.assertEqual(an["kp_path"], ["第一章 三角形", "", "全等三角形的性质"])
+        self.assertEqual(an["knowledge_points"], ["全等三角形的性质", "三线合一"])
+
+    def test_tp_sel_alone_no_longer_drives_chapter(self):
+        """v1.2o：只有 tp_sel（无教材章/受控 kp）→ 章节回落 LLM 分析（stub 输出第二章），
+        不再写「专题集 · 类别」专题结构"""
         _stub_llm()
         cat = self.cat
         sid = self.sid
         sheet = _mk_sheet([self._draft_q(1, Q1, selected=True,
                                          tp_sel={"set": sid, "cat": cat["id"]})])
         pipeline.ingest_selected(sheet)
-        rec = store.load()["questions"][0]
-        an = rec["analysis"]
-        self.assertEqual(an["chapter"], "初二中考必考专题 · " + cat["name"])   # v1.2l：二级复合名
-        self.assertEqual(an["kp_path"][0], "初二中考必考专题")
-        self.assertEqual(an["kp_path"][1], "第{0}类 {1}".format(cat["no"], cat["name"]))
-        self.assertEqual(an["kp_path"][2], "")
-        self.assertEqual(an["difficulty"], 2)   # LLM 分析仍跑（difficulty 来自 LLM 分析，非类别难度）
+        an = store.load()["questions"][0]["analysis"]
+        self.assertEqual(an["chapter"], "第二章 特殊三角形")   # LLM 分析兜底（CHAPTERS 受控词表）
+        self.assertNotIn("·", an["chapter"])                  # 不含专题二级名
+
+    def test_kps_without_chapter_falls_to_analysis(self):
+        """有受控 kp 但无章名（旧草稿）→ 章走 LLM 分析兜底，kp 仍落 knowledge_points"""
+        _stub_llm()
+        sheet = _mk_sheet([self._draft_q(1, Q1, selected=True,
+                                         kps=["等腰三角形的性质"])])
+        pipeline.ingest_selected(sheet)
+        an = store.load()["questions"][0]["analysis"]
+        self.assertEqual(an["chapter"], "第二章 特殊三角形")
+        self.assertEqual(an["knowledge_points"], ["等腰三角形的性质"])
+        self.assertEqual(an["kp_path"], [])
 
     def test_kps_controlled_land_in_knowledge_points(self):
         """v1.2k 转录期受控 kps → analysis.knowledge_points（LLM 自由分析仅作兜底）"""
@@ -378,14 +401,13 @@ class TestCommitFlow(unittest.TestCase):
         cat = self.cat
         sid = self.sid
         sheet = _mk_sheet([self._draft_q(1, Q1, selected=True,
-                                         tp_sel={"set": sid, "cat": cat["id"]},
+                                         chapter="第一章 三角形",
                                          kps=["等腰三角形的性质", "三线合一"])])
         pipeline.ingest_selected(sheet)
         an = store.load()["questions"][0]["analysis"]
         self.assertEqual(an["knowledge_points"], ["等腰三角形的性质", "三线合一"])
         # 无受控 kps 的旧草稿 → 回落 LLM 自由分析（stub 输出 knowledge_points=["x"]；换题避免查重跳过）
-        sheet2 = _mk_sheet([self._draft_q(1, Q2, selected=True,
-                                          tp_sel={"set": sid, "cat": cat["id"]})])
+        sheet2 = _mk_sheet([self._draft_q(1, Q2, selected=True)])
         pipeline.ingest_selected(sheet2)
         an2 = store.load()["questions"][-1]["analysis"]   # 第二次入库追加在库尾
         self.assertEqual(an2["knowledge_points"], ["x"])

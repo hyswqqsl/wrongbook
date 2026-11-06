@@ -241,36 +241,27 @@ def ingest_selected(sheet, provider=None):
         report.append("[分析] {0} · 难度{1} · {2}".format(
             an.get("chapter"), an.get("difficulty"), "/".join(an.get("knowledge_points") or [])))
 
-        # ④ 归类（v1.2b：专题大类优先，与专题体系统一；kp_sel 为旧草稿兼容，缺省回落 LLM 分析）
-        #    v1.2l：chapter 升级二级复合名「专题集 · 类别」（与 tools/migrate_chapter.py 迁移后格式一致）；
+        # ④ 归类（v1.2o：chapter 回归教材章 —— 与 data/kb/knowledge_points.json 同构，
+        #    转录期由受控 kp 反查所属章；专题类别只服务专题入库（dest_topic），不再写工作台章节；
+        #    kp_sel 为旧草稿兼容，缺省回落 LLM 分析）
         #    v1.2k：细分知识点优先用转录期受控 kps（内置 KB 清单词表），LLM 自由分析仅作兜底
-        tp_sel = q.get("tp_sel") or {}
         kp_sel = q.get("kp_sel") or {}
         grade = q.get("grade") or "八年级上册"
-        cat_label, cat_no, set_name = None, None, None
-        if tp_sel.get("set") and tp_sel.get("cat"):
-            try:
-                import topics as _topics
-                s, c = _topics.find_category(tp_sel["set"], tp_sel["cat"])
-                if c:
-                    cat_label = c["name"]   # 纯名称（去「第N类」前缀）
-                    cat_no = c.get("no")
-                    set_name = s["name"]
-            except Exception:
-                pass
-        if cat_label:
-            chapter = "{0} · {1}".format(set_name, cat_label)   # v1.2l：二级复合名
-            kp_path = [set_name or "", "第{0}类 {1}".format(cat_no, cat_label), ""]
+        kps_ctl = [k for k in (q.get("kps") or []) if k][:3]   # v1.2k：受控细分知识点（转录期归一化）
+        # chapter 优先级：转录期受控 kp 反查的教材章 > 旧草稿 kp_sel > LLM 分析（CHAPTERS 词表）
+        chapter = (q.get("chapter") or "").strip()   # v1.2o：教材章（转录期受控 kp 反查）
+        if chapter:
+            kp_path = [chapter, "", kps_ctl[0] if kps_ctl else ""]
         elif kp_sel.get("chapter"):
             chapter = kp_sel["chapter"]
             kp_path = [kp_sel.get("chapter", ""), kp_sel.get("section", ""),
                        kp_sel.get("kp", "")]
         else:
-            chapter = an.get("chapter") or "其他"
+            chapter = (an.get("chapter") or "").strip()   # 兜底：LLM 分析（受控词表）
             kp_path = []
-        kps_ctl = [k for k in (q.get("kps") or []) if k][:3]   # v1.2k：受控细分知识点（转录期归一化）
         report.append("[归类] {0} · {1}{2}".format(
-            grade, chapter, "（{0}）".format(set_name) if set_name else ""))
+            grade, chapter or "未分类",
+            " · " + "/".join(kps_ctl) if kps_ctl else ""))
 
         rec = store.add({
             "source": sheet.get("source") or "",

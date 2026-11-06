@@ -811,7 +811,7 @@ function kpFilterOptions(df){
   const ch=df.chapter||'', cur=df.kp||'';
   let html='<option value="">全部</option>';
   const byCh=(window._dashFacets||{}).kp_by_chapter||{};
-  const chapters=ch?[ch]:Object.keys(byCh).sort();
+  const chapters=ch?[ch]:Object.keys(byCh);   // v1.2o：后端已按 KB 章序（教材结构）返回，保持插入顺序
   chapters.forEach(c=>{
     const kps=byCh[c]||[];
     if(!kps.length)return;

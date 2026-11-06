@@ -93,14 +93,29 @@ def dashboard(chapter=None, difficulty=None, kp=None, reason=None,
         for k in kps:
             kp_by_chapter.setdefault(ch, {})
             kp_by_chapter[ch][k] = kp_by_chapter[ch].get(k, 0) + 1
+    # v1.2o：章节排序跟随教材 KB 章序（knowledge_points.json 的 chapters 顺序，
+    # 第一章→第五章；中文按字典序会得到「一三二五四」错序），KB 外章节排后面
+    kb_order = []
+    try:
+        import kbtree as _kb
+        kb_order = [c.get("title", "") for c in _kb.knowledge_points().get("chapters", [])]
+    except Exception:
+        pass
+
+    def _ch_order(ch):
+        return (kb_order.index(ch) if ch in kb_order else len(kb_order), ch)
+
+    def _order_chapters(chs):
+        return sorted(chs, key=_ch_order)
+
     facets = {
-        "chapters": sorted({(q.get("analysis", {}) or {}).get("chapter", "").strip()
-                            for q in _all} - {""}),
+        "chapters": _order_chapters({(q.get("analysis", {}) or {}).get("chapter", "").strip()
+                                     for q in _all} - {""}),
         "reasons": sorted({(q.get("mistake_reason") or {}).get("kind", "") or "none"
                            for q in _all}),
-        # {章节: {知识点: 出现次数}}——按出现次数降序排列
-        "kp_by_chapter": {ch: [k for k, _ in sorted(m.items(), key=lambda x: -x[1])]
-                          for ch, m in kp_by_chapter.items()},
+        # {章节: {知识点: 出现次数}}——章节按 KB 章序、章内知识点按出现次数降序
+        "kp_by_chapter": {ch: [k for k, _ in sorted(kp_by_chapter[ch].items(), key=lambda x: -x[1])]
+                          for ch in _order_chapters(kp_by_chapter)},
         "kps": sorted({k for m in kp_by_chapter.values() for k in m}),
     }
     return {

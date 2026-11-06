@@ -411,18 +411,20 @@ def classify_questions(client, model, questions, cats=None, kb_kps=None):
         return []
     by_label = {c["cat_label"]: c for c in cats}
     kp_names = {it["kp"] for it in kb_kps}
+    kp_chapter = {it["kp"]: (it.get("chapter") or "") for it in kb_kps}   # v1.2o：kp → 教材章（工作台章节结构）
     out = []
     for c in (data.get("questions") or []):
         if not isinstance(c, dict):
             continue
         grade = c.get("grade") if c.get("grade") in grade_opts else "八年级上册"
         item = {"no": c.get("no"), "grade": grade, "set": None, "cat": None,
-                "kps": []}
+                "kps": [], "chapter": ""}
         m = by_label.get((c.get("cat") or "").strip())
         if m:
             item["set"], item["cat"] = m["set_id"], m["cat_id"]
         # kps 受控（v1.2k）：每个输出 → 精确/包含匹配回清单名 → difflib 相似收敛（阈值 0.5）→
         #   都不行丢弃（绝不保留清单外原文）；去重、最多 3 个
+        # chapter（v1.2o）：首个命中 kp 所属的教材章（工作台章节结构 = knowledge_points.json）
         for raw in [str(k).strip() for k in (c.get("kps") or []) if str(k).strip()]:
             hit = raw if raw in kp_names else None
             if not hit:
@@ -432,6 +434,8 @@ def classify_questions(client, model, questions, cats=None, kb_kps=None):
                 hit = close[0] if close else ""
             if hit and hit not in item["kps"]:
                 item["kps"].append(hit)
+                if not item["chapter"]:
+                    item["chapter"] = kp_chapter.get(hit, "")
             if len(item["kps"]) >= 3:
                 break
         out.append(item)
@@ -533,9 +537,10 @@ def transcribe_photo(photo_bytes, source_note="", provider=None):
             kps = [k for k in (c.get("kps") or []) if k][:3] if c else []   # v1.2k：最多3个（受控清单）
             rec["kps"] = kps
             rec["kp"] = kps[0] if kps else ""   # 兼容旧草稿/展示兜底：首个细分知识点（只读）
+            rec["chapter"] = (c.get("chapter") or "") if c else ""   # v1.2o：教材章（受控 kp 反查，工作台章节=knowledge_points.json 结构）
     except Exception:
         for rec in sheet["questions"]:
-            rec["grade"], rec["tp_sel"], rec["kps"], rec["kp"] = "八年级上册", None, [], ""
+            rec["grade"], rec["tp_sel"], rec["kps"], rec["kp"], rec["chapter"] = "八年级上册", None, [], "", ""
 
     from store import load_sheets, save_sheets
     db = load_sheets()

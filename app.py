@@ -12,6 +12,7 @@ import ai_config
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=os.path.join(BASE, "static"), static_url_path="/static")
+app.json.sort_keys = False   # v1.2o：保留 dict 插入序（工作台 kp_by_chapter 按 KB 章序下发，Flask 默认字典序会得「一三二五四」错序）
 app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024   # 视频讲解上传可达数百 MB（v1.2）
 
 

@@ -135,9 +135,12 @@ class TestClassifyQuestions(unittest.TestCase):
         self.assertEqual(out[0]["set"], "ts1")            # 类别名精确匹配回 id
         self.assertEqual(out[0]["cat"], "tc1")
         self.assertEqual(out[0]["kps"], ["三角形内角和定理"])  # 精确匹配
+        self.assertEqual(out[0]["chapter"], "第一章 三角形")    # v1.2o：kp 反查教材章
         self.assertEqual(out[1]["kps"], ["角平分线的性质"])    # 包含匹配回清单名
+        self.assertEqual(out[1]["chapter"], "第一章 三角形")
         self.assertIsNone(out[1]["cat"])                  # 未知类别 → 置 None
         self.assertEqual(out[2]["kps"], [])  # 清单未覆盖 → 置空（前端显示「其他」）
+        self.assertEqual(out[2]["chapter"], "")           # 无命中 kp → 无章
         self.assertEqual(out[3]["kps"], ["三角形内角和定理"])  # 重复输出去重
 
     def test_fuzzy_kp_convergence(self):
@@ -174,6 +177,7 @@ class TestClassifyQuestions(unittest.TestCase):
         finally:
             rf.ask_json_vision = rf_ask
         self.assertEqual(out[0]["kps"], ["k1", "k2", "k3"])   # 第4个被截断；「k2 的变体」包含匹配回 k2
+        self.assertEqual(out[0]["chapter"], "第一章 三角形")     # v1.2o：首个命中 kp 所属章
 
     def test_prompt_contains_cat_labels(self):
         import reviewflow as rf

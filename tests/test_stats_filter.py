@@ -101,6 +101,26 @@ class TestDashboardFilter(unittest.TestCase):
         self.assertIn("三角形内角和", d["facets"]["kps"])
         self.assertIn("none", d["facets"]["reasons"])
 
+    def test_facets_chapters_follow_kb_order(self):
+        """v1.2o：章节候选按教材 KB 章序（knowledge_points.json）排列，
+        不是中文字典序（否则得「一三二五四」错序）"""
+        import kbtree
+        _kb = kbtree.knowledge_points
+        kbtree.knowledge_points = lambda: {"grade": "八上", "chapters": [
+            {"title": "第一章 三角形", "kps": []},
+            {"title": "第二章 特殊三角形", "kps": []},
+            {"title": "第五章 一次函数", "kps": []}]}
+        try:
+            d = stats.dashboard()
+        finally:
+            kbtree.knowledge_points = _kb
+        self.assertEqual(d["facets"]["chapters"],
+                         ["第一章 三角形", "第五章 一次函数"])   # 按章序，非字典序
+        self.assertEqual(list(d["facets"]["kp_by_chapter"].keys()),
+                         ["第一章 三角形", "第五章 一次函数"])   # kp 分组同章序
+        from app import app as _flask_app
+        self.assertIs(_flask_app.json.sort_keys, False)   # jsonify 不重排 dict 键序（否则前端拿到字典序）
+
     def test_kp_candidates_grouped_by_chapter_from_bank(self):
         """知识点下拉候选：题库标注汇总（与列表同源），按章分组，与搜索结果无关"""
         d = stats.dashboard(kp="内角和")            # 命中 1 题

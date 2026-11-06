@@ -139,6 +139,15 @@
 - **V1.2n 章节二级迁移工具**：`tools/migrate_chapter.py`（一次性、幂等）——历史单名
   chapter 在 topics.json 中反查所属集 → 升级二级复合名；含「 · 」跳过、找不到同名类别保持原样；
   当前库无待迁数据（存量已手迁）；全量 **160 项测试全绿**
+- **V1.2o 工作台章节回归教材结构**：`analysis.chapter` 与工作台章节/知识点筛选改回
+  **教材知识结构**（`data/kb/knowledge_points.json`：第一章~第五章 + 每章细分知识点）——
+  v1.2c~l 的「专题大类 → 专题集 · 类别」实验结束：**专题类别只服务专题入库**（dest_topic），
+  不再写工作台章节；转录期受控 kp 命中后**反查所属教材章**（classify 输出 chapter，
+  首个命中 kp 的所属章）；入库优先级：教材章 > 旧草稿 kp_sel > LLM 分析（CHAPTERS 词表兜底）；
+  `kp_path=[章, "", 首个受控kp]`；stats facets 章节候选**按 KB 章序**下发（中文按字典序
+  会得「一三二五四」错序；Flask jsonify `sort_keys=False` 保插入序，前端去 `.sort()`）；
+  `tools/migrate_chapter.py` 改写为「专题集 · 类别」→ 教材章（类别名匹配优先→kp 投票兜底，
+  默认 dry-run，`--apply` 落盘带 .bak；存量 1 题已迁移）；测试 163 项全绿
 
 ---
 
@@ -314,7 +323,7 @@ wrongbook/                 # 本项目（V1.0.1 起完全自包含，可独立�
         questions: [ {no, text, choices, has_figure, figure_boxes, figure_crops[],
                       figure_spec, figure_svg, figure_mode, figure_note,
                       printed_answer, has_handwriting,
-                      grade, tp_sel, kps[], kp,            // v1.2c/k：归类（受控知识点≤3，只读）
+                      grade, chapter, tp_sel, kps[], kp,  // v1.2c/k/o：归类（教材章+受控kp≤3，只读）
                       selected: false, reason: null, edited_text: null} ] }
       - 题干转录后统一剥掉卷面「【考点N】xxx（N分）」栏头（v1.2m，防查重不中重复入库）
 ```
