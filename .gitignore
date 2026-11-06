@@ -18,3 +18,6 @@ data/topic_crops/
 data/videos/
 # GeoGebra Math Apps Bundle：几十 MB 大资源按需拉取（tools/fetch_geogebra.sh），不入库
 static/vendor/geogebra/
+
+# Playwright 走查产物
+.playwright-cli/

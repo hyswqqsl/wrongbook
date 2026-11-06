@@ -260,7 +260,8 @@ def remove(qid):
                 pass
     # ---- 视频讲解清理（v1.2，交叉引用：其余题目/未处置草稿单/专题例题） ----
     video = target.get("video")
-    if video and os.path.exists(video):
+    if video and not str(video).startswith("http") and os.path.exists(video):
+        # v1.2p：视频讲解改存链接（B站等），仅本地文件路径参与清理/交叉引用
         used_by_q = any(q.get("video") == video for q in db["questions"])
         if not used_by_q and not video_draft_ref(video) and not _topics_video_ref(video):
             try:

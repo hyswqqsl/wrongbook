@@ -227,7 +227,9 @@ def _remove_example_file(e):
         except OSError:
             pass
     v = e.get("video")
-    if v and os.path.exists(v) and not video_referenced(v, exclude_eid=e["id"]):
+    if v and not str(v).startswith("http") and os.path.exists(v) \
+            and not video_referenced(v, exclude_eid=e["id"]):
+        # v1.2p：链接视频（http…）无文件本体，跳过清理
         # 视频可能同时被错题本/未处置草稿单引用（导入时同题双目的地），有引用不删
         try:
             used_by_book = any(q.get("video") == v for q in store.load()["questions"])

@@ -578,31 +578,6 @@ def api_topics_example_patch(eid):
         return _err(e)
 
 
-_VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"}
-
-
-@app.post("/api/videos")
-def api_video_upload():
-    """通用视频讲解上传（v1.2，可选）：multipart file → data/videos/<id>.<ext>
-    返回 {path}；路径可写入草稿题（随提交进错题本/专题例题）或直接 PATCH 例题。"""
-    try:
-        f = request.files.get("file")
-        if not f:
-            return jsonify({"error": "缺少文件"}), 400
-        ext = os.path.splitext(f.filename or "")[1].lower()
-        if ext not in _VIDEO_EXTS:
-            return jsonify({"error": "仅支持 " + "/".join(sorted(_VIDEO_EXTS))}), 400
-        vdir = os.path.join(store._data_dir(), "videos")
-        os.makedirs(vdir, exist_ok=True)
-        import time as _t, uuid as _u
-        name = _t.strftime("v%Y%m%d-%H%M%S-") + _u.uuid4().hex[:6] + ext
-        fp = os.path.join(vdir, name)
-        f.save(fp)
-        return jsonify({"path": fp, "size": os.path.getsize(fp)})
-    except Exception as e:
-        return _err(e)
-
-
 @app.post("/api/topics/examples/<eid>/practice")
 def api_topics_example_practice(eid):
     """记一次例题练习 {correct} → {streak, ready, count, correct}"""

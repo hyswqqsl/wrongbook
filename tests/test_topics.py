@@ -462,7 +462,7 @@ class TestApi(unittest.TestCase):
 
 
 class TestVideos(unittest.TestCase):
-    """v1.2 视频讲解：上传端点 / 双链透传 / 交叉引用清理"""
+    """v1.2p 视频讲解改链接：端点移除 / 链接双链透传 / 历史文件清理链保留"""
 
     def setUp(self):
         self.tmp = _temp_all()
@@ -471,28 +471,15 @@ class TestVideos(unittest.TestCase):
         from app import app
         self.c = app.test_client()
 
-    def _fake_mp4(self, name="讲解.mp4"):
-        import io as _io
-        import werkzeug.datastructures as _w
-        return _w.FileStorage(stream=_io.BytesIO(b"\x00\x00\x00 ftypisom"),
-                              filename=name, content_type="video/mp4")
-
-    def test_upload_endpoint(self):
-        import werkzeug.datastructures as _w
+    def test_upload_endpoint_removed(self):
+        """v1.2p：视频上传端点已移除（改存链接，不再上传文件）"""
         r = self.c.post("/api/videos", data={"file": (io.BytesIO(b"fakevideo"), "a.mp4")},
                         content_type="multipart/form-data")
-        j = r.get_json()
-        self.assertIn("videos", j["path"])
-        self.assertTrue(os.path.exists(j["path"]))
-        # 非法扩展名拒绝
-        r2 = self.c.post("/api/videos", data={"file": (io.BytesIO(b"x"), "a.exe")},
-                         content_type="multipart/form-data")
-        self.assertIn("error", r2.get_json())
+        self.assertEqual(r.status_code, 404)
 
     def test_video_flows_to_topic_and_book(self):
-        vpath = os.path.join(self.tmp, "videos", "v.mp4")
-        os.makedirs(os.path.dirname(vpath), exist_ok=True)
-        open(vpath, "wb").write(b"v")
+        """v1.2p：视频改存链接（B站 URL 含 t= 定位）——双链透传不变"""
+        vpath = "https://www.bilibili.com/video/BV1N9Jt6zE67/?spm_id_from=333.337&t=340"
         _stub_llm()
         sheet = _mk_sheet([{"no": 1, "type": "single", "question": Q1,
                             "choices": [{"key": "A", "text": "3"}],
@@ -511,19 +498,29 @@ class TestVideos(unittest.TestCase):
         self.assertEqual(rec_view["video"], vpath)
 
     def test_example_video_patch(self):
+        """v1.2p：PATCH 例题视频链接；删除例题无文件清理（链接无本体）也不报错"""
         ex = topics.add_example(self.sid, self.cat["id"], Q1, answer="B")
         self.assertIsNone(ex["video"])
-        vpath = os.path.join(self.tmp, "videos", "v2.mp4")
-        os.makedirs(os.path.dirname(vpath), exist_ok=True)
-        open(vpath, "wb").write(b"v")
-        r = self.c.patch(f"/api/topics/examples/{ex['id']}", json={"video": vpath})
-        self.assertEqual(r.get_json()["video"], vpath)
-        # 例题删除：视频无其他引用 → 连带删除
-        self.assertTrue(topics.delete_example(ex["id"]))
-        self.assertFalse(os.path.exists(vpath))
+        vurl = "https://www.bilibili.com/video/BV1N9Jt6zE67/?t=340"
+        r = self.c.patch(f"/api/topics/examples/{ex['id']}", json={"video": vurl})
+        self.assertEqual(r.get_json()["video"], vurl)
+        self.assertTrue(topics.delete_example(ex["id"]))   # 链接视频：无文件可删，不异常
+        # 清空链接 = 移除
+        ex2 = topics.add_example(self.sid, self.cat["id"], Q2, answer="8")
+        r2 = self.c.patch(f"/api/topics/examples/{ex2['id']}", json={"video": None})
+        self.assertIsNone(r2.get_json()["video"])
+
+    def test_video_url_in_wrongbook_delete_no_crash(self):
+        """错题带链接视频：删除错题不做文件清理、不异常"""
+        vurl = "https://www.bilibili.com/video/BV1N9Jt6zE67/?t=340"
+        rec = store.add({"type": "fill", "question": {"text": Q1, "choices": None},
+                         "analysis": {"chapter": "", "kp_path": [], "knowledge_points": [],
+                                      "difficulty": 2}, "video": vurl})
+        self.assertTrue(store.remove(rec["id"]))
 
     def test_video_shared_between_book_and_topic(self):
-        """双目的地同一视频：删错题 → 例题仍引用，视频保留；再删例题 → 才删文件"""
+        """历史本地文件视频（v1.2 上传）：双目的地删错题 → 例题仍引用，文件保留；
+        再删例题 → 才删文件（v1.2p 起仅存量文件走此清理链，链接视频不涉及）"""
         vpath = os.path.join(self.tmp, "videos", "shared.mp4")
         os.makedirs(os.path.dirname(vpath), exist_ok=True)
         open(vpath, "wb").write(b"v")

@@ -459,10 +459,10 @@ function qCard(sheet,q){
     <div class="cls-row">
       🎥 视频讲解（可选）：
       ${q.video?`<span class="tag t-pass">已附视频</span>
+        <button class="sec" style="font-size:13px;padding:5px 11px" onclick="setDraftVideo('${sheet.id}',${q.no})">🔗 换链接</button>
         <button class="sec" style="font-size:13px;padding:5px 11px" onclick="removeDraftVideo('${sheet.id}',${q.no})">移除</button>`
-        :`<button class="sec" style="font-size:13px;padding:5px 11px" onclick="document.getElementById('vf-${sheet.id}-${q.no}').click()">🎥 上传视频</button>`}
-      <input type="file" id="vf-${sheet.id}-${q.no}" accept="video/*" class="hidden" onchange="uploadDraftVideo('${sheet.id}',${q.no},this)">
-      <span class="small" id="vstat-${sheet.id}-${q.no}">详情页/专题卡可播放</span>
+        :`<button class="sec" style="font-size:13px;padding:5px 11px" onclick="setDraftVideo('${sheet.id}',${q.no})">🔗 贴视频链接</button>`}
+      <span class="small">B站等链接，含 t=340 自动从该秒播放</span>
     </div>
     <div class="reason-row ${q.selected?'':'hidden'}" id="reason-${sheet.id}-${q.no}">
       错因：<label><input type="radio" name="r-${sheet.id}-${q.no}" value="careless" ${q.reason&&q.reason.kind==='careless'?'checked':''} onchange="setReason('${sheet.id}',${q.no},'careless')">马虎</label>
@@ -471,6 +471,29 @@ function qCard(sheet,q){
       <input type="text" placeholder="备注（如：看错条件）" value="${esc(q.reason&&q.reason.note||'')}" onchange="setReasonNote('${sheet.id}',${q.no},this.value)">
     </div>
   </div>`;
+}
+/* 视频讲解渲染（v1.2p）：链接 → B站内嵌播放器（自动带 t= 从该秒播放）/ 其他平台新标签打开；
+   历史本地文件（v1.2 上传）仍用 <video> 原样播放 */
+function videoBlockHtml(v){
+  if(!v)return '';
+  v=String(v);
+  if(/^https?:\/\//i.test(v)){
+    let t='',pg='';
+    try{const n=new URL(v);t=(n.searchParams.get('t')||'').replace(/^\D+|\D+$/g,'');pg=n.searchParams.get('p')||'';}catch(e){}
+    const bv=v.match(/bilibili\.com\/video\/(BV[0-9A-Za-z]+)/);
+    const av=v.match(/bilibili\.com\/video\/av(\d+)/i);
+    if(bv||av){
+      const q=new URLSearchParams();
+      if(bv)q.set('bvid',bv[1]);else q.set('aid',av[1]);
+      if(t)q.set('t',t);
+      q.set('page',pg||'1');q.set('autoplay','0');q.set('danmaku','0');q.set('high_quality','1');
+      return `<iframe src="https://player.bilibili.com/player.html?${q.toString()}" scrolling="no" frameborder="no" allowfullscreen style="width:100%;max-width:560px;height:315px;margin-top:6px;border-radius:8px;border:1px solid var(--line)"></iframe>`;
+    }
+    const yt=v.match(/(?:youtu\.be\/|[?&]v=)([\w-]{6,})/);
+    if(yt)return `<iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}${t?`?start=${t}`:''}" allowfullscreen style="width:100%;max-width:560px;height:315px;margin-top:6px;border-radius:8px;border:1px solid var(--line)"></iframe>`;
+    return `<div style="margin-top:6px"><a href="${esc(v)}" target="_blank" rel="noopener">🔗 打开视频链接</a></div>`;
+  }
+  return `<video controls preload="metadata" src="/data/${v.replace(/^.*data\//,'')}" style="width:100%;max-width:560px;margin-top:6px;border-radius:8px"></video>`;
 }
 function hlQ(box,qid){}
 /* ---------- 左侧原图手动框选 ---------- */
@@ -573,18 +596,12 @@ function setTopicMain(sid,no,on){   // 「存专题」勾选（主或附加侧�
   patchQ(sid,no,{dest_topic:q.dest_topic,tp_sel:q.tp_sel},null);
   renderReview();
 }
-async function uploadDraftVideo(sid,no,input){   // v1.2：人审卡可选上传视频讲解
-  const f=input.files[0]; if(!f)return;
-  const st=document.getElementById(`vstat-${sid}-${no}`);
-  st.textContent='上传中…（视频较大，请稍候）';
-  const fd=new FormData(); fd.append('file',f);
-  try{
-    const j=await (await fetch('/api/videos',{method:'POST',body:fd})).json();
-    if(j.error){st.textContent='❌ '+j.error;return;}
-    patchQ(sid,no,{video:j.path},null);
-    st.textContent='✅ 已附视频讲解';
-    renderReview();
-  }catch(e){st.textContent='❌ '+e;}
+function setDraftVideo(sid,no){   // v1.2p：人审卡贴视频链接（B站等，支持 t= 定位）
+  const s=sheets.find(x=>x.id===sid),q=s&&s.questions.find(x=>x.no===no); if(!q)return;
+  const v=prompt('粘贴视频讲解链接（B站/YouTube 等；B站链接里的 t=340 会自动从该秒播放）：\n清空并确定 = 移除视频',q.video||'');
+  if(v===null)return;
+  patchQ(sid,no,{video:v.trim()||null},null);
+  renderReview();
 }
 function removeDraftVideo(sid,no){patchQ(sid,no,{video:null},null);renderReview();}
 function editQ(sid,no){
@@ -872,7 +889,7 @@ async function showQModal(qid){
     ${(q.question||{}).choices?`<div class="choices">${q.question.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:''}
     ${fig}
     ${q.video?`<details class="tp-ana-wrap"><summary class="small" style="cursor:pointer;color:var(--blue)">🎥 视频讲解</summary>
-      <video controls preload="metadata" src="/data/${q.video.replace(/^.*data\//,'')}" style="width:100%;max-width:560px;margin-top:6px;border-radius:8px"></video></details>`:''}
+      ${videoBlockHtml(q.video)}</details>`:''}
     <div class="qm-sec"><b>答案</b>：${esc(q.verified_answer||'（无）')}
       ${q.verify_status==='conflict'?'<span class="tag t-conflict">与照片答案冲突</span>':q.verify_status==='pass'?'<span class="tag t-pass">已验伪</span>':''}
       ${q.printed_answer&&q.printed_answer!==q.verified_answer?`<span class="small">（照片印刷答案：${esc(q.printed_answer)}）</span>`:''}</div>
@@ -1285,8 +1302,7 @@ function exCardHtml(set,cat,e){
       ${p.ready?'<span class="tag t-pass">🏆 已掌握</span>':p.count?`<span class="small">练过 ${p.count} 次 · 连对 ${p.streak}/3</span>`:'<span class="small">未练过</span>'}
       <span style="margin-left:auto"></span>
       <button class="sec" onclick="tpPracticeOne('${set.id}','${cat.id}','${e.id}')">📝 练习此题</button>
-      <button class="sec" onclick="document.getElementById('tvf-${e.id}').click()" title="上传/替换视频讲解">${e.video?'🎥 换视频':'🎥 传视频'}</button>
-      <input type="file" id="tvf-${e.id}" accept="video/*" class="hidden" onchange="tpUploadVideo('${e.id}',this)">
+      <button class="sec" onclick="tpSetVideo('${e.id}')" title="粘贴/替换视频讲解链接">${e.video?'🔗 换链接':'🔗 贴视频链接'}</button>
       <button class="sec" onclick="tpToBook('${e.id}',this)">📥 存入错题本</button>
       <button class="sec" onclick="tpDelExample('${e.id}')">✕</button>
     </div>
@@ -1296,7 +1312,7 @@ function exCardHtml(set,cat,e){
     ${(e.answer||e.analysis)?`<details class="tp-ana-wrap"><summary class="small" style="cursor:pointer;color:var(--blue)">答案与解析（先做再看）</summary>
       <div class="ans tp-ana" style="margin-top:6px">答案：<b>${esc(e.answer)||'（无）'}</b>${e.analysis?`<div style="margin-top:4px">${esc(e.analysis)}</div>`:''}</div></details>`:''}
     ${e.video?`<details class="tp-ana-wrap"><summary class="small" style="cursor:pointer;color:var(--blue)">🎥 视频讲解</summary>
-      <video controls preload="metadata" src="/data/${e.video.replace(/^.*data\//,'')}" style="width:100%;max-width:560px;margin-top:6px;border-radius:8px"></video></details>`:''}
+      ${videoBlockHtml(e.video)}</details>`:''}
   </div>`;
 }
 function renderCatDetail(area,set,cat){
@@ -1341,17 +1357,14 @@ async function tpToBook(eid,btn){
   if(r.error)return alert('❌ '+r.error);
   if(btn){btn.textContent='✅ 已入错题本';btn.disabled=true;}
 }
-async function tpUploadVideo(eid,input){   // v1.2：例题卡上传/替换视频讲解
-  const f=input.files[0]; if(!f)return;
-  if(!confirm(`上传视频讲解（${(f.size/1048576).toFixed(1)} MB）？上传完成前请勿关闭页面。`))return;
-  const fd=new FormData(); fd.append('file',f);
-  try{
-    const j=await (await fetch('/api/videos',{method:'POST',body:fd})).json();
-    if(j.error)return alert('❌ '+j.error);
-    const r=await (await fetch(`/api/topics/examples/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({video:j.path})})).json();
-    if(r.error)return alert('❌ '+r.error);
-    tpReload();
-  }catch(e){alert('❌ '+e);}
+async function tpSetVideo(eid){   // v1.2p：例题卡粘贴/替换视频讲解链接（B站等）
+  let cur='';
+  for(const s of TOPICS.sets||[])for(const c of s.categories||[])for(const x of c.examples||[])if(x.id===eid)cur=x.video||'';
+  const v=prompt('粘贴视频讲解链接（B站/YouTube 等；B站链接里的 t=340 会自动从该秒播放）：\n清空并确定 = 移除视频',cur);
+  if(v===null)return;
+  const r=await (await fetch(`/api/topics/examples/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({video:v.trim()||null})})).json();
+  if(r.error)return alert('❌ '+r.error);
+  tpReload();
 }
 function tpPracticeOne(sid,cid,eid){
   const set=TOPICS.sets.find(s=>s.id===sid),cat=set.categories.find(c=>c.id===cid);
