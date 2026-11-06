@@ -243,12 +243,17 @@ def remove(qid):
 
     # ---- 连带图片清理 ----
     crop = (target.get("question") or {}).get("figure_crop")
+    # ---- 连带图片清理（v1.2q 修复：crop 可能被其他错题/专题例题/未处置草稿引用，全无引用才删文件） ----
+    crop = (target.get("question") or {}).get("figure_crop")
     if crop:
-        try:
-            os.remove(crop)
-        except OSError:
-            pass
-        _scrub_crop_refs(crop)
+        used_by_q = any((q.get("question") or {}).get("figure_crop") == crop for q in db["questions"])
+        used_by_topic = _topics_crop_ref(crop)
+        if not used_by_q and not used_by_topic and not crop_draft_ref(crop):
+            try:
+                os.remove(crop)
+            except OSError:
+                pass
+            _scrub_crop_refs(crop)   # 文件已删：同步清理草稿单里的坏引用（文件保留时引用不清）
     photo = target.get("photo")
     if photo:
         used_by_q = any(q.get("photo") == photo for q in db["questions"])
@@ -269,6 +274,24 @@ def remove(qid):
             except OSError:
                 pass
     return True
+
+
+def crop_draft_ref(crop):
+    """图形文件是否仍被【未处置】草稿单题引用（figure_crops[]/figure_crop；已处置引用不阻塞）"""
+    return any(crop in (q.get("figure_crops") or []) or q.get("figure_crop") == crop
+               for sh in load_sheets().get("sheets", [])
+               for q in sh.get("questions", [])
+               if not (q.get("ingested_id") or q.get("skipped_dup")
+                       or q.get("topic_example_id") or q.get("topic_dup_of")))
+
+
+def _topics_crop_ref(crop):
+    """图形文件是否仍被专题例题引用（惰性导入避免循环依赖；异常时宁可不删）"""
+    try:
+        import topics
+        return topics.crop_referenced(crop)
+    except Exception:
+        return True
 
 
 def video_draft_ref(video):

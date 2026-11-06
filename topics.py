@@ -221,9 +221,13 @@ def delete_category(sid, cid):
 # ---------- 例题 ----------
 
 def _remove_example_file(e):
-    if e.get("figure_crop") and os.path.exists(e["figure_crop"]):
+    # 图形（v1.2q 修复）：topic_crops 文件可能同时被 to_book 的错题记录引用（共享同一文件），
+    # 有引用必须保留（否则错题详情图形丢失——q20261106-111019 事故根因）
+    crop = e.get("figure_crop")
+    if crop and os.path.exists(crop) and not crop_referenced(crop, exclude_eid=e["id"]) \
+            and not _book_crop_ref(crop) and not store.crop_draft_ref(crop):
         try:
-            os.remove(e["figure_crop"])
+            os.remove(crop)
         except OSError:
             pass
     v = e.get("video")
@@ -250,6 +254,26 @@ def video_referenced(video, exclude_eid=None):
                 if e.get("video") == video and e.get("id") != exclude_eid:
                     return True
     return False
+
+
+def crop_referenced(crop, exclude_eid=None):
+    """图形文件是否仍被（其他）专题例题引用"""
+    db = load_topics()
+    for s in db["sets"]:
+        for c in s["categories"]:
+            for e in c.get("examples", []):
+                if e.get("figure_crop") == crop and e.get("id") != exclude_eid:
+                    return True
+    return False
+
+
+def _book_crop_ref(crop):
+    """图形文件是否仍被错题记录引用（to_book 与例题共享 topic_crops 文件；异常宁可不删）"""
+    try:
+        return any((q.get("question") or {}).get("figure_crop") == crop
+                   for q in store.load()["questions"])
+    except Exception:
+        return True
 
 
 def _copy_crop(src, eid):

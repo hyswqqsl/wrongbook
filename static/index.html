@@ -458,11 +458,11 @@ function qCard(sheet,q){
     ${q.printed_answer?`<div class="answer-line">照片答案：${esc(q.printed_answer)}</div>`:''}
     <div class="cls-row">
       🎥 视频讲解（可选）：
-      ${q.video?`<span class="tag t-pass">已附视频</span>
-        <button class="sec" style="font-size:13px;padding:5px 11px" onclick="setDraftVideo('${sheet.id}',${q.no})">🔗 换链接</button>
-        <button class="sec" style="font-size:13px;padding:5px 11px" onclick="removeDraftVideo('${sheet.id}',${q.no})">移除</button>`
-        :`<button class="sec" style="font-size:13px;padding:5px 11px" onclick="setDraftVideo('${sheet.id}',${q.no})">🔗 贴视频链接</button>`}
-      <span class="small">B站等链接，含 t=340 自动从该秒播放</span>
+      <input type="text" style="flex:1;min-width:220px;max-width:420px" placeholder="直接粘贴B站等链接；t=340 自动从该秒播放"
+        value="${esc(q.video&&/^https?:/i.test(q.video)?q.video:'')}"
+        onchange="setDraftVideo('${sheet.id}',${q.no},this.value)">
+      ${q.video?`<span class="tag t-pass">已附</span>
+        <button class="sec" style="font-size:13px;padding:5px 11px" onclick="removeDraftVideo('${sheet.id}',${q.no})">移除</button>`:''}
     </div>
     <div class="reason-row ${q.selected?'':'hidden'}" id="reason-${sheet.id}-${q.no}">
       错因：<label><input type="radio" name="r-${sheet.id}-${q.no}" value="careless" ${q.reason&&q.reason.kind==='careless'?'checked':''} onchange="setReason('${sheet.id}',${q.no},'careless')">马虎</label>
@@ -596,11 +596,8 @@ function setTopicMain(sid,no,on){   // 「存专题」勾选（主或附加侧�
   patchQ(sid,no,{dest_topic:q.dest_topic,tp_sel:q.tp_sel},null);
   renderReview();
 }
-function setDraftVideo(sid,no){   // v1.2p：人审卡贴视频链接（B站等，支持 t= 定位）
-  const s=sheets.find(x=>x.id===sid),q=s&&s.questions.find(x=>x.no===no); if(!q)return;
-  const v=prompt('粘贴视频讲解链接（B站/YouTube 等；B站链接里的 t=340 会自动从该秒播放）：\n清空并确定 = 移除视频',q.video||'');
-  if(v===null)return;
-  patchQ(sid,no,{video:v.trim()||null},null);
+function setDraftVideo(sid,no,v){   // v1.2q：人审卡内联输入框直接粘贴链接（onchange 即存；清空=移除）
+  patchQ(sid,no,{video:(v||'').trim()||null},null);
   renderReview();
 }
 function removeDraftVideo(sid,no){patchQ(sid,no,{video:null},null);renderReview();}
@@ -872,11 +869,9 @@ async function showQModal(qid){
   const kps=[...new Set([...(an.kp_path||[]).filter(Boolean),...(an.knowledge_points||[])])];
   const fig=q.figure_svg?`<figure style="text-align:center;margin:8px 0"><div class="figsvg">${q.figure_svg}</div></figure>`
     :(q.question&&q.question.figure_crop?`<figure style="text-align:center;margin:8px 0"><img id="qmodal-fig" src="/data/${q.question.figure_crop.replace(/^.*data\//,'')}?v=${imgVer}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:300px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
-  qmodalQ=q;
   $('#qmodal').innerHTML=`<div class="qm-box" onclick="event.stopPropagation()">
     <div class="qm-head"><b>题目详情</b><span class="small">${esc(q.id)}</span>
       ${q.mastered_at?'<span class="tag t-pass">已归档</span>':'<span class="tag t-review">在库</span>'}
-      <button class="sec" onclick="openGgbRecord()">✎改图</button>
       <button class="warn" onclick="delQ('${q.id}')">🗑 删除</button>
       <button class="sec" onclick="hideQModal()">关闭 ✕</button></div>
     <div class="qm-meta">
@@ -910,7 +905,6 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')hideQModal();});
 
 /* ---------- 🧠 GeoGebra 图形工作台（v1.1a，DESIGN.md 5.5） ----------
    分工：LLM 生成构造命令（草稿）→ 本地 applet 执行（构造即正确）→ 人拖拽修正画法 → 导出 PNG */
-let qmodalQ=null;    // 详情弹窗当前题（✎改图用）
 let ggbState=null;   // {mode:'draft'|'record', sid,no,qid,question,lastFails,H,refCrop}
 let ggbLoaded=false;
 /* 图片放大查看器（v1.1.0g）：题卡/详情弹窗图形点击 → 全屏看大图；点任意处/Esc 关闭 */
@@ -953,13 +947,6 @@ function openGgbDraft(sid,no){
   ggbState={mode:'draft',sid,no,question:text,
     refCrop:q.figure_ggb_ref||(q.figure_crops||[]).find(p=>!/_g\.png$/.test(p))||null};
   showGgb(q.figure_ggb||null);
-}
-function openGgbRecord(){
-  const q=qmodalQ;if(!q)return;
-  const inner=q.question||{};
-  ggbState={mode:'record',qid:q.id,question:inner.text||'',
-    refCrop:inner.figure_ggb_ref||(inner.figure_crop&&!/_g\.png$/.test(inner.figure_crop)?inner.figure_crop:null)};
-  showGgb(inner.figure_ggb||null);
 }
 function showGgb(cmds){
   ggbState.H=ggbState.refCrop?560:420;   // 行高：有对照图加高画布 → 两栏底部平齐（v1.1.0e）
@@ -1302,7 +1289,6 @@ function exCardHtml(set,cat,e){
       ${p.ready?'<span class="tag t-pass">🏆 已掌握</span>':p.count?`<span class="small">练过 ${p.count} 次 · 连对 ${p.streak}/3</span>`:'<span class="small">未练过</span>'}
       <span style="margin-left:auto"></span>
       <button class="sec" onclick="tpPracticeOne('${set.id}','${cat.id}','${e.id}')">📝 练习此题</button>
-      <button class="sec" onclick="tpSetVideo('${e.id}')" title="粘贴/替换视频讲解链接">${e.video?'🔗 换链接':'🔗 贴视频链接'}</button>
       <button class="sec" onclick="tpToBook('${e.id}',this)">📥 存入错题本</button>
       <button class="sec" onclick="tpDelExample('${e.id}')">✕</button>
     </div>
@@ -1311,6 +1297,14 @@ function exCardHtml(set,cat,e){
     ${fig}
     ${(e.answer||e.analysis)?`<details class="tp-ana-wrap"><summary class="small" style="cursor:pointer;color:var(--blue)">答案与解析（先做再看）</summary>
       <div class="ans tp-ana" style="margin-top:6px">答案：<b>${esc(e.answer)||'（无）'}</b>${e.analysis?`<div style="margin-top:4px">${esc(e.analysis)}</div>`:''}</div></details>`:''}
+    <div class="cls-row">
+      🎥 视频讲解（可选）：
+      <input type="text" style="flex:1;min-width:220px;max-width:420px" placeholder="直接粘贴B站等链接；t=340 自动从该秒播放"
+        value="${esc(e.video&&/^https?:/i.test(e.video)?e.video:'')}"
+        onchange="tpSetVideo('${e.id}',this.value)">
+      ${e.video?`<span class="tag t-pass">已附</span>
+        <button class="sec" style="font-size:13px;padding:5px 11px" onclick="tpClearVideo('${e.id}')">移除</button>`:''}
+    </div>
     ${e.video?`<details class="tp-ana-wrap"><summary class="small" style="cursor:pointer;color:var(--blue)">🎥 视频讲解</summary>
       ${videoBlockHtml(e.video)}</details>`:''}
   </div>`;
@@ -1357,14 +1351,13 @@ async function tpToBook(eid,btn){
   if(r.error)return alert('❌ '+r.error);
   if(btn){btn.textContent='✅ 已入错题本';btn.disabled=true;}
 }
-async function tpSetVideo(eid){   // v1.2p：例题卡粘贴/替换视频讲解链接（B站等）
-  let cur='';
-  for(const s of TOPICS.sets||[])for(const c of s.categories||[])for(const x of c.examples||[])if(x.id===eid)cur=x.video||'';
-  const v=prompt('粘贴视频讲解链接（B站/YouTube 等；B站链接里的 t=340 会自动从该秒播放）：\n清空并确定 = 移除视频',cur);
-  if(v===null)return;
-  const r=await (await fetch(`/api/topics/examples/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({video:v.trim()||null})})).json();
+async function tpSetVideo(eid,v){   // v1.2q：例题卡内联输入框直接粘贴链接（onchange 即存）
+  const r=await (await fetch(`/api/topics/examples/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({video:(v||'').trim()||null})})).json();
   if(r.error)return alert('❌ '+r.error);
   tpReload();
+}
+async function tpClearVideo(eid){   // 移除例题视频链接
+  await tpSetVideo(eid,'');
 }
 function tpPracticeOne(sid,cid,eid){
   const set=TOPICS.sets.find(s=>s.id===sid),cat=set.categories.find(c=>c.id===cid);

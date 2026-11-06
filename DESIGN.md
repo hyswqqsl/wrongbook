@@ -155,6 +155,15 @@
   `player.bilibili.com/player.html?bvid=…&t=340&page=…`（BV/av 号+t/p 参数解析，
   autoplay=0/danmaku=0/high_quality=1）；YouTube → nocookie embed（start=）；其他链接 →
   新标签打开。链接无文件本体：删除题/例题跳过文件清理；测试 164 项全绿
+- **V1.2q 图形交叉引用保护 + 交互细修**：① **丢图事故修复**——to_book 的错题与专题例题
+  **共享同一 topic_crops 文件**，而删除链路只对视频做了引用检查、crop 是无条件删：
+  「专题删例题/错题本删题」会把另一方图形连带删掉（q20261106-111019 图形丢失）。
+  修复：`topics._remove_example_file` 与 `store.remove` 删 crop 前统一交叉引用检查
+  （其余例题 crop_referenced / 其余错题 / 未处置草稿 crop_draft_ref，全无引用才删文件；
+  文件保留时草稿坏引用不清；已处置草稿引用不阻塞）；丢图文件从草稿源裁剪图恢复。
+  ② 详情弹窗「✎改图」按钮移除（`/api/questions/<id>/figure` API 保留备用）。
+  ③ 视频链接改**面板内联输入**（人审卡/例题卡 onchange 即存，清空=移除；不再弹 prompt）。
+  测试 167 项全绿（含 TestCropSharedProtection 事故场景回归）
 
 ---
 

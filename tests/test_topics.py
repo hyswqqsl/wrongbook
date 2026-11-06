@@ -455,10 +455,47 @@ class TestApi(unittest.TestCase):
         r = self.c.post(f"/api/topics/examples/{ex['id']}/to-book", json={})
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.get_json()["id"])
-        # 删除类别（连带例题+图形）
+        # 删除类别（连带例题；图形被 to_book 的错题记录引用 → v1.2q 保护：文件保留）
         r = self.c.delete(f"/api/topics/sets/{sid}/categories/{cid}")
         self.assertTrue(r.get_json()["ok"])
+        self.assertTrue(os.path.exists(ex["figure_crop"]))       # 错题记录仍引用 → 保留
+        # 错题记录也删除后：全无引用 → 文件连带删除
+        recs = store.load()["questions"]
+        store.remove(recs[-1]["id"])
         self.assertFalse(os.path.exists(ex["figure_crop"]))
+
+
+class TestCropSharedProtection(unittest.TestCase):
+    """v1.2q 图形交叉引用保护：to_book 的错题与专题例题共享 topic_crops 文件，
+    删任一方不得丢另一方图形（q20261106-111019 图形丢失事故回归）"""
+
+    def setUp(self):
+        self.tmp = _temp_all()
+        self.sid = topics.load_topics()["sets"][0]["id"]
+        self.cat = topics.load_topics()["sets"][0]["categories"][0]
+
+    def _png(self):
+        import struct, zlib
+        path = os.path.join(self.tmp, "src.png")
+        def chunk(typ, data):
+            c = struct.pack(">I", len(data)) + typ + data
+            return c + struct.pack(">I", zlib.crc32(typ + data) & 0xFFFFFFFF)
+        ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+        png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(b"\x00\xff\x00\x00")) + chunk(b"IEND", b"")
+        open(path, "wb").write(png)
+        return path
+
+    def test_deleting_book_copy_keeps_example_figure(self):
+        """删 to_book 产出的错题 → 例题图形保留；再删例题 → 文件才删（事故场景正向）"""
+        ex = topics.add_example(self.sid, self.cat["id"], Q1, answer="B", crop_src=self._png())
+        crop = ex["figure_crop"]
+        self.assertTrue(os.path.exists(crop))
+        rec = topics.to_book(ex["id"])
+        self.assertEqual(rec["question"]["figure_crop"], crop)   # 共享同一文件
+        self.assertTrue(store.remove(rec["id"]))                 # 删错题副本
+        self.assertTrue(os.path.exists(crop))                    # 例题仍引用 → 保留（旧代码此处丢图）
+        self.assertTrue(topics.delete_example(ex["id"]))         # 再删例题
+        self.assertFalse(os.path.exists(crop))                   # 全无引用 → 连带删除
 
 
 class TestVideos(unittest.TestCase):
