@@ -72,6 +72,7 @@ def dashboard(chapter=None, difficulty=None, kp=None, reason=None,
             "difficulty": int(an.get("difficulty", 2)),
             "reason": REASON_CN.get((q.get("mistake_reason") or {}).get("kind", ""), "未标注"),
             "kp": kp,
+            "created": (q.get("created_at") or "")[:10],   # 录入日期（保留到天）
             "mastered": bool(q.get("mastered_at")),
             "times": len(pr),
             "correct": sum(1 for p in pr if p.get("correct")),

@@ -793,12 +793,12 @@ async function loadDash(){
   const filterHtml=`<div class="card" id="dash-filter" style="display:flex;flex-wrap:nowrap;align-items:center;gap:7px;overflow-x:auto;white-space:nowrap;padding:10px 14px">
     <b style="flex:none">筛选</b>
     章节 <select id="f-chapter" onchange="rebuildKpOptions()"><option value="">全部</option>${(d.facets.chapters||[]).map(c=>`<option ${c===df.chapter?'selected':''}>${esc(c)}</option>`).join('')}</select>
+    知识点 <select id="f-kp" style="max-width:210px">${kpFilterOptions(df)}</select>
     难度 <select id="f-difficulty"><option value="">全部</option>
       <option value="1" ${df.difficulty==='1'?'selected':''}>① 简单</option>
       <option value="2" ${df.difficulty==='2'?'selected':''}>② 中等</option>
       <option value="3" ${df.difficulty==='3'?'selected':''}>③ 困难</option></select>
     错因 <select id="f-reason"><option value="">全部</option>${(d.facets.reasons||[]).map(r=>`<option value="${r}" ${r===df.reason?'selected':''}>${reasonCN[r]||r}</option>`).join('')}</select>
-    知识点 <select id="f-kp" style="max-width:210px">${kpFilterOptions(df)}</select>
     <label style="display:flex;align-items:center;gap:3px;flex:none;cursor:pointer"><input type="checkbox" id="f-mastered" ${df.mastered?'checked':''} onchange="loadDash()">含已归档</label>
     <button class="pri" onclick="loadDash()" style="flex:none">🔍 搜索</button>
     <button class="sec" onclick="resetDashFilter()" style="flex:none">重置</button>
@@ -825,7 +825,7 @@ async function loadDash(){
     </div>
     <table class="tb"><tr>
       <th><input type="checkbox" onchange="toggleAllRows(this)" title="全选"></th>
-      <th style="min-width:260px">题目</th><th>章节</th><th>难度</th><th>知识点</th><th>错因</th><th>练习</th><th>连对</th><th>状态</th><th></th></tr>
+      <th style="min-width:260px">题目</th><th>章节</th><th>难度</th><th>知识点</th><th>错因</th><th>练习</th><th>录入</th><th>状态</th><th></th></tr>
     ${d.practice_overview.map(r=>`<tr>
       <td><input type="checkbox" class="row-sel" value="${r.id}" ${dashSelected.has(r.id)?'checked':''} onchange="selRow('${r.id}',this.checked)"></td>
       <td style="max-width:360px"><div style="display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden">${esc(r.text)}</div></td>
@@ -833,7 +833,7 @@ async function loadDash(){
       <td><span class="tag ${diffTag[r.difficulty]||'t-med'}">${diffCN[r.difficulty]||r.difficulty}</span></td>
       <td class="small" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.kp||'—')}</td>
       <td class="small">${esc(r.reason)}</td>
-      <td>${r.times}次/对${r.correct}</td><td>${r.streak}</td>
+      <td>${r.times}次/对${r.correct}</td><td class="small">${esc(r.created||'—')}</td>
       <td>${r.mastered?'<span class="tag t-pass">已归档</span>':(r.need===0?'<span class="badge">建议归档</span>':'')}</td>
       <td style="white-space:nowrap">
         <button class="sec" style="font-size:12.5px;padding:3px 10px" onclick="showQModal('${r.id}')">查看</button>
