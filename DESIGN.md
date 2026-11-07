@@ -214,6 +214,12 @@
 - **V1.3.4 工作台微调**：筛选栏「知识点」紧跟「章节」（章节变→知识点候选联动，顺序与
   使用频率一致）；错题列表去「连对」列（连对信息在练习/详情仍可见），加「录入」列
   （created_at 保留到天）
+- **V1.3.5 GeoGebra 功能整体移除（开发版+发布版）**：随发布决策（RELEASE_DESIGN.md）——
+  D21 非商业许可边界 + bundle 体积/首跑下载负担，重画功能退出产品；
+  删 ggbflow.py / tools/fetch_geogebra.sh / tests/test_ggb_figure.py / static/vendor/geogebra；
+  删 3 端点（/api/ggb-script、sheets ggb-figure、questions figure）+ 前端整个工作台
+  （弹窗/Set* 翻译器/按钮；viewImg 保留）；pipeline/topics 移除 figure_ggb 存档链
+  （历史数据残留字段忽略不清洗）；run.sh 自检行移除；回归 172 项全绿（ggb 契约测试随之删除）
 
 ---
 
@@ -264,7 +270,7 @@ wrongbook/                 # 本项目（V1.0.1 起完全自包含，可独立�
 ├── topics.py              # 专题模块（v1.2）：专题集/类别/例题 + 每用户练习记录（v1.2t 起与错题本解耦）
 ├── stats.py               # 工作台统计
 ├── serve.sh               # Terminal.app 常驻启动（脱离 IDE shell 生命周期）
-├── tests/                 # 回归测试 57 项（图形链/纠正三入口/EXIF方向/整单重裁/入库图形源）
+├── tests/                 # 回归测试 172 项（图形链/纠正入口/EXIF方向/整单重裁/入库图形源）
 ├── tools/                 # 历史数据迁移：EXIF转正 / 错位裁剪图模板匹配恢复 / 章节二级迁移(v1.2n)
 ├── static/
 │   ├── index.html         # 单页工作台（原生JS + KaTeX本地渲染）
@@ -547,81 +553,11 @@ wrongbook/                 # 本项目（V1.0.1 起完全自包含，可独立�
 
 - 换题约束继承父项目：章节约束注入 + 填空不产选项 + 难度透传。
 
-### 5.5 GeoGebra 图形工作台（v1.1a 已实施）
+### 5.5 GeoGebra 图形工作台（v1.1a~v1.3.4，**V1.3.5 已整体移除**）
 
-**动机**（图形链三大遗留痛点）：
-
-| 痛点 | 现状 | GeoGebra 解法 |
-|---|---|---|
-| D13 自动矢量图"几何对但画法不对" | 人审只能弃用回原图 | 弹窗内**拖拽修正**（自由点动、约束联动），所见即所得 |
-| D15 向量化费 token（重试重发图片） | v0.6 砍掉自动化只留 crop | LLM 只产出**文本命令脚本**（1 次纯文本调用，重试仅回传错误文本） |
-| SVG 渲染器只支持点+线段 | 数轴/函数图象只能 crop | GeoGebra 原生支持圆/弧/数轴/函数绘图（v1.1c） |
-
-**核心分工**（与录入链同哲学：AI 给草稿，人管对错）：
-
-| 角色 | 职责 |
-|---|---|
-| LLM | 题干 → GeoGebra 构造命令脚本（"翻译"，1 次纯文本调用） |
-| GeoGebra 引擎 | 命令 → 精确图形（**构造即正确**：Midpoint/PerpendicularLine 是真约束） |
-| 人 | 审一眼 + 拖拽修正画法（比例/虚实/朝向，约束不破坏）→ 导出静态 PNG |
-
-**范围**：
-- ✅ **v1.1a（本期）**：人审「🧠GeoGebra重画」弹窗 + 入库后「✎改图」（命令脚本随题存档，永远可再编辑）
-- ⏸ v1.1b（后续）：ggb 命令作为入库链 spec 新格式（替代 points/segments，geocheck 改验 getValue 读回坐标）
-- ⏸ v1.1c（后续）：数轴/函数图象覆盖（Graphing 视角；`_NON_SVG_HINTS` 类题从 crop 升级矢量）
-- ❌ 不做：转录期自动 GeoGebra 化（v0.6 crop 默认决策不变）；表格类题矢量替换（仍 crop）
-
-**数据模型**：
-- 草稿题与错题记录新增 `figure_ggb`：JSON 命令数组（可再编辑源文件），无则 null
-- 文件：草稿期 `data/crops/<sheet>_q<no>_g.png`；入库后改图**覆盖原 figure_crop 路径**（图源唯一权威，同 recrop_all 幂等哲学）；无图老题新建 `data/crops/<qid>_g.png`
-- 入库后改图字段联动：`figure_crop=新图`、`figure_ggb=新脚本`、`figure_spec/figure_svg 清空`、`figure_mode="crop"`（对齐 use_crop 语义：用户显式改图即选择"展示图即权威"）
-- 练习记录/掌握度/归档状态不受改图影响（practice 按 id 追加）
-
-**流程（草稿期）**：
-
-```
-题卡 [✂️手动框选][🧠GeoGebra重画]（有图才显示；「🖼自动抓取」按钮已移除——转录时每题已自动抓图，v1.1.0c）
-      │ 点重画 → 弹窗嵌入本地 applet
-      ▼
-POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
-  → 前端 applet.evalCommand 逐行执行（失败行标红收集）
-  → 有失败？标红提示，**不自动重试（省 token，v1.1.0b）**；人手改命令重执行，或手动点「🤖重新生成」带失败行反馈
-  → 用户拖拽修正（自由点动 → 依赖对象联动，约束保持；可调线型样式）
-  → 「导出」getScreenshotBase64(scale=2) → POST …/ggb-figure
-  → 存 <sheet>_q<no>_g.png + figure_ggb；figure_crops=[该图]，figure_mode="crop"
-```
-
-**流程（入库后改图，工作台详情「✎改图」）**：
-
-```
-有 figure_ggb → 直接重放命令 → 拖改 → 导出 → POST /api/questions/<id>/figure
-无 figure_ggb（历史题/框选题）→ 选项层：✂️框选重裁 / 🧠GeoGebra重画（现场生成）
-改图即刻生效于：题卡/工作台详情/做题页/Word/导出PDF（都读 figure_crop）
-```
-
-**LLM 命令生成（ggb-script API）**：
-- Prompt 要点：点名与题干大写字母一致；几何关系一律构造命令（Midpoint/PerpendicularBisector/
-  AngleBisector/PerpendicularLine/ParallelLine/Circle/Intersect/Polygon…白名单），
-  **禁止手算坐标**；辅助线 `SetLineStyle(…,2)` 虚线；只输出 `{"commands":[…]}`
-- 调用：**有对照图走视觉调用**（v1.1.0e：附原题图形照片，prompt 要求布局/摆向/相对位置与图一致、
-  几何关系仍以题干为准；`make_client(vision=True)`），无对照图纯文本；
-  temperature 0.2，json_object → plain → nothink 降级（复用 ask_json_vision）
-- 手动重试回路：失败行标红后，人点「🤖重新生成」才回传 `prev_errors`（不重发图片）；
-  自动重试已移除（v1.1.0b 用户反馈：省 token）
-
-**前端（GeoGebra 本地化，对齐 V1.0.1 自包含原则）**：
-- Math Apps Bundle 自托管到 `static/vendor/geogebra/`（**不进 git**，体积几十 MB）；
-  `tools/fetch_geogebra.sh` 一键下载解压，run.sh 启动检测缺失 → 录入页提示
-- applet 参数：`appName="geometry"`、固定 `width/height`（导出一致性）、`showToolBar=false`、
-  `showMenuBar=false`、`perspective="G"`
-
-**API 新增**（详见第 6 节表）：`/api/ggb-script`（通用命令生成，草稿/入库两场景共用）/ `ggb-figure`（草稿期保存）/ `questions/<id>/figure`（入库题改图）
-
-**许可证（D21）**：GeoGebra Apps 免费仅限**非商业**用途（个人/教育 ✅），需保留官方署名；商业化前需单独授权。
-
-**测试**：新增 `test_ggb_figure.py`（stub LLM，全离线）：三端点契约、`_g` 幂等覆盖、入库改图字段联动
-（spec 清空/ggb 更新/crop 路径）、无 crop 老题新建文件、删除题连带删 `_g` 文件；前端走查：生成→失败重试→
-拖拽→导出→入库后再改。
+> 设计与实施记录见 git 历史。移除动机：GeoGebra Apps 免费许可仅限非商业用途（对外分发
+> 触碰许可边界，原 D21）；bundle 体积大且首跑下载是发布版的失败点（原 D22）。
+> 图形策略回归 v0.6 定稿：**原题裁剪图为权威图形**（转录自动抓图 + 人审手动框选纠正，见 5.1）。
 
 ### 5.6 专题模块（v1.2 已实施）
 
@@ -679,7 +615,7 @@ POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
   {"id":"tc…","no":1,"name":"三边关系","points":3,"difficulty":"easy",   // easy|medium|final
    "examples":[{"id":"te…","type":"single","text":"…","choices":[…],
      "answer":"B","analysis":"解析","figure_crop":"…/topic_crops/te….png",
-     "figure_ggb":null,"figure_spec":null,"video":null,"source":"来源","created_at":"…"}]}]}]}
+     "figure_spec":null,"video":null,"source":"来源","created_at":"…"}]}
 
 // data/users/<uid>/topics.json（每用户练习记录）
 {"version":1,"practice":{"te…":[{"at":"…","correct":true}]}}   // streak≥3=已掌握
@@ -732,9 +668,6 @@ POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
 | GET  | `/api/users` | 用户表 + 当前用户 |
 | POST | `/api/users` | 新建用户（题库为空）并切换 `{name}` |
 | POST | `/api/users/switch` | 切换当前用户 `{id}` |
-| POST | `/api/ggb-script` | 🧠 v1.1a：LLM 生成 GeoGebra 构造命令 `{question, prev_errors?}` → `{commands[]}`（纯文本；草稿/入库共用） |
-| POST | `/api/sheets/<sid>/questions/<no>/ggb-figure` | 🧠 v1.1a：保存重绘图 `{png, commands}` → `_g` 图 + `figure_ggb` |
-| POST | `/api/questions/<id>/figure` | 🧠 v1.1a：入库题改图 `{png, commands}` → 覆盖 figure_crop + 清 spec/svg + 存 ggb |
 | GET  | `/api/topics` | 📚 v1.2：专题全集（类别/例题 + 当前用户练习统计 + spec 渲染 SVG） |
 | POST | `/api/topics/sets` | 📚 v1.2：新建专题集 `{name}` |
 | DELETE | `/api/topics/sets/<sid>` | 📚 v1.2：删专题集（连带例题图形/无引用视频） |
@@ -756,7 +689,7 @@ POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
 │   → 转录+图形分层进度 → 进入人审视图：           │
 │     左：原图（拍照原件，方向已统一）             │
 │     右：逐题卡片（KaTeX实时渲染）               │
-│        [✂️手动框选] [🧠GeoGebra重画]            │
+│        [✂️手动框选]                             │
 │        ☑存错题本+错因 · 存入专题(下拉可多选)     │
 │        🔗视频讲解(贴B站链接,t=定位播放)          │
 │        顶部粘性栏：已选N题（错题本X·专题Y）[提交] │
@@ -773,8 +706,7 @@ POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
 
 > V1.0.3 起菜单仅「录入/工作台」；做题页由工作台「开始做题」新标签页直达（#quiz），
 > 无会话时显示引导（不再随机刷题）；相似题/出卷入口已移除。
-> v1.1a 已实施：题卡图形纠正入口（✂️手动框选 / 🧠GeoGebra重画；v1.1.0c 起「自动抓取」按钮移除——
-> 转录时已自动抓图，无图题不显示按钮），工作台详情增「✎改图」，见 5.5。
+> 图形纠正唯一入口 = ✂️手动框选（转录时已自动抓图；GeoGebra 重画 V1.3.5 移除，见 5.5）。
 
 公式渲染：KaTeX 本地文件（static/vendor/katex，离线可用），v1 直接渲染 LaTeX。
 
@@ -791,7 +723,7 @@ POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
 | ~~出卷端到端~~ | ~~8题针对卷~~ | **V1.0.3 移除该功能，测试随之取消** |
 | 统计正确性 | 手工构造小库对账 dashboard 数字（含错因分布） | 全对 |
 | Web 冒烟 | 启动服务 curl 各端点 + 浏览器走查4 Tab | 全通 |
-| 回归套件 | `pytest tests/`（图形链/纠正入口/EXIF方向/整单重裁/入库图形源/查重/多用户/知识树/AI引擎配置/GeoGebra图形/专题+视频/考点清洗/知识点受控） | 160 项全绿 |
+| 回归套件 | `pytest tests/`（图形链/纠正入口/EXIF方向/整单重裁/入库图形源/查重/多用户/知识树/AI引擎配置/专题+视频/考点清洗/知识点受控/跨页拼接/旋转扶正） | 172 项全绿 |
 
 > v0.7.2 工作台：错题列表补章节/难度/知识点列+公式渲染+「查看」详情弹窗（全部信息/练习历史）；统计图默认折叠
 > 数据事故记录：v0.7 上线当天 test_dedup 因未开 set_test_mode 覆盖真实题库，已从 .bak 恢复并全测试加保险（bfe510b）
@@ -828,7 +760,7 @@ POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
 
 | # | 决策/风险 | 处置 |
 |---|---|---|
-| D1 | 存储选 JSON 而非 SQLite | 规模小+git友好；>2000题再迁 |
+| D1 | 存储选 JSON 而非 SQLite | 规模小+git友好；发布复审维持 JSON（RELEASE_DESIGN.md §3.6，迁移触发条件与写入加固 fsync/.bak 三代轮换见该节）；>2000题或单文件>20MB再议 |
 | D2 | `.venv/bin/pip` shebang 指旧路径 | 一律用 `.venv/bin/python -m pip`（已记录） |
 | D3 | 照片含手写解答/多题干扰 | 排版机人审前置：只转录印刷体+标记手写；逐题勾选 |
 | D4 | 照片本身题目有误（教辅勘误） | bad_question → needs_review 人工核对 |
@@ -848,10 +780,7 @@ POST …/ggb-script（服务端纯文本 LLM：题干 → 命令 JSON）
 | D19 | 刷题判卷方式 | 按题型混合：单选/多选点选自动评分；填空文本输入（归一化+数值等价）自动评分；问答看答案自判。连对计数/建议归档/重复做错即时反馈（v0.7.4） |
 | D18 | 知识点需要来自教材而非 LLM 自由发挥 | v0.7.1 全书五章 KB（build_kb 视觉转录，可断点续跑）→ kbtree 构建章/节/知识点树；录入期 LLM 只在树内选（超出八上→按年级进度给九年级）；人审树形选择器可改，入库以人审值为权威 |
 | D20 | 发布给他人时不能携带/暴露开发者 API key | **注入式配置**：三层来源（网页「⚙ 设置」落盘 data/ai_config.json > 环境变量 > key.env 开发者便利文件），前两者均已 gitignore；`make_client` 统一注入（provider 缺省=用户选中引擎）；GLM 默认 glm-5.3-flash（原生多模态单模型，看图/解题同模型；视觉字段可改 glm-4.6v-flash 省钱）；key 前端只回显掩码，设置弹窗带「测试连接」（文本+视觉各一次最小真实调用） |
-| D21 | GeoGebra Apps 许可证仅限非商业用途 | 个人/教育用途合规；applet 保留官方署名；商业化前需向 GeoGebra 购买授权 |
-| D22 | Math Apps Bundle 体积大（下载 32MB/解压 116MB），不宜进 git | `static/vendor/geogebra/` 加入 gitignore；`tools/fetch_geogebra.sh` 一键拉取；run.sh 启动自检缺失提示（代码自包含、大资源按需取） |
-| D23 | LLM 命令脚本一次成功率非 100% | evalCommand 逐行回执 → 失败行标红提示；**不自动重试**（人手动决定是否带失败行反馈重新生成，v1.1.0b）；prompt 强制 SetLineStyle 先命名对象；理解错靠人审拖拽兜底 |
-| D24 | 入库后改图的覆盖策略 | 覆盖原 figure_crop 文件（图源唯一权威，同 recrop_all）；同时清 figure_spec/svg 并置 figure_mode="crop"（对齐 use_crop 语义）；figure_ggb 一并更新保证"永远可再编辑" |
+| D21~D24 | GeoGebra 工作台相关决策（非商业许可/Bundle 体积/命令成功率/改图覆盖） | **V1.3.5 功能整体移除，决策随之消解**（历史见 git；图形策略回归 v0.6：裁剪图为权威 + 手动框选纠正） |
 | D25 | 专题例题不再过质量链（验伪/分析费 token 且类别已由人定） | 仅存专题零 LLM：题干/图形/答案已由排版机+人审定稿，提交即落库；双目的地时错题本副本仍走完整链；专题内查重≥92% 防重复存入；做错例题手动存错题本（对齐 P4 人管对错） |
 | D26 | 视频讲解的存储形态 | **v1.2p 定稿：存外链不存文件**（B 站等 URL 含 t= 定位，B 站自动内嵌从指定秒播放）——上传端点移除、无大文件管理/清理负担；v1.2 存量本地文件保留 `<video>` 播放与交叉引用清理链（错题/未处置草稿/专题例题全无引用才删，gitignore 不入库） |
 

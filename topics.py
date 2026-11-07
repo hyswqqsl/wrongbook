@@ -303,7 +303,7 @@ def _category_dup(cat, text, threshold=0.92):
 
 
 def add_example(sid, cid, text, choices=None, answer=None, ex_type="fill",
-                analysis="", crop_src=None, ggb=None, spec=None, source="", video=None,
+                analysis="", crop_src=None, spec=None, source="", video=None,
                 kps=None):
     """新增例题（pipeline 从草稿题组装；crop 文件复制进全局 topic_crops）"""
     db = load_topics()
@@ -320,7 +320,7 @@ def add_example(sid, cid, text, choices=None, answer=None, ex_type="fill",
     ex = {"id": eid, "created_at": _now(), "type": ex_type or "fill",
           "text": text, "choices": choices or None, "answer": (answer or "").strip(),
           "analysis": analysis or "", "figure_crop": _copy_crop(crop_src, eid),
-          "figure_ggb": ggb, "figure_spec": spec, "source": source or "",
+          "figure_spec": spec, "source": source or "",
           "video": video,
           # v1.2q：与错题本详情同口径（转录期受控 kps；思路/易错由分析补全）
           "kps": [k for k in (kps or []) if k][:3],

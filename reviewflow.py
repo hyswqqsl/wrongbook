@@ -387,8 +387,7 @@ def rotate_sheet_photo(sid):
     """人审兜底（v1.3）：原图【顺时针】旋转 90° 并同步变换全部图形框 + 整单重裁。
 
     自动扶正（LLM 二选一）约 75% 准确，转错方向时人点此按钮一键修正（可连点）。
-    box 变换复用 box_to_upright(orientation=6)（顺 90 的坐标映射）；GeoGebra 导出图
-    （_g.png）不随照片旋转（独立图源，不受照片方向影响）。返回更新后的草稿单。"""
+    box 变换复用 box_to_upright(orientation=6)（顺 90 的坐标映射）。返回更新后的草稿单。"""
     sheet = store.get_sheet(sid)
     if not sheet:
         raise ValueError("草稿单不存在")

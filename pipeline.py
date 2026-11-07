@@ -32,7 +32,7 @@ ok=false 表示题目矛盾/欠定/无解，此时 answer 填"无法确定"。""
 
 
 def _ask_text_json(client, model, prompt, image_uri=None, max_tokens=16000):
-    """文本问答：json_object → 纯文本 ×2 → 关思考（D12 老方子，v1.2 对齐 reviewflow/ggbflow）。
+    """文本问答：json_object → 纯文本 ×2 → 关思考（D12 老方子，v1.2 对齐 reviewflow）。
 
     v1.2 修复：原 8000 max_tokens + 三级降级——DeepSeek 思考链烧光预算致 content='',
     每次都等满响应（实测验伪+分析拖到 2~3 分钟/题，提交遮罩久转）。
@@ -69,19 +69,22 @@ def _ask_text_json(client, model, prompt, image_uri=None, max_tokens=16000):
 
 # ---------- F1b 入库质量链 ----------
 
-def build_question_payload(text, choices, spec, crops, ggb=None):
+def build_question_payload(text, choices, spec, crops):
     """入库的 question 字段：figure_spec 为权威图形，figure_crop 为兜底原图。
 
     - spec 有效 → figure_spec=spec, figure_crop 仍留档（对照/兜底）
     - spec 缺失但有裁剪图 → figure_spec=None, figure_crop=第一张
     - 都没有 → 两个都 None
-    - ggb = GeoGebra 构造命令脚本（v1.1a）：随题存档，入库后可再编辑重绘（D24）
+    - crops = 裁剪图路径列表（权威原图；与 spec 独立并存）
+
+    Returns:
+        dict: question 子对象
     """
     crop = (crops or [None])[0]
     return {"text": text, "choices": choices,
             "figure_spec": spec if spec else None,
             "figure_crop": crop,
-            "figure_ggb": ggb}
+            "figure_crop": (crops or [None])[0]}
 
 
 def resolve_figure_spec(q, text, vectorize=None, client=None, model=None):
@@ -176,7 +179,7 @@ def ingest_selected(sheet, provider=None, progress=None):
                     dest_topic.get("set"), dest_topic.get("cat"), text,
                     choices=choices, answer=q.get("printed_answer") or "",
                     ex_type=q.get("type") or "fill",
-                    crop_src=(crops or [None])[0], ggb=q.get("figure_ggb"),
+                    crop_src=(crops or [None])[0],
                     spec=q.get("figure_spec"),
                     source=sheet.get("source") or "", video=q.get("video"),
                     kps=q.get("kps"))   # v1.2q：转录期受控知识点随例题存档
@@ -217,9 +220,7 @@ def ingest_selected(sheet, provider=None, progress=None):
         # ① 图形：尊重人审期的用户选择（详见 resolve_figure_spec）
         crops = q.get("figure_crops") or []
         spec = resolve_figure_spec(q, text, client=client, model=model)
-        if q.get("figure_ggb"):
-            report.append("[图形] GeoGebra 重绘脚本已随题存档（入库后可再改图）")
-        elif q.get("figure_spec"):
+        if q.get("figure_spec"):
             report.append("[图形] 排版机已生成矢量图形（geocheck 合法）")
         elif q.get("figure_mode") == "crop":
             report.append("[图形] 人审已选定原题照片裁剪图为权威图形")
@@ -285,7 +286,7 @@ def ingest_selected(sheet, provider=None, progress=None):
         rec = store.add({
             "source": sheet.get("source") or "",
             "type": q.get("type") or "fill",
-            "question": build_question_payload(text, choices, spec, crops, q.get("figure_ggb")),
+            "question": build_question_payload(text, choices, spec, crops),
             "printed_answer": printed,
             "verified_answer": verified,
             "verify_status": status,

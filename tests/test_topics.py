@@ -174,11 +174,10 @@ class TestExamples(unittest.TestCase):
         ex = topics.add_example(
             self.sid, self.cat["id"], Q1, choices=[{"key": "A", "text": "3"}],
             answer="A", ex_type="single", analysis="等腰性质", crop_src=src,
-            ggb=["A=(0,0)"], spec={"points": []}, source="测试卷")
+            spec={"points": []}, source="测试卷")
         self.assertTrue(ex["id"].startswith("te"))
         self.assertEqual(ex["type"], "single")
         self.assertEqual(ex["answer"], "A")
-        self.assertEqual(ex["figure_ggb"], ["A=(0,0)"])
         self.assertEqual(ex["figure_spec"], {"points": []})
         # 图形复制进全局 topic_crops/<eid>.png（与用户 crops 解耦）
         self.assertTrue(os.path.exists(ex["figure_crop"]))
