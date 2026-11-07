@@ -283,13 +283,16 @@ function fetchT(url,opt={},ms=120000){
   const t=setTimeout(()=>ctl.abort(),ms);
   return fetch(url,{...opt,signal:ctl.signal}).finally(()=>clearTimeout(t));
 }
-/* ---------- 图片待传队列：拖拽 / 粘贴 / 点选 三入口统一入队 ---------- */
-let pendingFiles=[];
+/* ---------- 图片待传队列：拖拽 / 粘贴 / 点选 三入口统一入队 ----------
+   v1.3.1 跨页题：joinFlags[i]=true 表示第 i 张与上一张（组）是同一道题的上下两页，
+   转录时前端拼成一张长图 → 一次转录产出完整题目（boxes/裁剪/入库全链路自然工作） */
+let pendingFiles=[],joinFlags=[];
 function addFiles(list){
   const imgs=[...list].filter(f=>f.type&&f.type.startsWith('image/'));
   if(!imgs.length)return alert('未识别到图片文件（仅支持图片）');
-  pendingFiles.push(...imgs);renderThumbs();
+  pendingFiles.push(...imgs);joinFlags.push(...imgs.map(()=>false));renderThumbs();
 }
+function setJoin(i,on){joinFlags[i]=on;}
 function renderThumbs(){
   const el=$('#thumbs');
   el.classList.toggle('hidden',!pendingFiles.length);
@@ -297,9 +300,29 @@ function renderThumbs(){
   el.innerHTML=pendingFiles.map((f,i)=>`<div class="thumb">
     <img src="${URL.createObjectURL(f)}" alt="" onclick="viewImg(this.src)" class="zoomimg" title="点击放大">
     <button class="rm" title="移除" onclick="rmFile(${i})">✕</button>
-    <div class="nm">${esc(f.name||'剪贴板图片')}</div></div>`).join('');
+    <div class="nm">${esc(f.name||'剪贴板图片')}</div>
+    ${i>0?`<label class="jn small" title="两页是同一道题：拼成长图一次转录"><input type="checkbox" ${joinFlags[i]?'checked':''} onchange="setJoin(${i},this.checked)">⇧ 接上张（跨页题）</label>`:''}
+  </div>`).join('');
 }
-function rmFile(i){pendingFiles.splice(i,1);renderThumbs();}
+function rmFile(i){pendingFiles.splice(i,1);joinFlags.splice(i,1);renderThumbs();}
+/* 拼接一组照片为纵向长图（等宽缩放 + 页间白条 28px）→ File */
+async function stitchImages(files){
+  const imgs=[];
+  for(const f of files){
+    imgs.push(await new Promise(res=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>res(null);i.src=URL.createObjectURL(f);}));
+  }
+  if(imgs.some(i=>!i))return files[0];   // 任一解码失败 → 退回首张（不阻塞转录）
+  const W=Math.min(...imgs.map(i=>i.width));
+  const scaled=imgs.map(i=>{const h=Math.round(i.height*W/i.width);
+    const c=document.createElement('canvas');c.width=W;c.height=h;
+    c.getContext('2d').drawImage(i,0,0,W,h);return c;});
+  const GAP=28;
+  const H=scaled.reduce((a,c)=>a+c.height,0)+GAP*(scaled.length-1);
+  const out=document.createElement('canvas');out.width=W;out.height=H;
+  const ctx=out.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+  let y=0;scaled.forEach(c=>{ctx.drawImage(c,0,y);y+=c.height+GAP;});
+  return await new Promise(res=>out.toBlob(b=>res(new File([b],'拼接长图.jpg',{type:'image/jpeg'})),'image/jpeg',0.92));
+}
 function pickFiles(){$('#photos').click();}
 $('#photos').onchange=e=>{addFiles(e.target.files);e.target.value='';};
 (function initDrop(){
@@ -331,10 +354,19 @@ $('#btn-upload').onclick=async()=>{
   const note=$('#src-note').value.trim();
   sheets=[]; renderReview();                        // 清空上一单的试题
   showOv('转录中…');                                 // 锁屏
+  // v1.3.1 跨页题分组：joinFlags 标记的照片与上一组合并为一次转录（拼接长图）
+  const groups=[];let cur=[files[0]];
+  for(let i=1;i<files.length;i++){
+    if(joinFlags[i])cur.push(files[i]);
+    else{groups.push(cur);cur=[files[i]];}
+  }
+  groups.push(cur);
   try{
-    for(let i=0;i<files.length;i++){
-      setOv(`转录中（${i+1}/${files.length}）… 约20-60秒，请勿关闭页面`);
-      const fd=new FormData(); fd.append('photo',files[i]); if(note)fd.append('source',note);
+    for(let i=0;i<groups.length;i++){
+      const g=groups[i];
+      setOv(`转录中（${i+1}/${groups.length}${g.length>1?`，跨页拼接 ${g.length} 张`:''}）… 约20-60秒，请勿关闭页面`);
+      const photo=g.length>1?await stitchImages(g):g[0];
+      const fd=new FormData(); fd.append('photo',photo); if(note)fd.append('source',note);
       try{const r=await fetchT('/api/sheets',{method:'POST',body:fd},300000); const j=await r.json();
         if(j.error){$('#upload-status').textContent='❌ '+j.error;}
         else{j.mode=INGEST_MODE;
@@ -343,7 +375,7 @@ $('#btn-upload').onclick=async()=>{
           sheets.unshift(j); $('#upload-status').textContent=`✅ 已转录 ${j.questions.length} 题（尚未提交入库，核对无误后点下方「提交」）`; renderReview();}
       }catch(e){$('#upload-status').textContent='❌ '+e;}
     }
-  }finally{hideOv(); pendingFiles=[]; renderThumbs();}
+  }finally{hideOv(); pendingFiles=[]; joinFlags=[]; renderThumbs();}
 };
 function renderReview(){
   // 双入口独立（v1.2b 反馈）：每个入口只看自己转录的照片

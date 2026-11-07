@@ -30,6 +30,8 @@ TRANSCRIBE_PROMPT = """你是数学试卷数字化专家。图片是一张数学
 7. printed_answer: 照片中可见的印刷答案（选项字母或答案文本）；看不到填 null
 8. 照片顶部/页边的卷名、日期等线索写到 source_guess（没有填 ""）
 9. 宁全勿漏：照片里每一道题都要转录，包括做对的题（由用户决定取舍）
+10. 照片可能是两页上下拼接的长图（页间有空白分隔）：跨页被截断的同一道题
+    必须合并为**一题完整转录**（题干接续 + 全部小问；figure_boxes 标注在长图坐标上）
 
 只输出 JSON（不要其他文字）：
 {"source_guess":"…",
@@ -50,8 +52,8 @@ def strip_kaoqian_title(text):
                   "", text).lstrip()
 
 
-def preprocess(photo_bytes):
-    """照片 → 压缩后的 JPEG data URI（最长边1600，q85）
+def preprocess(photo_bytes, max_side=1600):
+    """照片 → 压缩后的 JPEG data URI（最长边 max_side，q85；跨页拼接长图自动放宽）
 
     ⚠ 必须先应用 EXIF orientation（转正）：否则浏览器显示的是转正后的图，
     而 LLM/裁剪用的是原始像素 → 两个坐标系错位（抓图会转 90°，见 test_orientation.py）。
@@ -60,8 +62,8 @@ def preprocess(photo_bytes):
     img = img.convert("RGB")
     w, h = img.size
     m = max(w, h)
-    if m > 1600:
-        r = 1600 / m
+    if m > max_side:
+        r = max_side / m
         img = img.resize((int(w * r), int(h * r)), Image.LANCZOS)
     buf = io.BytesIO()
     img.save(buf, "JPEG", quality=85)
@@ -588,7 +590,9 @@ def transcribe_photo(photo_bytes, source_note="", provider=None):
     _up.save(buf, "JPEG", quality=92)
     photo_bytes = buf.getvalue()
 
-    uri, (W, H) = preprocess(photo_bytes)
+    # 跨页拼接长图（v1.3.1）：H/W≥1.5 → 放宽到 2400，两页文字保持可读
+    max_side = 2400 if _up.size[1] / max(1, _up.size[0]) >= 1.5 else 1600
+    uri, (W, H) = preprocess(photo_bytes, max_side=max_side)
     client, model = make_client(provider, vision=True)
     data = ask_json_vision(client, model, TRANSCRIBE_PROMPT, uri)
 
