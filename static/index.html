@@ -25,8 +25,10 @@ button:disabled{opacity:.45;cursor:wait}
 .ov-box{background:#fff;border-radius:14px;padding:26px 44px;text-align:center;font-size:15px;box-shadow:0 8px 40px rgba(0,0,0,.25)}
 .spinner{width:34px;height:34px;border:4px solid var(--line);border-top-color:var(--blue);border-radius:50%;margin:0 auto 12px;animation:spin .9s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-#result-banner{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:100;background:#e9f9ef;border:2px solid var(--green);border-radius:12px;padding:12px 22px;box-shadow:0 6px 30px rgba(0,0,0,.2);max-width:760px;font-size:14.5px}
+#result-banner{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:100;background:#e9f9ef;border:2px solid var(--green);border-radius:12px;padding:12px 22px;box-shadow:0 6px 30px rgba(0,0,0,.2);max-width:760px;font-size:14.5px;max-height:86vh;overflow-y:auto}
 #result-banner h3{margin:0 0 4px;font-size:17px;color:var(--green)}
+#result-banner .rb-head{position:sticky;top:-12px;background:#e9f9ef;padding:4px 0;margin:0 -2px;z-index:1}
+#result-banner .rb-close{position:sticky;bottom:-12px;background:#e9f9ef;padding:6px 0 2px;margin:8px -2px 0;z-index:1}
 .commitbar{position:sticky;top:52px;z-index:8;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
 .commitbar span{color:var(--sub)}.commitbar b{color:var(--ink)}
 .commitbar button{margin-left:auto}
@@ -749,7 +751,7 @@ async function commitAll(btn){
 }
 function showResult(a){
   const el=$('#result-banner');
-  let html=`<h3>✅ 录入完成</h3><div>入库 <b>${a.ingested.length}</b> 题`+
+  let html=`<h3 class="rb-head">✅ 录入完成</h3><div>入库 <b>${a.ingested.length}</b> 题`+
     (a.topics.length?` · 存入专题 <b>${a.topics.length}</b> 题（第${a.topics.join('、')}题）`:'')+
     (a.skipped.length?` · 跳过重复 <b>${a.skipped.length}</b> 题`:'')+
     (a.errors.length?` · 失败 ${a.errors.length} 张`:'')+'</div>';
@@ -757,7 +759,7 @@ function showResult(a){
   if(a.errors.length)html+=`<div class="small" style="color:var(--red);margin-top:4px">❌ ${a.errors.map(esc).join('；')}</div>`;
   if(a.ingested.length)html+=`<details style="margin-top:6px"><summary class="small" style="cursor:pointer">错题本录入详情</summary>`+
     a.ingested.map(x=>`<div class="small" style="margin-top:6px"><b>第${x.no}题 → ${x.id}</b><br>${x.report.map(esc).join('<br>')}</div>`).join('')+'</details>';
-  html+=`<div style="margin-top:8px;text-align:right"><button class="sec" onclick="document.getElementById('result-banner').classList.add('hidden')">知道了</button></div>`;
+  html+=`<div class="rb-close" style="text-align:right"><button class="sec" onclick="document.getElementById('result-banner').classList.add('hidden')">知道了</button></div>`;
   el.innerHTML=html; el.classList.remove('hidden');
 }
 
