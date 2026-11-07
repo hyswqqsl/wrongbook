@@ -10,7 +10,7 @@
   5. 存入错题本：字段映射（source/难度/key_idea）；错题本查重拦截
   6. 提交链 ingest_selected：仅存专题零 LLM（make_client 不被调用）、
      草稿单写回 topic_example_id；双向多选（错题本+专题）；专题内重复算已处置
-  7. API：GET /api/topics、集合/类别/练习/to-book 端点契约
+  7. API：GET /api/topics、集合/类别/练习 端点契约；异步提交（v1.2r）
 
 全部离线：LLM 一律 stub（仅专题零 LLM 路径 + stub 质量链）。
 """
@@ -231,37 +231,6 @@ class TestPractice(unittest.TestCase):
         self.assertIsNone(ex["figure_svg"])   # 无有效 spec → 无 SVG
 
 
-class TestToBook(unittest.TestCase):
-    def setUp(self):
-        _temp_all()
-        self.sid = topics.load_topics()["sets"][0]["id"]
-        cats = topics.load_topics()["sets"][0]["categories"]
-        self.cat_final = [c for c in cats if c["difficulty"] == "final"][0]
-        crops = tempfile.mkdtemp()
-        self.ex = topics.add_example(self.sid, self.cat_final["id"], Q2,
-                                     answer="8", analysis="周长减两腰",
-                                     crop_src=_png_file(crops))
-
-    def test_creates_book_record(self):
-        rec = topics.to_book(self.ex["id"])
-        self.assertTrue(rec["id"])   # 错题记录 id（时间+随机后缀）
-        self.assertIn("初二中考必考专题", rec["source"])
-        self.assertIn("全等模型", rec["source"])
-        self.assertEqual(rec["verified_answer"], "8")
-        self.assertEqual(rec["verify_status"], "pass")
-        self.assertEqual(rec["analysis"]["difficulty"], 3)   # 压轴 → 难度3
-        self.assertEqual(rec["analysis"]["key_idea"], "周长减两腰")
-        self.assertEqual(rec["mistake_reason"]["kind"], "unknown")   # 默认错因
-        q = rec["question"]
-        self.assertEqual(q["text"], Q2)
-        self.assertTrue(q["figure_crop"])   # 图形引用随题
-
-    def test_book_dup_guard(self):
-        topics.to_book(self.ex["id"])
-        with self.assertRaises(topics.DuplicateExample):
-            topics.to_book(self.ex["id"])   # 已在错题本 → 拦截
-
-
 class TestCommitFlow(unittest.TestCase):
     def setUp(self):
         _temp_all()
@@ -451,17 +420,9 @@ class TestApi(unittest.TestCase):
         # 练习
         r = self.c.post(f"/api/topics/examples/{ex['id']}/practice", json={"correct": True})
         self.assertEqual(r.get_json()["streak"], 1)
-        # to-book
-        r = self.c.post(f"/api/topics/examples/{ex['id']}/to-book", json={})
-        self.assertEqual(r.status_code, 200)
-        self.assertTrue(r.get_json()["id"])
-        # 删除类别（连带例题；图形被 to_book 的错题记录引用 → v1.2q 保护：文件保留）
+        # 删除类别（连带例题；图形无其他引用 → 一并删除）
         r = self.c.delete(f"/api/topics/sets/{sid}/categories/{cid}")
         self.assertTrue(r.get_json()["ok"])
-        self.assertTrue(os.path.exists(ex["figure_crop"]))       # 错题记录仍引用 → 保留
-        # 错题记录也删除后：全无引用 → 文件连带删除
-        recs = store.load()["questions"]
-        store.remove(recs[-1]["id"])
         self.assertFalse(os.path.exists(ex["figure_crop"]))
 
 
@@ -598,7 +559,8 @@ class TestAsyncCommit(unittest.TestCase):
 
 
 class TestCropSharedProtection(unittest.TestCase):
-    """v1.2q 图形交叉引用保护：to_book 的错题与专题例题共享 topic_crops 文件，
+    """v1.2q 图形交叉引用保护：历史 to_book/双目的地使错题记录与专题例题共享
+    topic_crops 文件（v1.2t 起 to_book 入口移除，但存量共享数据仍需守护），
     删任一方不得丢另一方图形（q20261106-111019 图形丢失事故回归）"""
 
     def setUp(self):
@@ -622,8 +584,15 @@ class TestCropSharedProtection(unittest.TestCase):
         ex = topics.add_example(self.sid, self.cat["id"], Q1, answer="B", crop_src=self._png())
         crop = ex["figure_crop"]
         self.assertTrue(os.path.exists(crop))
-        rec = topics.to_book(ex["id"])
-        self.assertEqual(rec["question"]["figure_crop"], crop)   # 共享同一文件
+        # 手动构造历史共享形态（= 旧 to_book 产出的错题记录：question.figure_crop 指向例题图形）
+        rec = store.add({"type": "single", "source": "专题 · 历史",
+                         "question": {"text": ex["text"], "choices": None,
+                                      "figure_crop": crop},
+                         "printed_answer": "B", "verified_answer": "B",
+                         "verify_status": "pass", "mistake_reason": {"kind": "unknown"},
+                         "analysis": {"chapter": "", "kp_path": [], "knowledge_points": [],
+                                      "difficulty": 2},
+                         "practice": [], "flags": {}})
         self.assertTrue(store.remove(rec["id"]))                 # 删错题副本
         self.assertTrue(os.path.exists(crop))                    # 例题仍引用 → 保留（旧代码此处丢图）
         self.assertTrue(topics.delete_example(ex["id"]))         # 再删例题

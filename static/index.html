@@ -362,11 +362,12 @@ function renderReview(){
   $('#review-area').innerHTML=lockBar+(bar+(visible.length?visible.map(sheet=>`
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div><b>人审视图</b> ${sheet.questions.length&&sheet.questions.every(q=>q.done||q.skip)?'<span class="tag t-pass">✅ 已全部处置</span>':''} <span class="small">来源：${esc(sheet.source||'未标注')} · ${sheet.questions.length} 题 · 左：原图（与右侧逐题对照核对）</span></div>
+      <div><b>人审视图</b> ${sheet.questions.length&&sheet.questions.every(q=>q.done||q.skip)?'<span class="tag t-pass">✅ 已全部处置</span>':''} ${sheet.auto_rotated?`<span class="tag t-med">↻ 已自动扶正 ${sheet.auto_rotated}°</span>`:''} <span class="small">来源：${esc(sheet.source||'未标注')} · ${sheet.questions.length} 题 · 左：原图（与右侧逐题对照核对）</span>
+        <button class="sec" style="font-size:13px;padding:4px 10px;margin-left:8px" onclick="rotateSheet('${sheet.id}')" title="照片方向不对？点此顺时针旋转90°（可连点），裁剪图自动重裁">↻ 旋转90°</button></div>
     </div>
     <div class="review" style="margin-top:12px">
       <div class="photo-wrap" id="pw-${sheet.id}" onmousedown="startPick(event,'${sheet.id}')">
-        <img src="/data/${sheet.photo.replace(/^.*data\//,'')}" style="width:100%;display:block;border:1px solid var(--line);border-radius:8px">
+        <img src="/data/${sheet.photo.replace(/^.*data\//,'')}?v=${imgVer}" style="width:100%;display:block;border:1px solid var(--line);border-radius:8px">
         <div class="selbox hidden" id="sb-${sheet.id}"></div>
       </div>
       <div>${sheet.questions.map(q=>qCard(sheet,q)).join('')}</div>
@@ -607,6 +608,18 @@ function saveDraftVideo(sid,no,v){   // v1.2q：➕添加 / ✎编辑保存—�
   q._vedit=false;
   patchQ(sid,no,{video:v},null);
   renderReview();
+}
+async function rotateSheet(sid){   // v1.3 人审兜底：照片方向不对时人工旋转90°（图形框同步变换+整单重裁）
+  const s=sheets.find(x=>x.id===sid); if(!s)return;
+  try{
+    const r=await fetchT(`/api/sheets/${sid}/rotate`,{method:'POST'},30000);
+    const j=await r.json();
+    if(j.error)return alert('❌ '+j.error);
+    const i=sheets.findIndex(x=>x.id===sid);
+    if(i>=0)sheets[i]=j;
+    imgVer=Date.now();   // 强制照片/裁剪图刷新缓存
+    renderReview();
+  }catch(e){alert('❌ '+e);}
 }
 function removeDraftVideo(sid,no){   // 移除：弹确认
   if(!confirm('移除该题的视频讲解链接？'))return;
@@ -1221,7 +1234,6 @@ async function submitPaper(){
         <div style="margin-top:4px">状态：${badges}</div>
         <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">
           ${r.ready&&!q.__topic?`<button class="pri" onclick="masterQ('${q.id}')">📦 归档</button>`:''}
-          ${!correct&&q.__topic?`<button class="sec" onclick="tpToBook('${q.id}',this)">📥 存入错题本</button>`:''}
         </div></div>`;
   }
   const n=divs.length, score=n?Math.round(ok/n*100):0;
@@ -1269,7 +1281,7 @@ function renderTopics(){
   area.innerHTML=`<div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <b style="font-size:16px">📚 专题练习</b>
-      <span class="small">点各类别的「＋录入」上传照片转录添加；做错可手动存入错题本</span>
+      <span class="small">点各类别的「＋录入」上传照片转录添加；专题与错题本相互独立</span>
       <button class="sec" style="margin-left:auto" onclick="tpNewSet()">＋新建专题集</button>
     </div>
     ${TOPICS.sets.map(set=>{
@@ -1322,7 +1334,6 @@ function exCardHtml(set,cat,e){
       ${p.ready?'<span class="tag t-pass">🏆 已掌握</span>':p.count?`<span class="small">练过 ${p.count} 次 · 连对 ${p.streak}/3</span>`:'<span class="small">未练过</span>'}
       <span style="margin-left:auto"></span>
       <button class="sec" onclick="tpPracticeOne('${set.id}','${cat.id}','${e.id}')">📝 练习此题</button>
-      <button class="sec" onclick="tpToBook('${e.id}',this)">📥 存入错题本</button>
       <button class="warn" onclick="tpDelExample('${e.id}')">🗑 删除</button>
     </div>
     <div class="qtext">${esc(e.text)}</div>
@@ -1386,12 +1397,6 @@ function tpNewCat(sid){
 function tpDelExample(eid){
   if(!confirm('删除该例题？\n（图形文件若仍被错题本题目引用则保留，否则一并删除）'))return;
   fetch('/api/topics/examples/'+eid,{method:'DELETE'}).then(()=>tpReload());
-}
-async function tpToBook(eid,btn){
-  if(!confirm('存入错题本？\n错因默认记「不会」，可在工作台详情里修改。'))return;
-  const r=await (await fetch(`/api/topics/examples/${eid}/to-book`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json();
-  if(r.error)return alert('❌ '+r.error);
-  if(btn){btn.textContent='✅ 已入错题本';btn.disabled=true;}
 }
 let TP_VEDIT=null;   // v1.2q：例题卡视频链接编辑态（eid）
 async function tpSetVideo(eid,v){   // 保存链接（添加/编辑保存共用）；空值由调用方拦截

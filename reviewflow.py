@@ -11,7 +11,7 @@
   - 纯文字题：无图（figure_mode="none"）
 """
 import os, re, json, io, base64
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageDraw
 
 from common import make_client, CN_TYPE
 from store import add_sheet
@@ -107,6 +107,94 @@ def box_to_upright(box, orientation):
         return (t, 1 - r, b, 1 - l)
     # 其余（镜像类 2/4/5/7）罕见，按不变处理以免错裁
     return (l, t, r, b)
+
+
+# ---------- 拍摄方向自动扶正（v1.3）----------
+# 场景：照片内容本身横躺 90°（拍照时手机转了 90°，EXIF 无标记/被剥离——v0.5.1 只管 EXIF）。
+# 策略：CV 行/列投影剖面差分能量零 token 预筛（正立文档文字行水平 → 行剖面波动远大于列）；
+# 判"躺倒/不确定"才用 640px 小图视觉调用确认角度（±90° 与 180° 行剖面分不出，交给 LLM）。
+# 扶正后的图作为转录/抓图/存盘的唯一输入 → 全链路坐标系天然一致，下游零变换。
+
+ROT_DETECT_PROMPT = """图中同一份数档文档照片按四种旋转方向摆成四宫格：1=左上、2=右上、3=左下、4=右下。
+哪一个里的文字是正常方向（水平、可自上而下阅读）？
+只输出 JSON：{"n": 1}（n 为该象限序号 1/2/3/4）"""
+
+
+def _proj_energy(img):
+    """行/列投影剖面差分能量 (row_e, col_e)：前景（暗像素）按行/列求和后取一阶差分平方和。
+    正立文档：文字行水平 → 行剖面在"文字行/行间空白"间剧烈跳变 → 行能量大；躺倒则转移到列。"""
+    import numpy as np
+    g = np.asarray(img.convert("L"), dtype=np.float32)
+    fg = (g < 140).astype(np.float32)          # 文字为前景（纸张照片偏暗，阈值放宽）
+    rows, cols = fg.sum(axis=1), fg.sum(axis=0)
+
+    def energy(v):
+        d = np.diff(v)
+        return float((d * d).sum())
+
+    return energy(rows), energy(cols)
+
+
+def detect_rotation_cv(img):
+    """CV 预筛（零 token）：返回 'upright'（正立，跳过 LLM）| 'rotated'（躺倒）| 'unsure'"""
+    try:
+        small = img.copy()
+        small.thumbnail((500, 500))
+        row_e, col_e = _proj_energy(small)
+        if row_e <= 0 or col_e <= 0:
+            return "unsure"
+        ratio = row_e / col_e
+        if ratio >= 1.25:
+            return "upright"
+        if ratio <= 0.8:
+            return "rotated"
+        return "unsure"
+    except Exception:
+        return "unsure"
+
+
+def detect_rotation_llm(img, provider=None):
+    """四宫格指认式确认（v1.3.1）：把原图/顺转90/180/270 四个方向拼一张图，
+    让视觉模型"指认"哪个正立——选择类任务远比开放心算角度可靠（真实照片实测：
+    单图提问 270° 会误答 180°，四宫格全对）。失败返回 0（不旋转，保持现状）。"""
+    try:
+        cell = 300
+        tiles = []
+        for k in range(4):                      # 1:原图 2:顺90 3:顺180 4:顺270
+            t = img.copy()
+            t.thumbnail((cell, cell))
+            t = t.rotate(-90 * k, expand=True)
+            t.thumbnail((cell, cell))
+            tiles.append(t)
+        # 2x2 拼图：每格上方留 34px 标号条
+        cw = max(t.size[0] for t in tiles) + 12
+        ch = max(t.size[1] for t in tiles) + 46
+        grid = Image.new("RGB", (cw * 2, ch * 2), "white")
+        d = ImageDraw.Draw(grid)
+        for i, t in enumerate(tiles):
+            x, y = (i % 2) * cw, (i // 2) * ch
+            d.text((x + 8, y + 6), str(i + 1), fill=(200, 30, 30))
+            grid.paste(t, (x + 6, y + 34))
+            d.rectangle([x + 2, y + 2, x + cw - 3, y + ch - 3], outline=(180, 180, 180))
+        buf = io.BytesIO()
+        grid.save(buf, "JPEG", quality=70)
+        uri = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+        client, model = make_client(provider, vision=True)
+        data = ask_json_vision(client, model, ROT_DETECT_PROMPT, uri, max_tokens=2000)
+        n = int(data.get("n") or 1)
+        if n not in (1, 2, 3, 4):
+            return 0
+        return (n - 1) * 90                     # 1→0 2→90 3→180 4→270
+    except Exception:
+        return 0
+
+
+def detect_rotation(img, provider=None):
+    """拍摄方向检测主入口：返回需顺时针旋转的度数 0/90/180/270。
+    CV 判正立 → 直接 0（多数照片零开销）；躺倒/不确定 → LLM 确认。"""
+    if detect_rotation_cv(img) == "upright":
+        return 0
+    return detect_rotation_llm(img, provider)
 
 
 # ---------- 图形来源分层（A 方案） ----------
@@ -293,6 +381,38 @@ def auto_relocate(photo_bytes, sheet_id, no, boxes):
     return [c["path"] for c in out]
 
 
+def rotate_sheet_photo(sid):
+    """人审兜底（v1.3）：原图【顺时针】旋转 90° 并同步变换全部图形框 + 整单重裁。
+
+    自动扶正（LLM 二选一）约 75% 准确，转错方向时人点此按钮一键修正（可连点）。
+    box 变换复用 box_to_upright(orientation=6)（顺 90 的坐标映射）；GeoGebra 导出图
+    （_g.png）不随照片旋转（独立图源，不受照片方向影响）。返回更新后的草稿单。"""
+    sheet = store.get_sheet(sid)
+    if not sheet:
+        raise ValueError("草稿单不存在")
+    photo = sheet.get("photo")
+    if not photo or not os.path.exists(photo):
+        raise ValueError("无照片")
+    img = Image.open(photo).convert("RGB").rotate(-90, expand=True)
+    img.save(photo, "JPEG", quality=92)
+    from store import load_sheets, save_sheets
+    db = load_sheets()
+    target = next((sh for sh in db["sheets"] if sh["id"] == sid), None)
+    if not target:
+        raise ValueError("草稿单不存在")
+    for q in target.get("questions", []):
+        if q.get("figure_boxes"):
+            q["figure_boxes"] = [box_to_upright(b, 6) for b in q["figure_boxes"]]
+        mb = q.get("figure_manual_box")
+        if mb:
+            q["figure_manual_box"] = box_to_upright(mb, 6)
+    target["auto_rotated"] = ((target.get("auto_rotated") or 0) + 90) % 360
+    save_sheets(db)
+    sheet = store.get_sheet(sid) or target
+    recrop_all(sheet)
+    return sheet
+
+
 def recrop_all(sheet):
     """按【当前】照片重新裁剪该单所有图形（图源唯一权威 → 必然一致）。
 
@@ -458,6 +578,16 @@ def transcribe_photo(photo_bytes, source_note="", provider=None):
     """照片 → 草稿单（多题转录 + 几何题矢量图形 + 落盘）。返回草稿单 dict。
     视觉调用：provider 缺省用配置引擎；GLM 自动切视觉模型 glm-4.6v-flash。"""
     import figureflow
+    # ① EXIF 转正（v0.5.1）+ 拍摄方向自动扶正（v1.3：照片内容横躺，EXIF 管不到）
+    #    扶正后的照片作为转录/抓图/存盘的唯一输入 → 坐标系全链路一致
+    _up = upright_image(Image.open(io.BytesIO(photo_bytes))).convert("RGB")
+    auto_rot = detect_rotation(_up, provider)
+    if auto_rot:
+        _up = _up.rotate(-auto_rot, expand=True)   # PIL 逆时针为正 → 顺时针 rot 取负
+    buf = io.BytesIO()
+    _up.save(buf, "JPEG", quality=92)
+    photo_bytes = buf.getvalue()
+
     uri, (W, H) = preprocess(photo_bytes)
     client, model = make_client(provider, vision=True)
     data = ask_json_vision(client, model, TRANSCRIBE_PROMPT, uri)
@@ -475,11 +605,12 @@ def transcribe_photo(photo_bytes, source_note="", provider=None):
 
     os.makedirs(store.PHOTO_DIR, exist_ok=True)
     photo_path = os.path.join(store.PHOTO_DIR, sheet["id"] + ".jpg")
-    # 存【转正后】的照片（EXIF 已应用）：浏览器显示方向 = 服务端像素坐标，
-    # 用户手动框选的坐标才能和 crop_figures 对得上。
-    up = upright_image(Image.open(io.BytesIO(photo_bytes))).convert("RGB")
-    up.save(photo_path, "JPEG", quality=92)
+    # 存【转正+拍摄扶正】的照片：浏览器显示方向 = 服务端像素坐标，
+    # 用户手动框选的坐标才能和 crop_figures 对得上（photo_bytes 已完全扶正）。
+    with Image.open(io.BytesIO(photo_bytes)) as _im:
+        _im.save(photo_path, "JPEG", quality=92)
     sheet["photo"] = photo_path
+    sheet["auto_rotated"] = auto_rot   # v1.3：拍摄方向扶正记录（人审视图展示）
 
     for q in questions_raw:
         t = str(q.get("type") or "").strip().lower()

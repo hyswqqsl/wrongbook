@@ -39,7 +39,6 @@ SEED_SET = {
 }
 
 DIFF_CN = {"easy": "简单", "medium": "中等", "final": "压轴"}
-DIFF_TO_LEVEL = {"easy": 1, "medium": 2, "final": 3}   # 映射错题本难度 1|2|3
 
 
 # ---------- 路径（全局文件随 store._data_dir() 走，测试可重定向；练习记录按用户） ----------
@@ -221,7 +220,7 @@ def delete_category(sid, cid):
 # ---------- 例题 ----------
 
 def _remove_example_file(e):
-    # 图形（v1.2q 修复）：topic_crops 文件可能同时被 to_book 的错题记录引用（共享同一文件），
+    # 图形（v1.2q 修复）：topic_crops 文件可能同时被错题记录引用（历史 to_book/双目的地共享同一文件），
     # 有引用必须保留（否则错题详情图形丢失——q20261106-111019 事故根因）
     crop = e.get("figure_crop")
     if crop and os.path.exists(crop) and not crop_referenced(crop, exclude_eid=e["id"]) \
@@ -268,7 +267,7 @@ def crop_referenced(crop, exclude_eid=None):
 
 
 def _book_crop_ref(crop):
-    """图形文件是否仍被错题记录引用（to_book 与例题共享 topic_crops 文件；异常宁可不删）"""
+    """图形文件是否仍被错题记录引用（历史 to_book/双目的地与例题共享 topic_crops 文件；异常宁可不删）"""
     try:
         return any((q.get("question") or {}).get("figure_crop") == crop
                    for q in store.load()["questions"])
@@ -480,33 +479,3 @@ def view():
     return {"version": 1, "sets": sets}
 
 
-# ---------- 存入错题本（做错例题 → 标准错题记录，走复习/归档闭环） ----------
-
-def to_book(eid, reason=None):
-    """把例题转为错题记录。verify_status=pass（例题答案是家长选定的权威参考）；
-    analysis.chapter 留空（工作台显示未分类，可 PATCH 手改）；key_idea 带例题解析。"""
-    s, c, e = find_example(eid)
-    if not e:
-        raise ValueError("例题不存在")
-    dup = store.find_duplicate(e["text"])
-    if dup:
-        raise DuplicateExample(dup["id"])
-    rec = store.add({
-        "source": "专题 · {0} 第{1}类{2}".format(s["name"], c["no"], c["name"]),
-        "type": e.get("type") or "fill",
-        "question": {"text": e["text"], "choices": e.get("choices"),
-                     "figure_spec": e.get("figure_spec"),
-                     "figure_crop": e.get("figure_crop"),
-                     "figure_ggb": e.get("figure_ggb")},
-        "printed_answer": e.get("answer"),
-        "verified_answer": e.get("answer"),
-        "verify_status": "pass",
-        "mistake_reason": reason or {"kind": "unknown", "note": "专题例题做错"},
-        "analysis": {"grade": "八年级上册", "chapter": "", "kp_path": [],
-                     "knowledge_points": [], "pitfall": "",
-                     "difficulty": DIFF_TO_LEVEL.get(c.get("difficulty"), 2),
-                     "key_idea": e.get("analysis") or ""},
-        "photo": None,
-        "flags": {"needs_review": False},
-    })
-    return rec

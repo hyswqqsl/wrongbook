@@ -312,6 +312,18 @@ def api_ggb_figure(sid, no):
         return _err(e)
 
 
+@app.post("/api/sheets/<sid>/rotate")
+def api_sheet_rotate(sid):
+    """↻ v1.3 人审兜底：照片顺时针旋转 90°（自动扶正转错方向时人工一键修正，可连点）"""
+    try:
+        import reviewflow
+        return jsonify(reviewflow.rotate_sheet_photo(sid))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return _err(e)
+
+
 @app.post("/api/sheets/<sid>/recrop-all")
 def api_recrop_all(sid):
     """整单重裁：按当前照片重新裁所有图形（照片方向变更/迁移后用）"""
@@ -642,18 +654,6 @@ def api_topics_example_practice(eid):
         import topics
         b = request.get_json(force=True)
         return jsonify(topics.record_practice(eid, bool(b.get("correct"))))
-    except Exception as e:
-        return _err(e)
-
-
-@app.post("/api/topics/examples/<eid>/to-book")
-def api_topics_example_to_book(eid):
-    """做错的例题手动存入错题本（默认错因=不会，可后续在工作台手改）"""
-    try:
-        import topics
-        b = request.get_json(force=True, silent=True) or {}
-        reason = b.get("reason") if isinstance(b.get("reason"), dict) else None
-        return jsonify(topics.to_book(eid, reason))
     except Exception as e:
         return _err(e)
 
