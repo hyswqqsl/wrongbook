@@ -362,7 +362,7 @@ pytest 185 项全绿
 | R1 | `paths.py` data 外置改造 + meta.json 版本钩子 + JSON 写入加固（fsync + .bak 三代轮换）+ 全量回归 | ✅ **已完成**（V1.3.6，183 项全绿） |
 | R2 | 激活客户端：激活页/设备指纹/验签/心跳/宽限/锁定 | ✅ **已完成**（V1.3.7，208 项全绿 + mock ECS E2E 冒烟） |
 | R3 | ECS 验证服务 + 部署 + 签发 CLI | ✅ **完成**（V1.3.8：Alibaba Cloud Linux 3 部署成功，真实公网闭环验证通过） |
-| R4 | 打包：PyInstaller spec、首跑引导、Win/mac 构建冒烟（GeoGebra 已整体移除，无裁剪开关） | 1.5~2d |
+| R4 | 打包：PyInstaller spec、首跑引导、Win/mac 构建冒烟（GeoGebra 已整体移除，无裁剪开关） | ✅ **mac 包完成**（V1.4.0，冻结态冒烟通过）；Windows 待 Windows 机按 packaging/BUILD_WINDOWS.md 构建 |
 | R5 | 版本检查 + 备份/诊断包脚本 + 使用说明文档 | 0.5~1d |
 | R6 | 试点：先给 1 个外地家庭装，观察一周 → 迭代 → 再铺开 | 0.5d + 观察 |
 

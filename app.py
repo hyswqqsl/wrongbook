@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """app —— AI错题本 Flask 服务（本地单用户）"""
-import os, sys, traceback
+import os, sys, threading, traceback
 
 import paths
 
 BASE = paths.app_root()   # R1：静态资源/引擎随程序目录（frozen 态取 exe 目录）
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+BASE = paths.app_root()   # R1/R4：静态资源/引擎随程序目录（frozen 态取 exe 目录）
+
+sys.path.insert(0, BASE)   # R4：冻结态下模块目录与数据目录分离，引擎/资源按程序目录找
 from common import ROOT  # noqa
 
 from flask import Flask, request, jsonify, send_file, send_from_directory
@@ -624,10 +626,29 @@ def api_out(p):
 
 
 if __name__ == "__main__":
-    # debug 模式：./run.sh --debug 或 FLASK_DEBUG=1 ./run.sh（改代码自动重载 + 出错页面带堆栈；勿在生产常开）
-    # threaded=True（v1.2）：质量链 LLM 调用可达 1~3 分钟，串行模式会卡死全站请求
+    # debug 模式：./run.sh --debug 或 FLASK_DEBUG=1 ./run.sh（改代码自动重载；仅开发用）
     license_client.maybe_heartbeat_async()   # 启动时若已到期，先补一跳
-    license_client.start_heartbeat_loop()    # 运行中周期心跳（实测期 1 分钟）
+    license_client.start_heartbeat_loop()    # 运行中周期心跳（定稿 24h）
     debug = "--debug" in sys.argv or os.environ.get("FLASK_DEBUG") == "1"
-    print("AI错题本 → http://127.0.0.1:8899" + ("（debug）" if debug else ""))
-    app.run(host="127.0.0.1", port=8899, debug=debug, threaded=True)
+
+    if getattr(sys, "frozen", False):
+        # R4 打包态：自动选可用端口 + 自开浏览器（windowed 无终端，无 run.sh 代劳）
+        import socket, webbrowser
+        port = 8899
+        for p in range(8899, 8890, -1):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                try:
+                    s.bind(("127.0.0.1", p))
+                    port = p
+                    break
+                except OSError:
+                    continue
+        url = "http://127.0.0.1:%d" % port
+        _t = threading.Timer(1.5, lambda: webbrowser.open(url))
+        _t.daemon = True
+        _t.start()
+        print("AI错题本 →", url)
+        app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=False)
+    else:
+        print("AI错题本 → http://127.0.0.1:8899" + ("（debug）" if debug else ""))
+        app.run(host="127.0.0.1", port=8899, debug=debug, threaded=True)

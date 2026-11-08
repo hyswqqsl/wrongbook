@@ -2,6 +2,10 @@
 key.env
 __pycache__/
 .pytest_cache/
+# 打包构建产物（R4）：PyInstaller 工作目录与发布 zip，可随时重建不入库
+build/
+dist/
+.DS_Store
 data/photos/
 data/crops/
 out/

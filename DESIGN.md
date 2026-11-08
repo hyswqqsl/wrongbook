@@ -252,6 +252,17 @@
   **真实部署闭环（147.139.167.18:8901，HTTP 直连）**：公网探活/真实激活/心跳回执刷新/门禁放行全部通过；
   加固：license 流量强制直连不走系统代理（ProxyHandler({})）——本机代理环境曾致激活误报网络错误；
   冒烟码席位已用 1 个（如需回收：ECS 上 reset-seats）
+- **V1.4.0 打包发布（RELEASE_DESIGN.md R4，mac 包完成）**：新增 `packaging/`（wrongbook.spec +
+  build_mac.sh + BUILD_WINDOWS.md）——① 定稿：心跳回 24h、ENABLED 回 frozen/env 策略；
+  ② APP_VERSION 唯一源化（paths.py）；③ common.py/app.py 冻结态路径改造（app_root 挂 sys.path）；
+  ④ **export_paper 导出双通道**：开发态子进程 → 冻结态进程内 `export_paper.main()`
+  （打包后 sys.executable 不再是 Python 解释器，子进程方式失效）；
+  ⑤ 打包态启动：端口自动回退（8899→8891）+ 自开浏览器；
+  ⑥ 构建脚本：回归门禁 → PyInstaller windowed onedir+.app → 资源复制（static/engine/kb 种子）→
+  白名单校验（本地数据/密钥/geogebra 绝不入包）→ zip；
+  ⑦ **冻结态真实冒烟通过**：App Support 数据外置 ✓ 激活门禁+真实 ECS 激活 ✓ KB 播种 ✓
+  静态资源 ✓ 进程内 PDF 导出 ✓（修复：Timer daemon 参数/pipeline sys 导入）；
+  产物 `dist/AI错题本-v1.4.0-mac.zip`（83MB）；Windows 包待 Windows 机按 packaging/BUILD_WINDOWS.md 构建
 
 ---
 

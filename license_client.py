@@ -24,13 +24,12 @@ CA_PEM_PATH = os.environ.get("WRONGBOOK_LICENSE_CA", "") or None   # 自签证�
 HTTP_TIMEOUT = 10
 GRACE_DAYS = 14
 GRACE = GRACE_DAYS * 86400
-HEARTBEAT_INTERVAL = 60   # R3 实测期：1 分钟一跳（定稿改回 24*3600）；ok 判定窗口=2×间隔=2 分钟
-APP_VERSION = "1.4.0"   # R4 打包时与发布版本号联动更新
+HEARTBEAT_INTERVAL = 24 * 3600   # 定稿：每 24h 一跳（R3 实测期曾改 60s，已复原）
+APP_VERSION = paths.APP_VERSION   # R4：与打包版本唯一源联动（paths.py）
 
-# 启用策略（R3 实测期）：默认开启（用户要求本机真实激活测试）；
-# 回归套件经 tests/conftest.py 自动 WRONGBOOK_LICENSE=off；想临时关掉：export WRONGBOOK_LICENSE=off
-# 定稿后改回：bool(getattr(sys, "frozen", False)) or os.environ.get("WRONGBOOK_LICENSE") == "on"
-ENABLED = os.environ.get("WRONGBOOK_LICENSE") != "off"
+# 启用策略（定稿）：打包态默认启用；开发态默认关闭（无 ECS 会锁死开发者），
+# 本机联调：export WRONGBOOK_LICENSE=on 后启动
+ENABLED = bool(getattr(sys, "frozen", False)) or os.environ.get("WRONGBOOK_LICENSE") == "on"
 
 # 正式公钥（R3 生成；私钥随部署包上传 ECS，开发期密钥已废弃）
 LICENSE_PUBKEY_PEM = base64.b64decode(

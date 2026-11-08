@@ -2,11 +2,15 @@
 """common —— 工程接入层：sys.path、引擎客户端、章节词表（V1.0.1 起自包含，无父项目依赖）"""
 import os, sys
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+try:
+    import paths
+    BASE = paths.app_root()   # R4：冻结态取 exe 目录（engine/ 随包复制在旁）
+except Exception:            # paths 不可用时（极端隔离场景）回退源码目录
+    BASE = os.path.dirname(os.path.abspath(__file__))
 ENGINE = os.path.join(BASE, "engine")           # 内联的数学引擎模块（平铺目录，挂 sys.path）
 ROOT = BASE                                     # 兼容别名（历史代码引用）
 for _p in (BASE, ENGINE):
-    if _p not in sys.path:
+    if os.path.isdir(_p) and _p not in sys.path:
         sys.path.insert(0, _p)
 
 from generate_any import PROVIDERS  # noqa: E402  engine/generate_any.py

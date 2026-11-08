@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """pipeline —— 入库质量链 / 相似题生成 / 针对性出卷"""
-import os, re, json, time, subprocess, shutil
+import os, re, json, sys, time, subprocess, shutil
 
 import paths
 
@@ -380,6 +380,24 @@ def _latex2uni(s):
     return t
 
 
+def _run_export_paper(args_tail):
+    """统一导出入口：开发态子进程调 engine/export_paper.py；冻结态（打包）进程内调 main()
+    ——打包后 sys.executable 是应用自身，不能再当 Python 解释器用（R4）"""
+    if getattr(sys, "frozen", False):
+        import export_paper   # engine/ 已在 sys.path（common）；spec hiddenimports 已入包
+        old = sys.argv
+        sys.argv = ["export_paper"] + args_tail
+        try:
+            export_paper.main()
+        finally:
+            sys.argv = old
+        return
+    from common import BASE
+    subprocess.run([sys.executable,
+                    os.path.join(BASE, "engine", "export_paper.py")] + args_tail,
+                   check=True, capture_output=True)
+
+
 def export_selected_pdf(ids, with_answer=True):
     """工作台勾选题 → 练习卷 PDF（复用内联引擎 export_paper，无 AI 调用）。
 
@@ -387,8 +405,6 @@ def export_selected_pdf(ids, with_answer=True):
     的 figure_spec 矢量绘制）；答案默认附卷末（可裁剪）。返回 {pdf, n}。
     """
     from make_figures import normalize_bank
-    import sys
-    from common import BASE
     recs = [store.get(i) for i in ids]
     recs = [r for r in recs if r]
     if not recs:
@@ -423,12 +439,10 @@ def export_selected_pdf(ids, with_answer=True):
     jpath = os.path.join(out_dir, "错题练习卷_{0}.json".format(stamp))
     json.dump(bank, open(jpath, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
     prefix = os.path.join(out_dir, "错题练习卷_{0}".format(stamp))
-    cmd = [sys.executable,
-           os.path.join(BASE, "engine", "export_paper.py"), jpath,
-           "--title", "数学错题练习卷", "--out-prefix", prefix]
+    cmd = ["--title", "数学错题练习卷", "--out-prefix", prefix]
     if not with_answer:
         cmd.append("--no-answer")
-    subprocess.run(cmd, check=True, capture_output=True)
+    _run_export_paper([jpath] + cmd)
     pdf = prefix + ".pdf"
     if not os.path.exists(pdf):
         raise RuntimeError("PDF 生成失败（Chrome 缺失时 export_paper 只出 md/html）")
@@ -481,12 +495,8 @@ def export_selected_pdf(ids, with_answer=True):
     json.dump(bank, open(jpath, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 
     import sys
-    from common import BASE
-    subprocess.run([sys.executable,
-                    os.path.join(BASE, "engine", "export_paper.py"),
-                    jpath, "--title", "错题针对卷", "--out-prefix",
-                    os.path.join(out_dir, "错题针对卷_{0}".format(stamp))],
-                   check=True, capture_output=True)
+    _run_export_paper([jpath, "--title", "错题针对卷", "--out-prefix",
+                       os.path.join(out_dir, "错题针对卷_{0}".format(stamp))])
     pdf = os.path.join(out_dir, "错题针对卷_{0}.pdf".format(stamp))
     return {"pdf": pdf if os.path.exists(pdf) else None, "json": jpath,
             "n": len(bank["questions"]), "dropped": len(bad)}
