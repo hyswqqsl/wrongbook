@@ -26,6 +26,10 @@ button:disabled{opacity:.45;cursor:wait}
 .spinner{width:34px;height:34px;border:4px solid var(--line);border-top-color:var(--blue);border-radius:50%;margin:0 auto 12px;animation:spin .9s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 #result-banner{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:100;background:#e9f9ef;border:2px solid var(--green);border-radius:12px;padding:12px 22px;box-shadow:0 6px 30px rgba(0,0,0,.2);max-width:760px;font-size:14.5px;max-height:86vh;overflow-y:auto}
+#lic-banner{background:#fff7e0;border-bottom:1px solid #f0dfa0;color:#8a6d1a;padding:6px 22px;font-size:13px;display:none}
+#lic-view{max-width:460px;margin:60px auto}
+#lic-view .lic-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:28px 26px;text-align:center}
+#lic-view input{width:100%;box-sizing:border-box;padding:9px 12px;font:inherit;font-size:15px;text-align:center;letter-spacing:2px;border:1px solid var(--line);border-radius:8px}
 #result-banner h3{margin:0 0 4px;font-size:17px;color:var(--green)}
 #result-banner .rb-head{position:sticky;top:-12px;background:#e9f9ef;padding:4px 0;margin:0 -2px;z-index:1}
 #result-banner .rb-close{position:sticky;bottom:-12px;background:#e9f9ef;padding:6px 0 2px;margin:8px -2px 0;z-index:1}
@@ -164,6 +168,7 @@ details.kptree[open] summary{color:var(--ink)}
     <button class="sec" id="ai-badge" style="font-size:13px;padding:5px 10px" onclick="openAiConfig()" title="AI 引擎与 API Key 设置">⚙ 设置</button>
   </div>
 </header>
+<div id="lic-banner" class="small"></div>
 <main>
 
 <!-- ========== Tab1 录入（双入口：录入错题本 / 录入专题，入口由菜单决定） ========== -->
@@ -201,6 +206,17 @@ details.kptree[open] summary{color:var(--ink)}
   <div class="card" id="quiz-box">加载中…</div>
 </section>
 
+<section id="lic-view" class="hidden">
+  <div class="lic-card">
+    <div style="font-size:40px">🔐</div>
+    <h2 style="margin:6px 0 2px">激活 AI 错题本</h2>
+    <p id="lic-reason" class="small" style="color:#c0392b;margin:4px 0 0"></p>
+    <p class="small" style="margin:8px 0 12px">输入管理员提供的激活码（数据仅存本机，联网仅用于激活验证）</p>
+    <input id="lic-code" placeholder="WB-XXXX-XXXX-XXXX" autocomplete="off">
+    <button class="pri" id="lic-btn" style="width:100%;margin-top:10px" onclick="doActivate()">激 活</button>
+    <div id="lic-msg" class="small" style="margin-top:8px;color:#c0392b"></div>
+  </div>
+</section>
 </main>
 <div id="overlay" class="hidden"><div class="ov-box"><div class="spinner"></div><div id="ov-text">处理中…</div></div></div>
 <div id="qmodal" class="hidden"></div>
@@ -1408,14 +1424,45 @@ async function addUser(){
   if(j.error)return alert('❌ '+j.error);
   location.reload();   // 新用户题库为空，已自动切换
 }
-loadUsers();
-loadAiConfig();
-loadTopics();   // 专题数据预载（录入页「专题分类」与「同时存入专题」下拉都需要）
-if(sessionStorage.getItem('after-switch')==='dash'){   // 切换用户后：直达工作台（V1.0.3e）
-  sessionStorage.removeItem('after-switch');
-  document.querySelector('nav button[data-tab=dash]').click();   // click 内含 loadDash
-}else{
-  loadDash();   // 默认着陆仍预载工作台数据
+async function boot(){   // R2：先查激活状态再决定渲染（未激活/锁定→激活页；宽限→黄条；正常→全功能）
+  let lic=null;
+  try{ lic=await (await fetch('/api/license')).json(); }catch(e){}
+  if(lic && lic.enabled && (lic.state==='unactivated'||lic.state==='locked')){
+    document.querySelectorAll('main > section').forEach(s=>{if(s.id!=='lic-view')s.classList.add('hidden')});
+    document.querySelector('header nav').style.display='none';
+    $('#lic-view').classList.remove('hidden');
+    $('#lic-reason').textContent = lic.state==='locked' ? ({
+      expired:'激活码已过期，请联系管理员续费后重新激活',
+      grace_exceeded:'离线验证超期（超过 14 天未联网）：联网后自动恢复，或输入新激活码',
+      no_validation:'凭证异常，请重新激活'}[lic.reason]||'请重新激活') : '';
+    return;   // 激活页不走后续加载（后端门禁同样拦截）
+  }
+  if(lic && lic.enabled && lic.state==='grace'){
+    const b=$('#lic-banner');b.style.display='block';
+    b.textContent=`⚠ 离线验证剩余约 ${lic.grace_days_left||1} 天，联网后自动恢复`;
+  }
+  loadUsers();
+  loadAiConfig();
+  loadTopics();   // 专题数据预载（录入页「专题分类」与「同时存入专题」下拉都需要）
+  if(sessionStorage.getItem('after-switch')==='dash'){   // 切换用户后：直达工作台（V1.0.3e）
+    sessionStorage.removeItem('after-switch');
+    document.querySelector('nav button[data-tab=dash]').click();   // click 内含 loadDash
+  }else{
+    loadDash();   // 默认着陆仍预载工作台数据
+  }
+}
+boot();
+async function doActivate(){
+  const code=$('#lic-code').value.trim();
+  if(!code)return;
+  const btn=$('#lic-btn');btn.disabled=true;btn.textContent='验证中…';
+  try{
+    const r=await fetch('/api/license/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+    const j=await r.json();
+    if(j.ok){location.reload();return;}
+    $('#lic-msg').textContent='❌ '+(j.error||'激活失败');
+  }catch(e){$('#lic-msg').textContent='❌ 网络异常，请稍后重试';}
+  btn.disabled=false;btn.textContent='激 活';
 }
 function enterQuizView(){   // 做题视图：菜单全部未选中，切到做题区
   $$('nav button').forEach(x=>x.classList.remove('on'));

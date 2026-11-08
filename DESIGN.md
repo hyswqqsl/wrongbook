@@ -231,6 +231,17 @@
   ⑤ data/meta.json 版本钩子（schema=1，首次写入幂等，降级保护提示）；
   新增 tests/test_paths.py 11 项（目录解析/轮换/meta/存储集成/KB 播种），全量 **183 项全绿**；
   真实服务冒烟通过（dev 行为不变：数据仍在项目 data/，meta.json 首次生成）
+- **V1.3.7 激活客户端（RELEASE_DESIGN.md R2 完成）**：新增 `license_client.py` + `tools/license_keygen.py`（Ed25519 密钥对生成，开发期密钥已生成、发布前在 ECS 重签替换公钥）——
+  ① 设备指纹：已存档优先 → Win MachineGuid/mac IOPlatformUUID 哈希 → 随机落盘；
+  ② 凭证结构 v2：`license.json = {license(签发字段+签名,客户端不可变), receipt(最近服务端签名回执)}`——
+  宽限期以回执 server_time 为基准（心跳续期不能改已签名字段，客户端无私钥不能伪造回执）；
+  ③ 状态机 ok/grace/locked/unactivated：本机回拨被回执时间封底且回拨期不视为"新鲜"；
+  ④ app 门禁：未激活/锁定时业务 API 全 403，首页/激活端点放行（打包态默认启用，
+  开发态默认关闭、`WRONGBOOK_LICENSE=on` 联调）；启动/状态查询触发到期后台心跳（24h 间隔）；
+  ⑤ 前端：激活页（独立视图+锁定原因文案）+ 宽限黄条（剩余天数）；
+  ⑥ 传输层 urllib 零新依赖（自签证书场景内嵌公钥固定验证，`WRONGBOOK_LICENSE_SERVER` 可覆写地址）；
+  新增 tests/test_license.py 25 项（验签/绑定/状态机/回拨/激活/心跳/门禁），全量 **208 项全绿**；
+  mock ECS 端到端冒烟通过（未激活 403 → 激活 → 全功能）
 
 ---
 
@@ -676,6 +687,8 @@ wrongbook/                 # 本项目（V1.0.1 起完全自包含，可独立�
 | GET  | `/api/ai-config` | AI 引擎配置视图（引擎/掩码 key/模型；key 永不明文回传） |
 | POST | `/api/ai-config` | 保存配置 `{provider?, keys?, models?}`（key 空串=清除；落盘 data/ai_config.json） |
 | POST | `/api/ai-config/test` | 连通性测试 `{provider, key?, model?, vision?}`（测试值不落盘） |
+| GET  | `/api/license` | R2：激活状态视图（state/grace 剩余天数/掩码码/到期日；顺带触发到期后台心跳） |
+| POST | `/api/license/activate` | R2：激活 `{code}` → `{ok}` 或 400 `{error}`（服务端错误码转人话） |
 | GET  | `/api/users` | 用户表 + 当前用户 |
 | POST | `/api/users` | 新建用户（题库为空）并切换 `{name}` |
 | POST | `/api/users/switch` | 切换当前用户 `{id}` |

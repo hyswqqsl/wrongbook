@@ -13,10 +13,42 @@ from flask import Flask, request, jsonify, send_file, send_from_directory
 import store, stats
 import figureflow
 import ai_config
+import license_client
 
 app = Flask(__name__, static_folder=os.path.join(BASE, "static"), static_url_path="/static")
 app.json.sort_keys = False   # v1.2o：保留 dict 插入序（工作台 kp_by_chapter 按 KB 章序下发，Flask 默认字典序会得「一三二五四」错序）
 app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024   # 视频讲解上传可达数百 MB（v1.2）
+
+
+# ---------- 激活门禁（R2）：未激活/锁定时仅放行首页与激活相关，其余 API 全 403 ----------
+
+@app.before_request
+def _license_gate():
+    if not license_client.ENABLED:
+        return None
+    p = request.path
+    if p == "/" or p.startswith("/static") or p.startswith("/api/license"):
+        return None
+    st, _info = license_client.state()
+    if st in ("ok", "grace"):
+        return None
+    return jsonify({"error": "license_" + st}), 403
+
+
+@app.get("/api/license")
+def api_license_status():
+    """激活状态视图（前端启动首查；顺带触发到期后台心跳）"""
+    license_client.maybe_heartbeat_async()
+    return jsonify(license_client.status())
+
+
+@app.post("/api/license/activate")
+def api_license_activate():
+    body = request.get_json(force=True, silent=True) or {}
+    ok, err = license_client.activate(body.get("code", ""))
+    if not ok:
+        return jsonify({"ok": False, "error": err}), 400
+    return jsonify({"ok": True})
 
 
 def _err(e):
@@ -594,6 +626,7 @@ def api_out(p):
 if __name__ == "__main__":
     # debug 模式：./run.sh --debug 或 FLASK_DEBUG=1 ./run.sh（改代码自动重载 + 出错页面带堆栈；勿在生产常开）
     # threaded=True（v1.2）：质量链 LLM 调用可达 1~3 分钟，串行模式会卡死全站请求
+    license_client.maybe_heartbeat_async()   # R2：距上次验证超 24h 则后台心跳（不阻塞启动）
     debug = "--debug" in sys.argv or os.environ.get("FLASK_DEBUG") == "1"
     print("AI错题本 → http://127.0.0.1:8899" + ("（debug）" if debug else ""))
     app.run(host="127.0.0.1", port=8899, debug=debug, threaded=True)
