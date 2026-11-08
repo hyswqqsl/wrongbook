@@ -220,6 +220,17 @@
   删 3 端点（/api/ggb-script、sheets ggb-figure、questions figure）+ 前端整个工作台
   （弹窗/Set* 翻译器/按钮；viewImg 保留）；pipeline/topics 移除 figure_ggb 存档链
   （历史数据残留字段忽略不清洗）；run.sh 自检行移除；回归 172 项全绿（ggb 契约测试随之删除）
+- **V1.3.6 数据外置改造（RELEASE_DESIGN.md R1 完成）**：新增 `paths.py` 收口——
+  ① 目录解析三优先级：`WRONGBOOK_DATA` 环境变量 > 打包态平台数据目录
+  （Win %APPDATA%/mac ~/Library/Application Support，升级覆盖安装不丢数据）> 开发态项目内
+  data/（行为不变零迁移）；app_root() 区分程序资产（static/engine/KB 种子随包）与可变数据；
+  ② store/topics/ai_config/kbtree/pipeline/app 全部路径改走收口（out/ 产物也归数据目录）；
+  ③ KB 目录数据化：首次从随包种子播种到数据目录（手编 knowledge_points.json 升级不丢）；
+  ④ JSON 写入加固：atomic_write_json = tmp+fsync+.bak 三代轮换（.bak/.bak.1/.bak.2）
+  + 目录 fsync，覆盖 store 错题/草稿/users（原先无 bak）/topics/ai_config/kp 清单全部写入点；
+  ⑤ data/meta.json 版本钩子（schema=1，首次写入幂等，降级保护提示）；
+  新增 tests/test_paths.py 11 项（目录解析/轮换/meta/存储集成/KB 播种），全量 **183 项全绿**；
+  真实服务冒烟通过（dev 行为不变：数据仍在项目 data/，meta.json 首次生成）
 
 ---
 
@@ -270,7 +281,7 @@ wrongbook/                 # 本项目（V1.0.1 起完全自包含，可独立�
 ├── topics.py              # 专题模块（v1.2）：专题集/类别/例题 + 每用户练习记录（v1.2t 起与错题本解耦）
 ├── stats.py               # 工作台统计
 ├── serve.sh               # Terminal.app 常驻启动（脱离 IDE shell 生命周期）
-├── tests/                 # 回归测试 172 项（图形链/纠正入口/EXIF方向/整单重裁/入库图形源）
+├── tests/                 # 回归测试 183 项（图形链/纠正入口/EXIF方向/整单重裁/入库图形源/数据外置）
 ├── tools/                 # 历史数据迁移：EXIF转正 / 错位裁剪图模板匹配恢复 / 章节二级迁移(v1.2n)
 ├── static/
 │   ├── index.html         # 单页工作台（原生JS + KaTeX本地渲染）
@@ -723,7 +734,7 @@ wrongbook/                 # 本项目（V1.0.1 起完全自包含，可独立�
 | ~~出卷端到端~~ | ~~8题针对卷~~ | **V1.0.3 移除该功能，测试随之取消** |
 | 统计正确性 | 手工构造小库对账 dashboard 数字（含错因分布） | 全对 |
 | Web 冒烟 | 启动服务 curl 各端点 + 浏览器走查4 Tab | 全通 |
-| 回归套件 | `pytest tests/`（图形链/纠正入口/EXIF方向/整单重裁/入库图形源/查重/多用户/知识树/AI引擎配置/专题+视频/考点清洗/知识点受控/跨页拼接/旋转扶正） | 172 项全绿 |
+| 回归套件 | `pytest tests/`（图形链/纠正入口/EXIF方向/整单重裁/入库图形源/查重/多用户/知识树/AI引擎配置/专题+视频/考点清洗/知识点受控/跨页拼接/旋转扶正/数据外置） | 183 项全绿 |
 
 > v0.7.2 工作台：错题列表补章节/难度/知识点列+公式渲染+「查看」详情弹窗（全部信息/练习历史）；统计图默认折叠
 > 数据事故记录：v0.7 上线当天 test_dedup 因未开 set_test_mode 覆盖真实题库，已从 .bak 恢复并全测试加保险（bfe510b）

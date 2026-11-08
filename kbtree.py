@@ -8,9 +8,8 @@
   - GET /api/kb        → 前端树形知识点选择器
   - compact_summary()  → 注入转录期"年级/知识点自动归类"的 prompt
 """
-import os
-import json
-from common import BASE
+import os, json, shutil
+import paths
 
 KB_FILES = [
     "【浙教版】八年级上册(2025秋版)数学电子课本_1-100_kb.json",
@@ -34,6 +33,23 @@ _cache = None
 _KB_DIR = None   # 测试钩子：覆盖 KB 所在目录
 
 
+def _kb_dir():
+    """KB 目录解析（R1）：数据目录 data/kb，首次从随包种子（app_root/data/kb）播种。
+    开发态两者同目录（自拷自零操作）；打包态种子在安装包内、可写副本在用户数据目录
+    （升级覆盖安装不丢手编的 knowledge_points.json）。"""
+    if _KB_DIR:
+        return _KB_DIR
+    d = os.path.join(paths.DATA_HOME, "kb")
+    src = os.path.join(paths.app_root(), "data", "kb")
+    if os.path.isdir(src) and not os.path.exists(os.path.join(d, "knowledge_points.json")):
+        os.makedirs(d, exist_ok=True)
+        for f in os.listdir(src):
+            dst = os.path.join(d, f)
+            if not os.path.exists(dst) and os.path.isfile(os.path.join(src, f)):
+                shutil.copy2(os.path.join(src, f), dst)
+    return d
+
+
 def set_kb_dir(d=None):
     """测试钩子：从指定目录读 KB 文件（None=父项目根目录）"""
     global _cache, _KB_DIR
@@ -42,7 +58,7 @@ def set_kb_dir(d=None):
 
 
 def _load_kb(name):
-    p = os.path.join(_KB_DIR or os.path.join(BASE, "data", "kb"), name)
+    p = os.path.join(_kb_dir(), name)
     if not os.path.exists(p):
         return None
     return json.load(open(p, encoding="utf-8"))
@@ -114,7 +130,7 @@ def compact_summary(tree=None):
 # ---------- 精简细分知识点清单（v1.2i） ----------
 
 def _kp_path():
-    return os.path.join(_KB_DIR or os.path.join(BASE, "data", "kb"), "knowledge_points.json")
+    return os.path.join(_kb_dir(), "knowledge_points.json")
 
 
 def knowledge_points(force=False):
@@ -140,7 +156,5 @@ def knowledge_points(force=False):
                     kps.append(k)
         if kps:
             out["chapters"].append({"title": ch["title"], "kps": kps})
-    os.makedirs(os.path.dirname(p), exist_ok=True)
-    with open(p, "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, indent=1)
+    paths.atomic_write_json(p, out)   # R1 收口：手编清单也走 fsync+.bak
     return out

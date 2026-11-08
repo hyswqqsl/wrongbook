@@ -100,7 +100,7 @@ AI错题本-v1.4.0-win64/
 
 | 项 | 方案 |
 |---|---|
-| 数据根目录 | 平台标准位置：Win `%APPDATA%/AI错题本/`，mac `~/Library/Application Support/AI错题本/`；支持环境变量 `WRONGBOOK_DATA` 覆盖（开发/测试用） |
+| 数据根目录 | 平台标准位置：Win `%APPDATA%/WrongBook/`，mac `~/Library/Application Support/WrongBook/`；支持环境变量 `WRONGBOOK_DATA` 覆盖（开发/测试用） |
 | 改造点 | 新增 `paths.py` 统一收口：`store.py` / `ai_config.py` / `topics.py` / `kbtree.py` / `app.py`（`/data` `/out` 静态路由）约 6 处 `data/...` 硬编码改读 `paths.DATA_HOME`；license 存 `DATA_HOME/license.json` |
 | 开发者本机 | 默认仍解析到项目内 `data/`（未设环境变量 + 未打包时保持现状），**老数据零迁移** |
 | 打包态检测 | `getattr(sys, "frozen", False)` → 用平台数据目录 |
@@ -344,7 +344,7 @@ pytest 185 项全绿
 
 | 阶段 | 内容 | 预估 |
 |---|---|---|
-| R1 | `paths.py` data 外置改造 + meta.json 版本钩子 + JSON 写入加固（fsync + .bak 三代轮换）+ 全量回归 | 0.5~1d |
+| R1 | `paths.py` data 外置改造 + meta.json 版本钩子 + JSON 写入加固（fsync + .bak 三代轮换）+ 全量回归 | ✅ **已完成**（V1.3.6，183 项全绿） |
 | R2 | 激活客户端：激活页/设备指纹/验签/心跳/宽限/锁定 | 1~1.5d |
 | R3 | ECS 验证服务 + Caddy/systemd 部署 + 签发 CLI + 契约测试 | 1d |
 | R4 | 打包：PyInstaller spec、首跑引导、Win/mac 构建冒烟（GeoGebra 已整体移除，无裁剪开关） | 1.5~2d |

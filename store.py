@@ -2,8 +2,10 @@
 """store —— 错题本 JSON 存储层（原子写 + 自动备份，与父项目同风格）"""
 import os, json, re, shutil, threading, time, uuid
 
+import paths
+
 LOCK = threading.Lock()
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+DATA_DIR = paths.DATA_HOME   # R1 数据外置：开发态=项目内 data/（不变）；打包态=平台数据目录
 DB_PATH = os.path.join(DATA_DIR, "wrongbook.json")
 DRAFT_PATH = os.path.join(DATA_DIR, "drafts.json")
 PHOTO_DIR = os.path.join(DATA_DIR, "photos")
@@ -51,10 +53,7 @@ def _load_users_raw():
 
 def _save_users_raw(u):
     with LOCK:
-        os.makedirs(_data_dir(), exist_ok=True)
-        tmp = users_path() + ".tmp"
-        json.dump(u, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-        os.replace(tmp, users_path())
+        paths.atomic_write_json(users_path(), u)   # R1 加固：原先无 .bak/fsync，统一收口
 
 
 def _migrate_legacy(udir):
@@ -124,6 +123,7 @@ def _init_once():
     if _INIT:
         return
     _INIT = True
+    paths.ensure_meta(_data_dir())   # R1：data/meta.json 版本钩子（首个写入口触发，幂等）
     _ensure_users()
     _rebind_paths()
 
@@ -187,12 +187,7 @@ def load():
 def save(db):
     _init_once()
     with LOCK:
-        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-        tmp = DB_PATH + ".tmp"
-        json.dump(db, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-        if os.path.exists(DB_PATH):
-            shutil.copy(DB_PATH, DB_PATH + ".bak")
-        os.replace(tmp, DB_PATH)
+        paths.atomic_write_json(DB_PATH, db)
 
 
 def add(record):
@@ -372,12 +367,7 @@ def load_sheets():
 def save_sheets(db):
     _init_once()
     with LOCK:
-        os.makedirs(os.path.dirname(DRAFT_PATH), exist_ok=True)
-        tmp = DRAFT_PATH + ".tmp"
-        json.dump(db, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-        if os.path.exists(DRAFT_PATH):
-            shutil.copy(DRAFT_PATH, DRAFT_PATH + ".bak")
-        os.replace(tmp, DRAFT_PATH)
+        paths.atomic_write_json(DRAFT_PATH, db)
 
 
 def add_sheet(sheet):

@@ -19,8 +19,9 @@
 """
 import os, json, time, threading, base64
 
-BASE = os.path.dirname(os.path.abspath(__file__))
-_CONFIG_PATH = os.path.join(BASE, "data", "ai_config.json")   # 测试可重定向
+import paths
+
+_CONFIG_PATH = os.path.join(paths.DATA_HOME, "ai_config.json")   # 测试可重定向
 
 # 引擎元数据（显示名 / key 环境变量 / 申请入口 / 默认模型）
 PROVIDER_META = {
@@ -114,11 +115,7 @@ def save_patch(patch):
             if p in PROVIDER_META and isinstance(m, dict):
                 cfg["models"][p] = {"text": str(m.get("text") or "").strip(),
                                     "vision": str(m.get("vision") or "").strip()}
-    os.makedirs(os.path.dirname(_CONFIG_PATH), exist_ok=True)
-    tmp = _CONFIG_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, _CONFIG_PATH)
+    paths.atomic_write_json(_CONFIG_PATH, cfg, indent=2)   # R1 收口：fsync+.bak 三代轮换
     global _CACHE
     with _LOCK:
         _CACHE = None     # 下次 load 重读新 mtime

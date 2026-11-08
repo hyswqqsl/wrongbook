@@ -2,6 +2,10 @@
 """app —— AI错题本 Flask 服务（本地单用户）"""
 import os, sys, traceback
 
+import paths
+
+BASE = paths.app_root()   # R1：静态资源/引擎随程序目录（frozen 态取 exe 目录）
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import ROOT  # noqa
 
@@ -10,7 +14,6 @@ import store, stats
 import figureflow
 import ai_config
 
-BASE = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=os.path.join(BASE, "static"), static_url_path="/static")
 app.json.sort_keys = False   # v1.2o：保留 dict 插入序（工作台 kp_by_chapter 按 KB 章序下发，Flask 默认字典序会得「一三二五四」错序）
 app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024   # 视频讲解上传可达数百 MB（v1.2）
@@ -338,7 +341,7 @@ def api_sheet_docx(sid):
         sheet = store.get_sheet(sid)
         if not sheet:
             return jsonify({"error": "不存在"}), 404
-        out = os.path.join(BASE, "out", "排版稿_{0}.docx".format(sid))
+        out = os.path.join(paths.DATA_HOME, "out", "排版稿_{0}.docx".format(sid))
         os.makedirs(os.path.dirname(out), exist_ok=True)
         wordexport.export_sheet_docx(sheet, out)
         return send_file(out, as_attachment=True, download_name=os.path.basename(out))
@@ -580,12 +583,12 @@ def api_user_switch():
 
 @app.get("/data/<path:p>")
 def api_data(p):
-    return send_from_directory(os.path.join(BASE, "data"), p)
+    return send_from_directory(paths.DATA_HOME, p)
 
 
 @app.get("/out/<path:p>")
 def api_out(p):
-    return send_from_directory(os.path.join(BASE, "out"), p)
+    return send_from_directory(os.path.join(paths.DATA_HOME, "out"), p)
 
 
 if __name__ == "__main__":

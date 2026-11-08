@@ -17,6 +17,7 @@ import time
 import uuid
 import difflib
 
+import paths
 import store
 
 LOCK = threading.Lock()
@@ -64,12 +65,7 @@ def _new_id(prefix):
 
 
 def _atomic_write(path, data):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".tmp"
-    json.dump(data, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    if os.path.exists(path):
-        shutil.copy(path, path + ".bak")
-    os.replace(tmp, path)
+    paths.atomic_write_json(path, data)   # R1 收口：fsync + .bak 三代轮换
 
 
 # ---------- 全局专题库 ----------
