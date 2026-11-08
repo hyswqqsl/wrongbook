@@ -7,7 +7,9 @@ data/crops/
 out/
 # 注入式 API Key：网页设置落盘 / 开发者便利文件，均不入库
 data/ai_config.json
-# 激活体系开发期私钥（R2）：绝对不入库；正式私钥只在 ECS /etc/wrongbook-license/
+# 激活体系私钥（R2/R3）：绝对不入库；正式私钥随部署包上传 ECS 后本机留档
+data/license_dev_private.pem
+data/license_ecs_private.pem
 data/license_dev_private.pem
 data/license.json*
 data/device_id

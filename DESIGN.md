@@ -242,6 +242,16 @@
   ⑥ 传输层 urllib 零新依赖（自签证书场景内嵌公钥固定验证，`WRONGBOOK_LICENSE_SERVER` 可覆写地址）；
   新增 tests/test_license.py 25 项（验签/绑定/状态机/回拨/激活/心跳/门禁），全量 **208 项全绿**；
   mock ECS 端到端冒烟通过（未激活 403 → 激活 → 全功能）
+- **V1.3.8 ECS 验证服务（RELEASE_DESIGN.md R3，服务端代码就绪）**：新增 `ecs/` 目录——
+  `license_server.py`（activate/heartbeat/version/healthz + SQLite WAL + 每IP限流 + audit 留痕，
+  gunicorn 0.0.0.0:8901）+ `license_admin.py`（issue/list/revoke/reset-seats/extend/audit CLI，
+  码面去除易混字符）+ systemd 单元 + `setup_server.sh` 一键部署 + DEPLOY.md 步骤指南；
+  正式 Ed25519 密钥对已生成（私钥 `data/license_ecs_private.pem` 已 gitignore，随部署包上传；
+  公钥已烧入客户端，服务地址默认 http://147.139.167.18:8901）；
+  本地全链路实测：激活/幂等重激活/席位上限 403/错码 401/续费延期下次心跳生效/吊销即锁，全部符合契约；
+  **真实部署闭环（147.139.167.18:8901，HTTP 直连）**：公网探活/真实激活/心跳回执刷新/门禁放行全部通过；
+  加固：license 流量强制直连不走系统代理（ProxyHandler({})）——本机代理环境曾致激活误报网络错误；
+  冒烟码席位已用 1 个（如需回收：ECS 上 reset-seats）
 
 ---
 

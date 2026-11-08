@@ -1,0 +1,15 @@
+[Unit]
+Description=WrongBook License Server (AI错题本激活验证)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/wrongbook-license
+Environment=WB_LICENSE_DB=/var/lib/wrongbook-license/license.db
+Environment=WB_LICENSE_KEY=/etc/wrongbook-license/private.pem
+ExecStart=/opt/wrongbook-license/venv/bin/gunicorn -w 1 --threads 8 -b 0.0.0.0:8901 license_server:app
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

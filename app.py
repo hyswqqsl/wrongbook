@@ -626,7 +626,8 @@ def api_out(p):
 if __name__ == "__main__":
     # debug 模式：./run.sh --debug 或 FLASK_DEBUG=1 ./run.sh（改代码自动重载 + 出错页面带堆栈；勿在生产常开）
     # threaded=True（v1.2）：质量链 LLM 调用可达 1~3 分钟，串行模式会卡死全站请求
-    license_client.maybe_heartbeat_async()   # R2：距上次验证超 24h 则后台心跳（不阻塞启动）
+    license_client.maybe_heartbeat_async()   # 启动时若已到期，先补一跳
+    license_client.start_heartbeat_loop()    # 运行中周期心跳（实测期 1 分钟）
     debug = "--debug" in sys.argv or os.environ.get("FLASK_DEBUG") == "1"
     print("AI错题本 → http://127.0.0.1:8899" + ("（debug）" if debug else ""))
     app.run(host="127.0.0.1", port=8899, debug=debug, threaded=True)

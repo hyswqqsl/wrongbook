@@ -51,7 +51,7 @@ class LicenseTestBase(unittest.TestCase):
                "expires_at": kw.pop("license_expires_at", now + 365 * 86400),
                "features": []}
         lic.update({k[8:]: v for k, v in kw.items() if k.startswith("license_")})
-        rtime = kw.pop("receipt_time", now - 3600)
+        rtime = kw.pop("receipt_time", now)   # 默认"刚回执"：不依赖 HEARTBEAT_INTERVAL 取值
         r = {"type": "receipt", "code": lic["code"], "device_id": lc._DEVICE_ID,
              "server_time": rtime}
         return {"license": _sign(lic), "receipt": _sign(r)}

@@ -18,19 +18,23 @@ import paths
 
 # ---------- 配置 ----------
 
-SERVER_BASE = os.environ.get("WRONGBOOK_LICENSE_SERVER", "http://127.0.0.1:8901").rstrip("/")
+SERVER_BASE = os.environ.get("WRONGBOOK_LICENSE_SERVER",
+                             "http://147.139.167.18:8901").rstrip("/")   # ECS 验证服务（R3）
 CA_PEM_PATH = os.environ.get("WRONGBOOK_LICENSE_CA", "") or None   # 自签证书场景：随包公钥文件
 HTTP_TIMEOUT = 10
 GRACE_DAYS = 14
 GRACE = GRACE_DAYS * 86400
-HEARTBEAT_INTERVAL = 24 * 3600
+HEARTBEAT_INTERVAL = 60   # R3 实测期：1 分钟一跳（定稿改回 24*3600）；ok 判定窗口=2×间隔=2 分钟
 APP_VERSION = "1.4.0"   # R4 打包时与发布版本号联动更新
 
-ENABLED = bool(getattr(sys, "frozen", False)) or os.environ.get("WRONGBOOK_LICENSE") == "on"
+# 启用策略（R3 实测期）：默认开启（用户要求本机真实激活测试）；
+# 回归套件经 tests/conftest.py 自动 WRONGBOOK_LICENSE=off；想临时关掉：export WRONGBOOK_LICENSE=off
+# 定稿后改回：bool(getattr(sys, "frozen", False)) or os.environ.get("WRONGBOOK_LICENSE") == "on"
+ENABLED = os.environ.get("WRONGBOOK_LICENSE") != "off"
 
-# 开发期公钥（tools/license_keygen.py 生成；R3/R4 发布前替换为 ECS 正式公钥）
+# 正式公钥（R3 生成；私钥随部署包上传 ECS，开发期密钥已废弃）
 LICENSE_PUBKEY_PEM = base64.b64decode(
-    "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUNvd0JRWURLMlZ3QXlFQTM5RFF0WmhpT2NSaVQrRGFJNXFwVy94Mlg2VFhFRlpZTEdxdGJQcDNvek09Ci0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=")
+    "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUNvd0JRWURLMlZ3QXlFQW1lWVNFLzc3VkRxOUNQYnVIOUF3UFhxbWdtZTc3dGFkMG1ESk5mTFVYVUk9Ci0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=")
 
 # ---------- 凭证结构（v2：签发凭证 + 签名心跳回执） ----------
 # license.json = {"license": {服务端签发字段+sig，客户端不可变},
@@ -167,7 +171,8 @@ def state():
     """返回 (state, info)：ok ｜ grace ｜ locked(reason) ｜ unactivated（未启用恒 ok）
 
     时间基准：max(本机时钟, 最新回执 server_time) —— 本机回拨被签名回执封底，无法续命；
-    宽限期从【最近一次服务端确认】起算（ok=48h 内，grace=14 天内，超过即锁定）。"""
+    宽限期从【最近一次服务端确认】起算：ok = 距回执 < 2×心跳间隔且回拨≤1h 容差；
+    grace = 仍在宽限窗口（默认 14 天）；超过即锁定（方案 A）。"""
     if not ENABLED:
         return "ok", {}
     env = load()
@@ -183,17 +188,11 @@ def state():
         return "locked", {"reason": "no_validation"}
     if now > lv + GRACE:
         return "locked", {"reason": "grace_exceeded"}
-    if exp and now > exp:
-        return "locked", {"reason": "expired"}
-    if not lv:
-        return "locked", {"reason": "no_validation"}
-    if now > lv + GRACE:
-        return "locked", {"reason": "grace_exceeded"}
     # ok 需本机时钟不早于最后回执（回拨/未同步时不视为"新鲜"，按宽限满额处理，
     # 联网后服务端时间即刻纠正）
     if now <= lv + 2 * HEARTBEAT_INTERVAL and _now() >= lv - 3600:
         return "ok", {}
-    return "grace", {"grace_days_left": max(1, (lv + GRACE - now) // 86400)}
+    return "grace", {"grace_days_left": max(1, (lv + GRACE - now + 86399) // 86400)}   # 向上取整
 
 
 def status():
@@ -215,16 +214,20 @@ def status():
 # ---------- 网络交互（测试可整体 monkeypatch _http_post） ----------
 
 def _http_post(path, payload, timeout=HTTP_TIMEOUT):
-    """返回 (status, body_dict)；HTTP 4xx/5xx 也返回状态码与错误体；网络异常上抛"""
+    """返回 (status, body_dict)；HTTP 4xx/5xx 也返回状态码与错误体；网络异常上抛
+    许可流量强制直连（不走系统代理）：家庭机器上代理软件半死不活是常见故障源"""
     url = SERVER_BASE + path
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST",
                                  headers={"Content-Type": "application/json"})
     ctx = None
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))   # 绕过系统代理
     if url.startswith("https://") and CA_PEM_PATH and os.path.exists(CA_PEM_PATH):
         ctx = ssl.create_default_context(cafile=CA_PEM_PATH)   # 自签证书固定验证
+        opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=ctx))
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+        with opener.open(req, timeout=timeout) as r:
             return r.status, json.loads(r.read().decode("utf-8") or "{}")
     except urllib.error.HTTPError as e:
         try:
@@ -288,8 +291,25 @@ def due_for_heartbeat():
 
 
 def maybe_heartbeat_async():
-    """距上次成功验证超过 24h 则后台心跳（不阻塞启动）"""
+    """距上次成功验证超过间隔则后台心跳（启动时/状态查询时触发）"""
     if not ENABLED or not due_for_heartbeat():
         return False
     threading.Thread(target=heartbeat, daemon=True).start()
     return True
+
+
+def start_heartbeat_loop():
+    """常驻后台循环：运行中每到一个心跳间隔就检查补发（实测期 1 分钟一跳，观察黄条/恢复用）"""
+    if not ENABLED:
+        return
+
+    def _loop():
+        while True:
+            time.sleep(HEARTBEAT_INTERVAL)
+            try:
+                if due_for_heartbeat():
+                    heartbeat()
+            except Exception:
+                pass   # 后台循环永不中断主程序
+
+    threading.Thread(target=_loop, daemon=True).start()
