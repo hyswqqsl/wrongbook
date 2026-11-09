@@ -24,7 +24,8 @@ CA_PEM_PATH = os.environ.get("WRONGBOOK_LICENSE_CA", "") or None   # 自签证�
 HTTP_TIMEOUT = 10
 GRACE_DAYS = 14
 GRACE = GRACE_DAYS * 86400
-HEARTBEAT_INTERVAL = 24 * 3600   # 定稿：每 24h 一跳（R3 实测期曾改 60s，已复原）
+HEARTBEAT_INTERVAL = 2 * 3600   # 运行中后台周期心跳
+HEARTBEAT_CHECK = 600           # 打开应用/状态查询时的"顺带验证"节流：吊销/延期最长 1h 生效（R3.1）
 APP_VERSION = paths.APP_VERSION   # R4：与打包版本唯一源联动（paths.py）
 
 # 启用策略（定稿）：打包态默认启用；开发态默认关闭（无 ECS 会锁死开发者），
@@ -286,7 +287,7 @@ def due_for_heartbeat():
     env = load()
     if not env:
         return False
-    return _now() - int(env["receipt"].get("server_time") or 0) > HEARTBEAT_INTERVAL
+    return _now() - int(env["receipt"].get("server_time") or 0) > HEARTBEAT_CHECK
 
 
 def maybe_heartbeat_async():

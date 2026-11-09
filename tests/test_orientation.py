@@ -163,7 +163,8 @@ class TestLegacyMigration(unittest.TestCase):
 
     def test_migrate_transforms_boxes_and_photo(self):
         import store
-        with tempfile.TemporaryDirectory() as td:
+#        with tempfile.TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
             old_photo_dir, old_crop_dir = store.PHOTO_DIR, store.CROP_DIR
             store.PHOTO_DIR = os.path.join(td, "photos")
             store.CROP_DIR = os.path.join(td, "crops")
