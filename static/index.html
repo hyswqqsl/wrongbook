@@ -324,6 +324,16 @@ function fetchT(url,opt={},ms=120000){
   const t=setTimeout(()=>ctl.abort(),ms);
   return fetch(url,{...opt,signal:ctl.signal}).finally(()=>clearTimeout(t));
 }
+
+// 兼容 Windows(\) 与 macOS(/) 的数据路径转换（R4.0c：Windows 转录照片/图形不显示的根因修复）
+// 服务端存的是平台数据目录绝对路径（如 C:\...\WrongBook\data\users\test\photos\x.jpg），
+// 旧正则 ^.*data\/ 只认正斜杠，Windows 反斜杠不命中 → 整条绝对路径被拼进 /data/ URL → 图片 404。
+function relDataUrl(pathStr){
+  if(!pathStr)return '';
+  const normalized=String(pathStr).replace(/\\/g,'/');          // 反斜杠统一转正斜杠
+  const rel=normalized.replace(/^.*\/data\//i,'');              // 剥离到 data/ 为止的绝对前缀
+  return '/data/'+rel;
+}
 /* ---------- 图片待传队列：拖拽 / 粘贴 / 点选 三入口统一入队 ----------
    v1.3.1 跨页题：joinFlags[i]=true 表示第 i 张与上一张（组）是同一道题的上下两页，
    转录时前端拼成一张长图 → 一次转录产出完整题目（boxes/裁剪/入库全链路自然工作） */
@@ -440,7 +450,7 @@ function renderReview(){
     </div>
     <div class="review" style="margin-top:12px">
       <div class="photo-wrap" id="pw-${sheet.id}" onmousedown="startPick(event,'${sheet.id}')">
-        <img src="/data/${sheet.photo.replace(/^.*data\//,'')}?v=${imgVer}" style="width:100%;display:block;border:1px solid var(--line);border-radius:8px">
+        <img src="${relDataUrl(sheet.photo)}?v=${imgVer}" style="width:100%;display:block;border:1px solid var(--line);border-radius:8px">
         <div class="selbox hidden" id="sb-${sheet.id}"></div>
       </div>
       <div>${sheet.questions.map(q=>qCard(sheet,q)).join('')}</div>
@@ -457,7 +467,7 @@ function figBlock(sheet,q){
     fig=`<figure style="margin:8px 0;text-align:center"><div class="figsvg">${svg}</div></figure>`;
     src='当前图形：矢量 SVG（自动生成，需与原题核对）';
   }else if(crops.length){
-    fig=`<figure style="margin:8px 0;text-align:center"><img src="/data/${crops[0].replace(/^.*data\//,'')}?v=${imgVer}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:280px;border:1px solid var(--line);border-radius:6px"></figure>`;
+    fig=`<figure style="margin:8px 0;text-align:center"><img src="${relDataUrl(crops[0])}?v=${imgVer}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:280px;border:1px solid var(--line);border-radius:6px"></figure>`;
     src='当前图形：原题照片裁剪图（原图为准）';
   }else{
     src='当前图形：无';
@@ -570,7 +580,7 @@ function videoBlockHtml(v){
     if(yt)return `<iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}${t?`?start=${t}`:''}" allowfullscreen style="width:100%;max-width:560px;height:315px;margin-top:6px;border-radius:8px;border:1px solid var(--line)"></iframe>`;
     return `<div style="margin-top:6px"><a href="${esc(v)}" target="_blank" rel="noopener">🔗 打开视频链接</a></div>`;
   }
-  return `<video controls preload="metadata" src="/data/${v.replace(/^.*data\//,'')}" style="width:100%;max-width:560px;margin-top:6px;border-radius:8px"></video>`;
+  return `<video controls preload="metadata" src="${relDataUrl(v)}" style="width:100%;max-width:560px;margin-top:6px;border-radius:8px"></video>`;
 }
 function hlQ(box,qid){}
 /* ---------- 左侧原图手动框选 ---------- */
@@ -984,7 +994,7 @@ async function showQModal(qid){
   const reason=reasonCN[mr.kind]||'未标注'+(mr.note?`（${esc(mr.note)}）`:'');
   const kps=[...new Set([...(an.kp_path||[]).filter(Boolean),...(an.knowledge_points||[])])];
   const fig=q.figure_svg?`<figure style="text-align:center;margin:8px 0"><div class="figsvg">${q.figure_svg}</div></figure>`
-    :(q.question&&q.question.figure_crop?`<figure style="text-align:center;margin:8px 0"><img id="qmodal-fig" src="/data/${q.question.figure_crop.replace(/^.*data\//,'')}?v=${imgVer}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:300px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
+    :(q.question&&q.question.figure_crop?`<figure style="text-align:center;margin:8px 0"><img id="qmodal-fig" src="${relDataUrl(q.question.figure_crop)}?v=${imgVer}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:300px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
   $('#qmodal').innerHTML=`<div class="qm-box" onclick="event.stopPropagation()">
     <div class="qm-head"><b>题目详情</b><span class="small">${esc(q.id)}</span>
       ${q.mastered_at?'<span class="tag t-pass">已归档</span>':'<span class="tag t-review">在库</span>'}
@@ -1065,7 +1075,7 @@ function renderPaper(qs,title){   // v1.2：错题本与专题例题共用渲染
   const body=qs.map((q,i)=>{
     const an=q.analysis||{};
     const fig=q.figure_svg?`<figure>${q.figure_svg}</figure>`
-      :((q.question&&q.question.figure_crop)?`<figure><img src="/data/${q.question.figure_crop.replace(/^.*data\//,'')}" style="max-width:280px"></figure>`:'');
+      :((q.question&&q.question.figure_crop)?`<figure><img src="${relDataUrl(q.question.figure_crop)}" style="max-width:280px"></figure>`:'');
     let ui='';
     if(q.type==='single')ui=(q.question.choices||[]).map(c=>
       `<label class="pq-opt"><input type="radio" name="pq-${i}" value="${esc(c.key)}"> ${esc(c.key)}. ${esc(c.text)}</label>`).join('');
@@ -1236,7 +1246,7 @@ function renderSetView(area,set){
 function exCardHtml(set,cat,e){
   const p=e.practice||{};
   const fig=e.figure_svg?`<figure style="margin:8px 0;text-align:center"><div class="figsvg">${e.figure_svg}</div></figure>`
-    :(e.figure_crop?`<figure style="margin:8px 0;text-align:center"><img src="/data/${e.figure_crop.replace(/^.*data\//,'')}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:260px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
+    :(e.figure_crop?`<figure style="margin:8px 0;text-align:center"><img src="${relDataUrl(e.figure_crop)}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:260px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
   const ve=e.video||'', vEdit=(TP_VEDIT===e.id);
   const hasAna=e.key_idea||e.pitfall;
   return `<div class="qcard" id="tpex-${e.id}">
@@ -1465,7 +1475,7 @@ async function boot(){   // R2：先查激活状态再决定渲染（未激活/�
     document.querySelectorAll('main > section').forEach(s=>{if(s.id!=='lic-view')s.classList.add('hidden')});
     document.querySelector('header nav').style.display='none';
     $('#lic-view').classList.remove('hidden');
-    $('#lic-reason').textContent = lic.revoked_hint ? '激活码已被停用，请联系管理员重新发码' : (
+    $('#lic-reason').textContent = lic.revoked_hint ? '激活码已被停用；若管理员已重新启用，重启本程序即可自动恢复，或重新输入激活码' : (
       lic.state==='locked' ? ({
       expired:'激活码已过期，请联系管理员续费后重新激活',
       grace_exceeded:'离线验证超期（超过 14 天未联网）：联网后自动恢复，或输入新激活码',

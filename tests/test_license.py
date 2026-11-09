@@ -331,6 +331,34 @@ class TestValidateOnStartup(LicenseTestBase):
         lc.validate_on_startup(timeout=4)            # 离线：不抛异常，宽限继续
         self.assertIsNotNone(lc.load())
 
+    def test_startup_auto_recovers_after_admin_enable(self):
+        """吊销 → 管理员 enable → 下次启动：静默用标记里的原码重激活，零输入自动恢复（R4.0c）"""
+        now = int(time.time())
+        self._write()
+        # 第一次心跳：被吊销 → 凭证删除 + 停用标记（存原码）
+        lc._http_post = lambda path, payload, timeout=10: (401, {"error": "code_revoked"})
+        lc.heartbeat()
+        self.assertIsNone(lc.load())
+        self.assertTrue(lc.status()["revoked_hint"])
+        # 管理员 enable 后：启动验证 → 静默激活成功 → 自动恢复 + 提示清除
+        env = self._mkenv(receipt_time=now)
+        lc._http_post = lambda path, payload, timeout=10: (
+            200, {"license": env["license"], "receipt": env["receipt"]})
+        lc.validate_on_startup()
+        self.assertIsNotNone(lc.load())
+        self.assertEqual(lc.state()[0], "ok")
+        self.assertFalse(lc.status()["revoked_hint"])
+
+    def test_startup_revoked_still_revoked_keeps_hint(self):
+        """吊销后管理员尚未 enable：启动重激活失败 → 保留红字提示与激活页"""
+        self._write()
+        lc._http_post = lambda path, payload, timeout=10: (401, {"error": "code_revoked"})
+        lc.heartbeat()
+        lc._http_post = lambda path, payload, timeout=10: (401, {"error": "code_revoked"})
+        lc.validate_on_startup()
+        self.assertIsNone(lc.load())
+        self.assertTrue(lc.status()["revoked_hint"])
+
     def test_disabled_skips(self):
         lc.ENABLED = False
         calls = []

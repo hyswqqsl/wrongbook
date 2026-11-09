@@ -239,7 +239,7 @@ def _http_post(path, payload, timeout=HTTP_TIMEOUT):
         return e.code, body
 
 
-def activate(code):
+def activate(code, timeout=HTTP_TIMEOUT):
     """激活：成功保存凭证返回 (True, None)；失败返回 (False, 错误信息)"""
     code = str(code or "").strip()
     if not code:
@@ -291,7 +291,8 @@ def heartbeat(timeout=HTTP_TIMEOUT):
         if body.get("error") == "code_revoked":
             try:
                 paths.atomic_write_json(os.path.join(paths.DATA_HOME, REVOKED_HINT_FILE),
-                                        {"code": env["license"].get("code"), "at": _now()})
+                                        {"code": env["license"].get("code"),
+                                         "device_id": env["license"].get("device_id"), "at": _now()})
             except Exception:
                 pass
         _forget()
@@ -300,9 +301,23 @@ def heartbeat(timeout=HTTP_TIMEOUT):
 def validate_on_startup(timeout=4):
     """启动时**无条件**同步验证一次（不看检查节流）：吊销/延期在下次启动时立即感知；
     网络异常按宽限处理（短超时，最多阻塞启动 4 秒）——R4.0b：修复“刚验证过就吊销，
-    重启应用仍可进入”的设计缺口"""
-    if ENABLED:
-        heartbeat(timeout=timeout)
+    重启应用仍可进入”的设计缺口。
+
+    吊销恢复（R4.0c）：若存在停用提示标记（说明管理员可能已 enable），
+    用标记里的原码静默尝试重新激活——成功则自动恢复全功能，家长零操作。"""
+    if not ENABLED:
+        return
+    hint = os.path.join(paths.DATA_HOME, REVOKED_HINT_FILE)
+    if not os.path.exists(LICENSE_PATH) and os.path.exists(hint):
+        try:
+            code = json.load(open(hint, encoding="utf-8")).get("code")
+            if code:
+                ok, _ = activate(code, timeout=timeout)   # 管理员已 enable → 静默恢复；仍停用 → 保留红字
+                if ok:
+                    return
+        except Exception:
+            pass
+    heartbeat(timeout=timeout)
 
 
 def revoked_hint():
