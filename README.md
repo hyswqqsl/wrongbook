@@ -50,6 +50,7 @@ GLM 默认 `glm-5.3-flash`（原生多模态，看图/解题同模型，¥0.8/¥
 | 验证服务 | `ecs/`（已部署 147.139.167.18:8901） | Flask+SQLite；激活/心跳/版本检查；限流+审计留痕；部署步骤见 `ecs/DEPLOY.md` |
 | 发码 | ECS 上 `venv/bin/python license_admin.py issue --owner 张同学家` | 线下收款后发码；永久/按天/试用码；吊销/延期/清席位同 CLI |
 | 打包 | `packaging/` | mac：`./packaging/build_mac.sh` → `dist/AI错题本-v1.4.0-mac.zip`；Windows：`packaging/BUILD_WINDOWS.md` |
+| 单实例/退出 | `app.py` | 固定 8899 单实例：重复双击 → 自动拉起已有页面 + 原生弹窗提示（不再顺延新端口）；页面右上角「⏻ 退出」安全关闭后台并释放端口（打包态唯一退出入口，带防跨站校验） |
 
 - 打包态数据目录外置：Win `%APPDATA%\WrongBook\` / mac `~/Library/Application Support/WrongBook/`
   ——**升级直接覆盖安装，题库/照片/激活状态不丢**

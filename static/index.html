@@ -166,6 +166,7 @@ details.kptree[open] summary{color:var(--ink)}
     <select id="user-sel" onchange="switchUser(this.value)" style="padding:5px 8px;border:1px solid var(--line);border-radius:6px;font:inherit"></select>
     <button class="sec" style="font-size:13px;padding:5px 10px" onclick="addUser()">＋ 新用户</button>
     <button class="sec" id="ai-badge" style="font-size:13px;padding:5px 10px" onclick="openAiConfig()" title="AI 引擎与 API Key 设置">⚙ 设置</button>
+    <button class="sec" id="btn-shutdown" style="font-size:13px;padding:5px 10px;color:var(--red);border-color:#f5c2c7" onclick="shutdownApp()" title="关闭后台服务并释放端口">⏻ 退出</button>
   </div>
 </header>
 <div id="lic-banner" class="small"></div>
@@ -1472,6 +1473,14 @@ function enterQuizView(){   // 做题视图：菜单全部未选中，切到做�
 }
 if(location.hash==='#quiz'){enterQuizView();}   // 工作台「开始做题」新标签页直达
 window.addEventListener('hashchange',()=>{if(location.hash==='#quiz')enterQuizView();});   // 同页改 hash 兑底
+async function shutdownApp(){
+  if(!confirm('确定要退出 AI错题本 后台服务吗？'))return;
+  try{
+    await fetch('/api/shutdown',{method:'POST',headers:{'X-WrongBook-Exit':'1'}});
+  }catch(e){}
+  document.body.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:80vh;color:#1b2430;font-family:system-ui,sans-serif"><div style="font-size:46px;margin-bottom:12px">✅</div><h2 style="margin:0 0 8px">AI错题本已安全退出</h2><p style="color:#667085;margin:0">后台服务已关闭、端口已释放，现在可以直接关闭此浏览器标签页。</p></div>';
+  setTimeout(()=>{try{window.close();}catch(e){}},300);
+}
 </script>
 </body>
 </html>

@@ -263,6 +263,14 @@
   ⑦ **冻结态真实冒烟通过**：App Support 数据外置 ✓ 激活门禁+真实 ECS 激活 ✓ KB 播种 ✓
   静态资源 ✓ 进程内 PDF 导出 ✓（修复：Timer daemon 参数/pipeline sys 导入）；
   产物 `dist/AI错题本-v1.4.0-mac.zip`（83MB）；Windows 包待 Windows 机按 packaging/BUILD_WINDOWS.md 构建
+- **V1.4.0a Windows 实测反馈（单实例 + 退出按钮）**：Windows 下窗口化 exe 无窗口无终端，
+  关浏览器不退出、重复双击会顺延新端口多实例——①**固定 8899 单实例**：启动探测
+  （connect_ex→bind 双检），占用则探针 /api/license 区分自家实例（webbrowser 拉起已有页面 +
+  原生弹窗提示后退出）与第三方占用（明确报“端口被占用”后退出，不再顺延新端口）；
+  ②**页面右上角「⏻ 退出」**：POST /api/shutdown → 0.3s 后 os._exit(0) 释放端口
+  （windowed exe 唯一退出入口；激活门禁豁免该端点——被锁用户也必须能退出）；
+  ③加固：端点要求自定义头 X-WrongBook-Exit:1（跨站表单无法携带，阻断恶意网页
+  静默关停本机服务）；门禁豁免/关停探测/退出调度各 1 项测试，全量 **211 项全绿**
 
 ---
 
@@ -710,6 +718,7 @@ wrongbook/                 # 本项目（V1.0.1 起完全自包含，可独立�
 | POST | `/api/ai-config/test` | 连通性测试 `{provider, key?, model?, vision?}`（测试值不落盘） |
 | GET  | `/api/license` | R2：激活状态视图（state/grace 剩余天数/掩码码/到期日；顺带触发到期后台心跳） |
 | POST | `/api/license/activate` | R2：激活 `{code}` → `{ok}` 或 400 `{error}`（服务端错误码转人话） |
+| POST | `/api/shutdown` | 🔒 R4.0a：安全退出（需自定义头 X-WrongBook-Exit:1，防跨站静默关停；激活门禁豁免——锁定态也可退出） |
 | GET  | `/api/users` | 用户表 + 当前用户 |
 | POST | `/api/users` | 新建用户（题库为空）并切换 `{name}` |
 | POST | `/api/users/switch` | 切换当前用户 `{id}` |

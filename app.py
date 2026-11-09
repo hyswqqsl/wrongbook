@@ -29,7 +29,7 @@ def _license_gate():
     if not license_client.ENABLED:
         return None
     p = request.path
-    if p == "/" or p.startswith("/static") or p.startswith("/api/license"):
+    if p == "/" or p.startswith("/static") or p.startswith("/api/license") or p == "/api/shutdown":
         return None
     st, _info = license_client.state()
     if st in ("ok", "grace"):
@@ -625,30 +625,101 @@ def api_out(p):
     return send_from_directory(os.path.join(paths.DATA_HOME, "out"), p)
 
 
+@app.post("/api/shutdown")
+def api_shutdown():
+    """关闭后台服务（前端右上角「退出」按钮调用）
+    需自定义头 X-WrongBook-Exit: 1（跨站表单无法携带 → 阻断恶意网页静默关停本机服务）"""
+    if request.headers.get("X-WrongBook-Exit") != "1":
+        return jsonify({"error": "missing exit token"}), 403
+    if request.remote_addr not in ("127.0.0.1", "::1", None):
+        return jsonify({"error": "仅允许本机关闭服务"}), 403
+    threading.Timer(0.3, lambda: os._exit(0)).start()
+    return jsonify({"ok": True})
+
+
+def _is_port_in_use(port):
+    """检测本机端口是否已被占用"""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        if s.connect_ex(("127.0.0.1", port)) == 0:
+            return True
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(("127.0.0.1", port))
+            return False
+        except OSError:
+            return True
+
+
+def _port_owner_is_ours(port):
+    """探测占用者是否为本应用实例（/api/license 应答含 app_version 标识）"""
+    import urllib.request
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:%d/api/license" % port, timeout=2) as r:
+            return "app_version" in json.loads(r.read().decode("utf-8") or "{}")
+    except Exception:
+        return False
+
+
+def _native_alert(msg, title="AI错题本"):
+    """原生弹窗提示（Windows MessageBoxW / macOS osascript）；失败静默（console 仍有输出）"""
+    try:
+        if sys.platform == "win32":
+            import ctypes
+            # 0x40 = MB_ICONINFORMATION, 0x1000 = MB_SYSTEMMODAL（置顶提示）
+            ctypes.windll.user32.MessageBoxW(0, msg, title, 0x00000040 | 0x00001000)
+        elif sys.platform == "darwin":
+            import subprocess
+            safe = msg.replace('"', "").replace("\\", "")
+            subprocess.run(
+                ["osascript", "-e", 'display alert "%s" message "%s"' % (title, safe)],
+                check=False,
+            )
+    except Exception:
+        pass
+
+
 if __name__ == "__main__":
     # debug 模式：./run.sh --debug 或 FLASK_DEBUG=1 ./run.sh（改代码自动重载；仅开发用）
-    license_client.maybe_heartbeat_async()   # 启动时若已到期，先补一跳
-    license_client.start_heartbeat_loop()    # 运行中周期心跳（定稿 24h）
+    port = 8899
+    url = "http://127.0.0.1:%d" % port
     debug = "--debug" in sys.argv or os.environ.get("FLASK_DEBUG") == "1"
 
     if getattr(sys, "frozen", False):
-        # R4 打包态：自动选可用端口 + 自开浏览器（windowed 无终端，无 run.sh 代劳）
-        import socket, webbrowser
-        port = 8899
-        for p in range(8899, 8890, -1):
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                try:
-                    s.bind(("127.0.0.1", p))
-                    port = p
-                    break
-                except OSError:
-                    continue
-        url = "http://127.0.0.1:%d" % port
+        # R4 打包态：固定端口单实例；已开启 → 拉起页面+弹窗提示后退出；端口被其他程序占用 → 明确报错
+        import webbrowser
+        if _is_port_in_use(port):
+            if _port_owner_is_ours(port):
+                webbrowser.open(url)   # 直接拉起已有实例的页面
+                _native_alert(
+                    "AI错题本程序已开启，请勿重复运行！\n\n当前服务地址：%s\n"
+                    "（如需退出程序，请在浏览器页面右上角点击「⏻ 退出」）" % url,
+                    "AI错题本 - 程序已开启")
+                sys.exit(0)
+            _native_alert(
+                "端口 %d 已被其他程序占用，AI错题本无法启动。\n"
+                "请关闭占用该端口的程序后重试（或重启电脑）。" % port,
+                "AI错题本 - 启动失败")
+            sys.exit(1)
+        license_client.maybe_heartbeat_async()   # 启动时若已到期，先补一跳
+        license_client.start_heartbeat_loop()    # 运行中周期心跳（定稿 24h）
         _t = threading.Timer(1.5, lambda: webbrowser.open(url))
         _t.daemon = True
         _t.start()
         print("AI错题本 →", url)
         app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=False)
     else:
+        if not debug and _is_port_in_use(port):
+            if _port_owner_is_ours(port):
+                _native_alert("AI错题本程序已开启，请勿重复运行！\n当前服务地址：%s" % url,
+                              "AI错题本 - 程序已开启")
+            else:
+                _native_alert("端口 %d 已被其他程序占用，启动失败。" % port,
+                              "AI错题本 - 启动失败")
+            print("AI错题本已在运行中或端口被占 →", url)
+            sys.exit(0)
+        license_client.maybe_heartbeat_async()
+        license_client.start_heartbeat_loop()
         print("AI错题本 → http://127.0.0.1:8899" + ("（debug）" if debug else ""))
-        app.run(host="127.0.0.1", port=8899, debug=debug, threaded=True)
+        app.run(host="127.0.0.1", port=port, debug=debug, threaded=True)
