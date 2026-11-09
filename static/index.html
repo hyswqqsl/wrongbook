@@ -241,7 +241,7 @@ $$('nav button').forEach(b=>b.onclick=()=>{
 /* ---------- Tab1 录入（排版机）—— 双入口：录入错题本 / 录入专题 ---------- */
 let sheets=[];
 let INGEST_MODE='book';   // 'book'=录入错题本（主） | 'topic'=录入专题（主，从专题页各类别进入）；另一侧为附加勾选
-let TP_INGEST_CAT=null;   // {set,cat} 从专题页进入时锁定的目标类别（转录后自动勾选存入该类）
+let TP_INGEST_CAT=null;   // {set,cat} 从专题页进入时锁定的目标类别（勾选题目后存入该类）
 function tpLockLabel(){
   if(!TP_INGEST_CAT)return '';
   for(const s of (TOPICS&&TOPICS.sets||[]))for(const c of s.categories)
@@ -255,14 +255,17 @@ function setIngestMode(m,lockCat){
   if(t)t.textContent=m==='book'?'上传错题照片':'上传专题例题照片'+(TP_INGEST_CAT?`（存入 ${tpLockLabel()}）`:'');
   if(h)h.textContent=m==='book'
     ?'一张或多张试卷/练习册照片；转录后逐题勾选入库并标注错因'
-    :'一张或多张照片；转录后自动勾选存入目标专题类别，知识点由大模型分析';
+    :'一张或多张照片；转录后逐题勾选存入目标专题类别，知识点由大模型分析';
   renderReview();   // 无条件渲染：锁定条/空状态提示立即出现，不等转录
 }
-function tpLockChange(val){   // 锁定条上更换目标类别：已自动勾选的题同步换类
+function tpLockChange(val){   // 锁定条上更换目标类别：已勾选的题同步换类
   const i=val.indexOf(':');
   TP_INGEST_CAT={set:val.slice(0,i),cat:val.slice(i+1)};
   sheets.filter(s=>(s.mode||'book')==='topic').forEach(s=>s.questions.forEach(q=>{
-    if(q.dest_topic){q.dest_topic={...TP_INGEST_CAT};q.tp_sel={...TP_INGEST_CAT};}
+    if(q.dest_topic){
+      q.dest_topic={...TP_INGEST_CAT};q.tp_sel={...TP_INGEST_CAT};
+      patchQ(s.id,q.no,{dest_topic:q.dest_topic,tp_sel:q.tp_sel},null);
+    }
   }));
   const t=$('#upload-title');
   if(t)t.textContent='上传专题例题照片（存入 '+tpLockLabel()+'）';
@@ -286,53 +289,10 @@ function showOv(t){$('#ov-text').textContent=t;$('#overlay').classList.remove('h
 function setOv(t){$('#ov-text').textContent=t;}
 function hideOv(){$('#overlay').classList.add('hidden');}
 /* 带超时的 fetch（v1.2）：慢请求永不无限转圈；超时 abort → catch 显示明确错误 */
-/* ---------- 预览沙箱/离线环境兼容层 + 激活失效全局感知（R4.0b，用户方案） ----------
-   ① blob:/file: 协议（静态预览）下 mock API，防 fetch TypeError；
-   ② 全局 403 license_* 感知 → 刷新回激活页（覆盖所有 fetch 调用，含直连）。
-   注意：http 模式下网络错误正常抛出（不伪装成预览响应，避免误导排障） */
-(function initSafeFetchAndDialog(){
-  const rawFetch=window.fetch.bind(window);
-  const isPreview=location.protocol==='blob:'||location.protocol==='file:';
-  function mockApiResponse(url){
-    let data={error:'当前为静态预览模式，请通过本地 AI错题本.exe 启动后使用'};
-    const u=url.split('?')[0];
-    if(u.startsWith('/api/license')) data={enabled:false,state:'ok',app_version:''};
-    else if(u.startsWith('/api/stats')) data={facets:{chapters:[],reasons:[],kp_by_chapter:{},kps:[]},total:0,active:0,mastered:0,by_type:{},by_difficulty:{},by_chapter:{},by_reason:{},by_knowledge_point:{},zero_practice:0,ready_to_master:[],practice_overview:[],all_ids:[]};
-    else if(u.startsWith('/api/topics')) data={sets:[]};
-    else if(u.startsWith('/api/users')) data={users:[],current:null};
-    else if(u.startsWith('/api/sheets')) data={error:'当前为静态预览模式，请通过本地 AI错题本.exe 启动后使用照片转录'};
-    return Promise.resolve(new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json'}}));
-  }
-  function intercept403(res) {
-    if(res.status===403) {
-      res.clone().json().then(j=>{
-        if(j&&j.error&&j.error.startsWith('license_')) location.reload();
-      }).catch(()=>{});
-    }
-    return res;
-  }
-  window.fetch=function(input,init){
-    if(isPreview&&typeof input==='string'&&input.startsWith('/')) return mockApiResponse(input);
-    if(typeof input==='string'&&input.startsWith('/'))
-      return rawFetch(location.origin+input,init).then(intercept403);
-    return rawFetch(input,init).then(intercept403);
-  };
-})();
-
 function fetchT(url,opt={},ms=120000){
   const ctl=new AbortController();
   const t=setTimeout(()=>ctl.abort(),ms);
   return fetch(url,{...opt,signal:ctl.signal}).finally(()=>clearTimeout(t));
-}
-
-// 兼容 Windows(\) 与 macOS(/) 的数据路径转换（R4.0c：Windows 转录照片/图形不显示的根因修复）
-// 服务端存的是平台数据目录绝对路径（如 C:\...\WrongBook\data\users\test\photos\x.jpg），
-// 旧正则 ^.*data\/ 只认正斜杠，Windows 反斜杠不命中 → 整条绝对路径被拼进 /data/ URL → 图片 404。
-function relDataUrl(pathStr){
-  if(!pathStr)return '';
-  const normalized=String(pathStr).replace(/\\/g,'/');          // 反斜杠统一转正斜杠
-  const rel=normalized.replace(/^.*\/data\//i,'');              // 剥离到 data/ 为止的绝对前缀
-  return '/data/'+rel;
 }
 /* ---------- 图片待传队列：拖拽 / 粘贴 / 点选 三入口统一入队 ----------
    v1.3.1 跨页题：joinFlags[i]=true 表示第 i 张与上一张（组）是同一道题的上下两页，
@@ -421,8 +381,6 @@ $('#btn-upload').onclick=async()=>{
       try{const r=await fetchT('/api/sheets',{method:'POST',body:fd},300000); const j=await r.json();
         if(j.error){$('#upload-status').textContent='❌ '+j.error;}
         else{j.mode=INGEST_MODE;
-          if(INGEST_MODE==='topic'&&TP_INGEST_CAT)   // 专题页录入：自动勾选存入锁定类别
-            j.questions.forEach(q=>{q.dest_topic={...TP_INGEST_CAT};q.tp_sel={...TP_INGEST_CAT};});
           sheets.unshift(j); $('#upload-status').textContent=`✅ 已转录 ${j.questions.length} 题（尚未提交入库，核对无误后点下方「提交」）`; renderReview();}
       }catch(e){$('#upload-status').textContent='❌ '+e;}
     }
@@ -431,11 +389,11 @@ $('#btn-upload').onclick=async()=>{
 function renderReview(){
   // 双入口独立（v1.2b 反馈）：每个入口只看自己转录的照片
   const visible=sheets.filter(s=>(s.mode||'book')===INGEST_MODE);
-  const selTotal=visible.reduce((a,s)=>a+s.questions.filter(q=>q.selected||q.dest_topic).length,0);
-  const bookTotal=visible.reduce((a,s)=>a+s.questions.filter(q=>q.selected).length,0);
+  const selTotal=visible.reduce((a,s)=>a+s.questions.filter(q=>!q.done&&(q.selected||q.dest_topic)).length,0);
+  const bookTotal=visible.reduce((a,s)=>a+s.questions.filter(q=>!q.done&&q.selected).length,0);
   const bar=visible.length?`<div class="commitbar"><span>已选 <b>${selTotal}</b> 题（错题本 ${bookTotal} · 专题 ${selTotal-bookTotal}）· 共 ${visible.length} 张照片</span>
     <button class="pri" onclick="commitAll(this)">提交</button></div>`:'';
-  const lockBar=TP_INGEST_CAT?`<div class="commitbar" style="border-color:var(--amber)"><span>🎯 正在为「<b>${esc(tpLockLabel())}</b>」录入例题 · 转录后已自动勾选存入该类</span>
+  const lockBar=TP_INGEST_CAT?`<div class="commitbar" style="border-color:var(--amber)"><span>🎯 正在为「<b>${esc(tpLockLabel())}</b>」录入例题 · 勾选题目后存入该类</span>
     <select onchange="tpLockChange(this.value)" style="padding:4px 8px;border:1px solid var(--line);border-radius:6px;font:inherit">
       ${(TOPICS&&TOPICS.sets||[]).map(set=>`<optgroup label="${esc(set.name)}">`+
         set.categories.map(c=>`<option value="${set.id}:${c.id}"${TP_INGEST_CAT.set===set.id&&TP_INGEST_CAT.cat===c.id?' selected':''}>第${c.no}类 ${esc(c.name)}</option>`).join('')+
@@ -450,7 +408,7 @@ function renderReview(){
     </div>
     <div class="review" style="margin-top:12px">
       <div class="photo-wrap" id="pw-${sheet.id}" onmousedown="startPick(event,'${sheet.id}')">
-        <img src="${relDataUrl(sheet.photo)}?v=${imgVer}" style="width:100%;display:block;border:1px solid var(--line);border-radius:8px">
+        <img src="/data/${sheet.photo.replace(/^.*data\//,'')}?v=${imgVer}" style="width:100%;display:block;border:1px solid var(--line);border-radius:8px">
         <div class="selbox hidden" id="sb-${sheet.id}"></div>
       </div>
       <div>${sheet.questions.map(q=>qCard(sheet,q)).join('')}</div>
@@ -467,7 +425,7 @@ function figBlock(sheet,q){
     fig=`<figure style="margin:8px 0;text-align:center"><div class="figsvg">${svg}</div></figure>`;
     src='当前图形：矢量 SVG（自动生成，需与原题核对）';
   }else if(crops.length){
-    fig=`<figure style="margin:8px 0;text-align:center"><img src="${relDataUrl(crops[0])}?v=${imgVer}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:280px;border:1px solid var(--line);border-radius:6px"></figure>`;
+    fig=`<figure style="margin:8px 0;text-align:center"><img src="/data/${crops[0].replace(/^.*data\//,'')}?v=${imgVer}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:280px;border:1px solid var(--line);border-radius:6px"></figure>`;
     src='当前图形：原题照片裁剪图（原图为准）';
   }else{
     src='当前图形：无';
@@ -580,7 +538,7 @@ function videoBlockHtml(v){
     if(yt)return `<iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}${t?`?start=${t}`:''}" allowfullscreen style="width:100%;max-width:560px;height:315px;margin-top:6px;border-radius:8px;border:1px solid var(--line)"></iframe>`;
     return `<div style="margin-top:6px"><a href="${esc(v)}" target="_blank" rel="noopener">🔗 打开视频链接</a></div>`;
   }
-  return `<video controls preload="metadata" src="${relDataUrl(v)}" style="width:100%;max-width:560px;margin-top:6px;border-radius:8px"></video>`;
+  return `<video controls preload="metadata" src="/data/${v.replace(/^.*data\//,'')}" style="width:100%;max-width:560px;margin-top:6px;border-radius:8px"></video>`;
 }
 function hlQ(box,qid){}
 /* ---------- 左侧原图手动框选 ---------- */
@@ -667,11 +625,13 @@ function setTpSel(sid,no,val){   // 保留兼容（旧引用）；知识点现�
   q.tp_sel=val?(()=>{const i=val.indexOf(':');return{set:val.slice(0,i),cat:val.slice(i+1)};})():null;
   patchQ(sid,no,{tp_sel:q.tp_sel},null);
 }
-function setTopicMain(sid,no,on){   // 「存专题」勾选（主或附加侧通用）：预选优先跟随大模型分析的知识点，可改
+function setTopicMain(sid,no,on){   // 「存专题」勾选（主或附加侧通用）：预选优先跟随锁定类别或大模型分析的知识点，可改
   const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
   if(on){
     if(!q.dest_topic){
-      if(q.tp_sel&&q.tp_sel.set&&q.tp_sel.cat){
+      if(TP_INGEST_CAT){
+        q.dest_topic={...TP_INGEST_CAT};   // 优先跟随专题页锁定的目标类别
+      }else if(q.tp_sel&&q.tp_sel.set&&q.tp_sel.cat){
         q.dest_topic={...q.tp_sel};   // 跟随知识点（同类）
       }else{
         const t=TOPICS&&TOPICS.sets[0];
@@ -698,10 +658,7 @@ async function rotateSheet(sid){   // v1.3 人审兜底：照片方向不对时�
     const j=await r.json();
     if(j.error)return alert('❌ '+j.error);
     const i=sheets.findIndex(x=>x.id===sid);
-    if(i>=0){
-      j.mode=sheets[i].mode;   // R4.0d：后端不存 mode（纯前端入口印记），整表替换时必须继承，否则专题录入的题会被入口过滤器隐藏（题目“消失”）
-      sheets[i]=j;
-    }
+    if(i>=0){j.mode=s.mode;sheets[i]=j;}
     imgVer=Date.now();   // 强制照片/裁剪图刷新缓存
     renderReview();
   }catch(e){alert('❌ '+e);}
@@ -742,7 +699,7 @@ async function saveEdit(sid,no){
 }
 /* 全局提交：一次处置所有选题（存错题本走质量链；存专题零 LLM），锁屏 → 完成横幅汇总 */
 async function commitAll(btn){
-  const hasDest=q=>q.selected||q.dest_topic;
+  const hasDest=q=>!q.done&&(q.selected||q.dest_topic);
   const visible=sheets.filter(s=>(s.mode||'book')===INGEST_MODE);   // 只提交当前入口的照片（双入口独立）
   const jobs=visible.filter(s=>s.questions.some(hasDest));
   if(!jobs.length)return alert('先勾选错题本 或 选择「存入专题」目标');
@@ -997,7 +954,7 @@ async function showQModal(qid){
   const reason=reasonCN[mr.kind]||'未标注'+(mr.note?`（${esc(mr.note)}）`:'');
   const kps=[...new Set([...(an.kp_path||[]).filter(Boolean),...(an.knowledge_points||[])])];
   const fig=q.figure_svg?`<figure style="text-align:center;margin:8px 0"><div class="figsvg">${q.figure_svg}</div></figure>`
-    :(q.question&&q.question.figure_crop?`<figure style="text-align:center;margin:8px 0"><img id="qmodal-fig" src="${relDataUrl(q.question.figure_crop)}?v=${imgVer}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:300px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
+    :(q.question&&q.question.figure_crop?`<figure style="text-align:center;margin:8px 0"><img id="qmodal-fig" src="/data/${q.question.figure_crop.replace(/^.*data\//,'')}?v=${imgVer}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:300px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
   $('#qmodal').innerHTML=`<div class="qm-box" onclick="event.stopPropagation()">
     <div class="qm-head"><b>题目详情</b><span class="small">${esc(q.id)}</span>
       ${q.mastered_at?'<span class="tag t-pass">已归档</span>':'<span class="tag t-review">在库</span>'}
@@ -1078,7 +1035,7 @@ function renderPaper(qs,title){   // v1.2：错题本与专题例题共用渲染
   const body=qs.map((q,i)=>{
     const an=q.analysis||{};
     const fig=q.figure_svg?`<figure>${q.figure_svg}</figure>`
-      :((q.question&&q.question.figure_crop)?`<figure><img src="${relDataUrl(q.question.figure_crop)}" style="max-width:280px"></figure>`:'');
+      :((q.question&&q.question.figure_crop)?`<figure><img src="/data/${q.question.figure_crop.replace(/^.*data\//,'')}" style="max-width:280px"></figure>`:'');
     let ui='';
     if(q.type==='single')ui=(q.question.choices||[]).map(c=>
       `<label class="pq-opt"><input type="radio" name="pq-${i}" value="${esc(c.key)}"> ${esc(c.key)}. ${esc(c.text)}</label>`).join('');
@@ -1228,7 +1185,7 @@ function catCardHtml(c,setId){
   const ready=(c.examples||[]).filter(e=>e.practice&&e.practice.ready).length;
   return `<div class="tp-cat" onclick="event.stopPropagation();tpOpenCat('${setId}','${c.id}')">
     <div style="display:flex;align-items:center;gap:6px"><b>第${c.no}类</b><span class="tag t-med">${c.points}分</span>
-      <button class="sec" style="margin-left:auto;font-size:12px;padding:3px 8px" onclick="event.stopPropagation();tpIngest('${setId}','${c.id}')" title="上传照片转录，自动存入该类">＋录入</button></div>
+      <button class="sec" style="margin-left:auto;font-size:12px;padding:3px 8px" onclick="event.stopPropagation();tpIngest('${setId}','${c.id}')" title="上传照片转录，存入该类">＋录入</button></div>
     <div style="margin-top:3px;font-size:14px">${esc(c.name)}</div>
     <div style="margin-top:5px;font-size:12.5px;color:var(--sub)">${TP_DIFF[c.difficulty]||''} · 例题 ${(c.examples||[]).length}${ready?` · 🏆${ready}`:''}</div>
   </div>`;
@@ -1243,13 +1200,13 @@ function renderSetView(area,set){
       <button class="sec" onclick="tpDelSet('${set.id}','${esc(set.name)}')">删除专题集</button>
     </div>
     <div class="tp-grid">${set.categories.map(c=>catCardHtml(c,set.id)).join('')||'<div class="small">还没有类别，点「＋新增类别」创建</div>'}</div>
-    <div class="small" style="margin-top:12px">加例题：点各类别卡的「＋录入」（或进入类别后点「＋录入例题」），上传照片转录即自动存入该类</div>
+    <div class="small" style="margin-top:12px">加例题：点各类别卡的「＋录入」（或进入类别后点「＋录入例题」），上传照片转录后勾选存入该类</div>
   </div>`;
 }
 function exCardHtml(set,cat,e){
   const p=e.practice||{};
   const fig=e.figure_svg?`<figure style="margin:8px 0;text-align:center"><div class="figsvg">${e.figure_svg}</div></figure>`
-    :(e.figure_crop?`<figure style="margin:8px 0;text-align:center"><img src="${relDataUrl(e.figure_crop)}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:260px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
+    :(e.figure_crop?`<figure style="margin:8px 0;text-align:center"><img src="/data/${e.figure_crop.replace(/^.*data\//,'')}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:260px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
   const ve=e.video||'', vEdit=(TP_VEDIT===e.id);
   const hasAna=e.key_idea||e.pitfall;
   return `<div class="qcard" id="tpex-${e.id}">
@@ -1295,7 +1252,7 @@ function renderCatDetail(area,set,cat){
       <button class="pri" style="margin-left:auto" onclick="tpIngest('${set.id}','${cat.id}')">＋录入例题</button>
       ${(cat.examples||[]).length?`<button class="pri" onclick="tpPracticeCat('${set.id}','${cat.id}')">▶ 整类练习（${cat.examples.length} 题）</button>`:''}
     </div>
-    ${(cat.examples||[]).map(e=>exCardHtml(set,cat,e)).join('')||'<div class="small" style="margin-top:10px">还没有例题：点右上「＋录入例题」上传照片转录，自动存入本类</div>'}
+    ${(cat.examples||[]).map(e=>exCardHtml(set,cat,e)).join('')||'<div class="small" style="margin-top:10px">还没有例题：点右上「＋录入例题」上传照片转录，勾选存入本类</div>'}
   </div>`;
   area.querySelectorAll('.qtext,.choices,.tp-ana').forEach(tex);
 }
@@ -1478,25 +1435,15 @@ async function boot(){   // R2：先查激活状态再决定渲染（未激活/�
     document.querySelectorAll('main > section').forEach(s=>{if(s.id!=='lic-view')s.classList.add('hidden')});
     document.querySelector('header nav').style.display='none';
     $('#lic-view').classList.remove('hidden');
-    $('#lic-reason').textContent = lic.revoked_hint ? '激活码已被停用；若管理员已重新启用，重启本程序即可自动恢复，或重新输入激活码' : (
-      lic.state==='locked' ? ({
+    $('#lic-reason').textContent = lic.state==='locked' ? ({
       expired:'激活码已过期，请联系管理员续费后重新激活',
       grace_exceeded:'离线验证超期（超过 14 天未联网）：联网后自动恢复，或输入新激活码',
-      no_validation:'凭证异常，请重新激活'}[lic.reason]||'请重新激活') : '');
+      no_validation:'凭证异常，请重新激活'}[lic.reason]||'请重新激活') : '';
     return;   // 激活页不走后续加载（后端门禁同样拦截）
   }
   if(lic && lic.enabled && lic.state==='grace'){
     const b=$('#lic-banner');b.style.display='block';
     b.textContent=`⚠ 离线验证剩余约 ${lic.grace_days_left||1} 天，联网后自动恢复`;
-  }
-  // 前端 3 秒轮询：后台心跳感知吊销/过期后（回执被删/状态变化），UI 秒级跳转激活页（R4.0b）
-  if(lic && lic.enabled && (lic.state==='ok' || lic.state==='grace')){
-    setInterval(async () => {
-      try{
-        const check=await (await fetch('/api/license')).json();
-        if(check && (check.state==='unactivated' || check.state==='locked')) location.reload();
-      }catch(e){}
-    }, 3000);
   }
   loadUsers();
   loadAiConfig();
@@ -1532,7 +1479,7 @@ window.addEventListener('hashchange',()=>{if(location.hash==='#quiz')enterQuizVi
 async function shutdownApp(){
   if(!confirm('确定要退出 AI错题本 后台服务吗？'))return;
   try{
-    await fetch('/api/shutdown',{method:'POST',headers:{'X-WrongBook-Exit':'1'}});
+    await fetch('/api/shutdown',{method:'POST'});
   }catch(e){}
   document.body.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:80vh;color:#1b2430;font-family:system-ui,sans-serif"><div style="font-size:46px;margin-bottom:12px">✅</div><h2 style="margin:0 0 8px">AI错题本已安全退出</h2><p style="color:#667085;margin:0">后台服务已关闭、端口已释放，现在可以直接关闭此浏览器标签页。</p></div>';
   setTimeout(()=>{try{window.close();}catch(e){}},300);
