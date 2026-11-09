@@ -698,7 +698,10 @@ async function rotateSheet(sid){   // v1.3 人审兜底：照片方向不对时�
     const j=await r.json();
     if(j.error)return alert('❌ '+j.error);
     const i=sheets.findIndex(x=>x.id===sid);
-    if(i>=0)sheets[i]=j;
+    if(i>=0){
+      j.mode=sheets[i].mode;   // R4.0d：后端不存 mode（纯前端入口印记），整表替换时必须继承，否则专题录入的题会被入口过滤器隐藏（题目“消失”）
+      sheets[i]=j;
+    }
     imgVer=Date.now();   // 强制照片/裁剪图刷新缓存
     renderReview();
   }catch(e){alert('❌ '+e);}
