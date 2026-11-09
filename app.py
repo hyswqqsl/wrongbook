@@ -684,6 +684,8 @@ if __name__ == "__main__":
     # debug 模式：./run.sh --debug 或 FLASK_DEBUG=1 ./run.sh（改代码自动重载；仅开发用）
     port = 8899
     url = "http://127.0.0.1:%d" % port
+    license_client.validate_on_startup()     # R4.0b：启动无条件同步验证（吊销/延期即时感知，最多阻塞 4s）
+    license_client.start_heartbeat_loop()    # 运行中周期检查补发（10 分钟）
     debug = "--debug" in sys.argv or os.environ.get("FLASK_DEBUG") == "1"
 
     if getattr(sys, "frozen", False):

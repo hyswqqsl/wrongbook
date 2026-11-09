@@ -25,7 +25,8 @@ HTTP_TIMEOUT = 10
 GRACE_DAYS = 14
 GRACE = GRACE_DAYS * 86400
 HEARTBEAT_INTERVAL = 2 * 3600   # 运行中后台周期心跳
-HEARTBEAT_CHECK = 600           # 打开应用/状态查询时的"顺带验证"节流：吊销/延期最长 1h 生效（R3.1）
+HEARTBEAT_CHECK = 600           # 打开应用/状态查询/后台循环的检查节流：吊销/延期最长 10 分钟生效（R4.0b）
+REVOKED_HINT_FILE = "license_revoked.json"   # 吊销提示标记（激活页红字用，重新激活后清除）
 APP_VERSION = paths.APP_VERSION   # R4：与打包版本唯一源联动（paths.py）
 
 # 启用策略（定稿）：打包态默认启用；开发态默认关闭（无 ECS 会锁死开发者），
@@ -208,6 +209,7 @@ def status():
         out["code_masked"] = (code[:5] + "…" + code[-4:]) if len(code) > 12 else code
         out["expires_at"] = time.strftime("%Y-%m-%d", time.localtime(lic["expires_at"])) \
             if lic.get("expires_at") and lic["expires_at"] < 4102444800 else "永久"
+    out["revoked_hint"] = revoked_hint()
     return out
 
 
@@ -259,18 +261,24 @@ def activate(code):
     if not verify_license(lic) or not verify_receipt(r, lic and lic.get("code")):
         return False, "凭证校验失败，请重试"
     save({"license": lic, "receipt": r})
+    try:
+        os.remove(os.path.join(paths.DATA_HOME, REVOKED_HINT_FILE))   # 重新激活成功：清除吊销提示
+    except OSError:
+        pass
     return True, None
 
 
-def heartbeat():
-    """心跳续期：200 → 存新回执（可附更新后的 license，如续费延期）；401/403 → 立即删凭证回激活页"""
+def heartbeat(timeout=HTTP_TIMEOUT):
+    """心跳续期：200 → 存新回执（可附更新后的 license，如续费延期）；401/403 → 立即删凭证回激活页；
+    code_revoked → 额外落吊销提示标记（激活页红字）"""
     env = load()
     if not env:
         return
     try:
         status_, body = _http_post("/v1/heartbeat",
                                    {"code": env["license"].get("code"),
-                                    "device_id": env["license"].get("device_id")})
+                                    "device_id": env["license"].get("device_id")},
+                                   timeout=timeout)
     except Exception:
         return   # 离线：保持宽限状态
     if status_ == 200:
@@ -280,7 +288,26 @@ def heartbeat():
             return   # 异常回执：丢弃，保持现状（下次心跳再试）
         save({"license": lic, "receipt": r})
     elif status_ in (401, 403):
+        if body.get("error") == "code_revoked":
+            try:
+                paths.atomic_write_json(os.path.join(paths.DATA_HOME, REVOKED_HINT_FILE),
+                                        {"code": env["license"].get("code"), "at": _now()})
+            except Exception:
+                pass
         _forget()
+
+
+def validate_on_startup(timeout=4):
+    """启动时**无条件**同步验证一次（不看检查节流）：吊销/延期在下次启动时立即感知；
+    网络异常按宽限处理（短超时，最多阻塞启动 4 秒）——R4.0b：修复“刚验证过就吊销，
+    重启应用仍可进入”的设计缺口"""
+    if ENABLED:
+        heartbeat(timeout=timeout)
+
+
+def revoked_hint():
+    """激活页红字提示：上次心跳收到过 code_revoked 且尚未重新激活（重新激活成功时清除）"""
+    return os.path.exists(os.path.join(paths.DATA_HOME, REVOKED_HINT_FILE))
 
 
 def due_for_heartbeat():
@@ -305,7 +332,7 @@ def start_heartbeat_loop():
 
     def _loop():
         while True:
-            time.sleep(HEARTBEAT_INTERVAL)
+            time.sleep(HEARTBEAT_CHECK)   # R4.0b：10 分钟检查一次（原 24h——吊销感知最长滞后一天）
             try:
                 if due_for_heartbeat():
                     heartbeat()

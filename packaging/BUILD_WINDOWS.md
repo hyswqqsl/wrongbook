@@ -61,7 +61,14 @@ tar -a -c -f AI错题本-v1.4.0-win64.zip -C dist AI错题本
 
 ```
 [root@iZk1a0m08ukt0odm2i4vpnZ ~]# cd /opt/wrongbook-license/
-[root@iZk1a0m08ukt0odm2i4vpnZ wrongbook-license]# venv/bin/python license_admin.py revoke --code WB-T6HZ-FHF8-VQ9A
+[root@iZk1a0m08ukt0odm2i4vpnZ wrongbook-license]# venv/bin/python license_admin.py revoke --code WB-2UFW-DP8R-8Q9W
 [root@iZk1a0m08ukt0odm2i4vpnZ ~]# cd /opt/wrongbook-license/
-[root@iZk1a0m08ukt0odm2i4vpnZ wrongbook-license]# venv/bin/python license_admin.py enable --code WB-T6HZ-FHF8-VQ9A
+[root@iZk1a0m08ukt0odm2i4vpnZ wrongbook-license]# venv/bin/python license_admin.py enable --code WB-2UFW-DP8R-8Q9W
+
+
+# ① 先看这个码绑定了哪些设备
+venv/bin/python license_admin.py list --code WB-2UFW-DP8R-8Q9W
+
+# ② 清空该码的设备绑定
+venv/bin/python license_admin.py reset-seats --code WB-2UFW-DP8R-8Q9W
 ```

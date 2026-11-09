@@ -7,6 +7,7 @@
 import os, json, time, base64, unittest, tempfile, shutil
 from unittest import mock
 
+import paths
 import license_client as lc
 import store
 import app as appmod
@@ -199,6 +200,22 @@ class TestActivateAndHeartbeat(LicenseTestBase):
         self.assertIsNone(lc.load())                       # 吊销 → 删凭证回激活页
         self.assertEqual(lc.state(), ("unactivated", {}))
 
+    def test_revoked_hint_lifecycle(self):
+        """吊销 → 激活页红字提示标记；重新激活成功 → 标记清除"""
+        now = int(time.time())
+        self._write()
+        lc._http_post = lambda path, payload, timeout=10: (401, {"error": "code_revoked"})
+        lc.heartbeat()
+        self.assertTrue(lc.status()["revoked_hint"])
+        self.assertTrue(os.path.exists(os.path.join(paths.DATA_HOME, lc.REVOKED_HINT_FILE)))
+        env = self._mkenv(receipt_time=now)
+        lc._http_post = lambda path, payload, timeout=10: (
+            200, {"license": env["license"], "receipt": env["receipt"]})
+        ok, err = lc.activate("WB-AAAA-BBBB-CCCC")
+        self.assertTrue(ok, err)
+        self.assertFalse(os.path.exists(os.path.join(paths.DATA_HOME, lc.REVOKED_HINT_FILE)))
+        self.assertFalse(lc.status()["revoked_hint"])
+
     def test_heartbeat_bad_receipt_ignored(self):
         env = self._write()
         before = env["receipt"]["server_time"]
@@ -284,3 +301,39 @@ class TestAppGate(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestValidateOnStartup(LicenseTestBase):
+    """R4.0b：启动无条件同步验证——刚验证过（节流窗口内）也必须发心跳，吊销下次启动即感知"""
+
+    def test_startup_validates_even_when_fresh(self):
+        now = int(time.time())
+        env = self._mkenv(receipt_time=now)          # 刚验证过：due=False（节流窗口内）
+        lc.save(env)
+        self.assertFalse(lc.due_for_heartbeat())
+        lc._http_post = mock.Mock(return_value=(
+            200, {"license": env["license"], "receipt": env["receipt"]}))
+        lc.validate_on_startup()
+        lc._http_post.assert_called_once()           # 无条件发心跳（不看节流）
+
+    def test_startup_detects_revocation(self):
+        self._write()
+        lc._http_post = lambda path, payload, timeout=10: (401, {"error": "code_revoked"})
+        lc.validate_on_startup()
+        self.assertIsNone(lc.load())                 # 吊销：启动即感知 → 锁回激活页
+        self.assertTrue(lc.status()["revoked_hint"])
+
+    def test_startup_offline_tolerated(self):
+        self._write()
+        def boom(path, payload, timeout=4):
+            raise OSError("no net")
+        lc._http_post = boom
+        lc.validate_on_startup(timeout=4)            # 离线：不抛异常，宽限继续
+        self.assertIsNotNone(lc.load())
+
+    def test_disabled_skips(self):
+        lc.ENABLED = False
+        calls = []
+        lc._http_post = lambda *a, **k: calls.append(1) or (0, {})
+        lc.validate_on_startup()
+        self.assertEqual(calls, [])                  # 未启用：不发

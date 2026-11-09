@@ -286,6 +286,39 @@ function showOv(t){$('#ov-text').textContent=t;$('#overlay').classList.remove('h
 function setOv(t){$('#ov-text').textContent=t;}
 function hideOv(){$('#overlay').classList.add('hidden');}
 /* 带超时的 fetch（v1.2）：慢请求永不无限转圈；超时 abort → catch 显示明确错误 */
+/* ---------- 预览沙箱/离线环境兼容层 + 激活失效全局感知（R4.0b，用户方案） ----------
+   ① blob:/file: 协议（静态预览）下 mock API，防 fetch TypeError；
+   ② 全局 403 license_* 感知 → 刷新回激活页（覆盖所有 fetch 调用，含直连）。
+   注意：http 模式下网络错误正常抛出（不伪装成预览响应，避免误导排障） */
+(function initSafeFetchAndDialog(){
+  const rawFetch=window.fetch.bind(window);
+  const isPreview=location.protocol==='blob:'||location.protocol==='file:';
+  function mockApiResponse(url){
+    let data={error:'当前为静态预览模式，请通过本地 AI错题本.exe 启动后使用'};
+    const u=url.split('?')[0];
+    if(u.startsWith('/api/license')) data={enabled:false,state:'ok',app_version:''};
+    else if(u.startsWith('/api/stats')) data={facets:{chapters:[],reasons:[],kp_by_chapter:{},kps:[]},total:0,active:0,mastered:0,by_type:{},by_difficulty:{},by_chapter:{},by_reason:{},by_knowledge_point:{},zero_practice:0,ready_to_master:[],practice_overview:[],all_ids:[]};
+    else if(u.startsWith('/api/topics')) data={sets:[]};
+    else if(u.startsWith('/api/users')) data={users:[],current:null};
+    else if(u.startsWith('/api/sheets')) data={error:'当前为静态预览模式，请通过本地 AI错题本.exe 启动后使用照片转录'};
+    return Promise.resolve(new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json'}}));
+  }
+  function intercept403(res) {
+    if(res.status===403) {
+      res.clone().json().then(j=>{
+        if(j&&j.error&&j.error.startsWith('license_')) location.reload();
+      }).catch(()=>{});
+    }
+    return res;
+  }
+  window.fetch=function(input,init){
+    if(isPreview&&typeof input==='string'&&input.startsWith('/')) return mockApiResponse(input);
+    if(typeof input==='string'&&input.startsWith('/'))
+      return rawFetch(location.origin+input,init).then(intercept403);
+    return rawFetch(input,init).then(intercept403);
+  };
+})();
+
 function fetchT(url,opt={},ms=120000){
   const ctl=new AbortController();
   const t=setTimeout(()=>ctl.abort(),ms);
@@ -1432,15 +1465,25 @@ async function boot(){   // R2：先查激活状态再决定渲染（未激活/�
     document.querySelectorAll('main > section').forEach(s=>{if(s.id!=='lic-view')s.classList.add('hidden')});
     document.querySelector('header nav').style.display='none';
     $('#lic-view').classList.remove('hidden');
-    $('#lic-reason').textContent = lic.state==='locked' ? ({
+    $('#lic-reason').textContent = lic.revoked_hint ? '激活码已被停用，请联系管理员重新发码' : (
+      lic.state==='locked' ? ({
       expired:'激活码已过期，请联系管理员续费后重新激活',
       grace_exceeded:'离线验证超期（超过 14 天未联网）：联网后自动恢复，或输入新激活码',
-      no_validation:'凭证异常，请重新激活'}[lic.reason]||'请重新激活') : '';
+      no_validation:'凭证异常，请重新激活'}[lic.reason]||'请重新激活') : '');
     return;   // 激活页不走后续加载（后端门禁同样拦截）
   }
   if(lic && lic.enabled && lic.state==='grace'){
     const b=$('#lic-banner');b.style.display='block';
     b.textContent=`⚠ 离线验证剩余约 ${lic.grace_days_left||1} 天，联网后自动恢复`;
+  }
+  // 前端 3 秒轮询：后台心跳感知吊销/过期后（回执被删/状态变化），UI 秒级跳转激活页（R4.0b）
+  if(lic && lic.enabled && (lic.state==='ok' || lic.state==='grace')){
+    setInterval(async () => {
+      try{
+        const check=await (await fetch('/api/license')).json();
+        if(check && (check.state==='unactivated' || check.state==='locked')) location.reload();
+      }catch(e){}
+    }, 3000);
   }
   loadUsers();
   loadAiConfig();
