@@ -32,3 +32,4 @@ static/vendor/geogebra/
 
 # Playwright 走查产物
 .playwright-cli/
+*.zip

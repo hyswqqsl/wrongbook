@@ -29,11 +29,15 @@ py -m venv .venv
 xcopy /E /I static  dist\AI错题本\static\
 xcopy /E /I engine  dist\AI错题本\engine\
 xcopy /E /I data\kb dist\AI错题本\data\kb\
+xcopy /E /I /Y static dist\AI错题本\static\; xcopy /E /I /Y engine dist\AI错题本\engine\; xcopy /E /I /Y data\kb dist\AI错题本\data\kb\
 ```
 
 检查包内**不得出现**：`ai_config.json`、`key.env`、`license*.pem`、`wrongbook.json`、`users` 目录（与 mac 构建脚本的白名单一致）。
 
 然后整体压缩 `dist\AI错题本\` 为 `AI错题本-v1.4.0-win64.zip`。
+```
+tar -a -c -f AI错题本-v1.4.0-win64.zip -C dist AI错题本
+```
 
 ## 4. 用户侧预期（写进使用说明）
 
@@ -52,3 +56,12 @@ xcopy /E /I data\kb dist\AI错题本\data\kb\
 | GeoGebra 按钮 | **不应出现**（已移除，UI 与包内都不该有） |
 | 激活 → 心跳 → 拔网 → 黄条 → 恢复 | 同 mac 冒烟清单 |
 | 升级覆盖 | 装新版覆盖旧目录，确认题库/照片/激活状态完好 |
+
+## 6. ECS上开启，停用key
+
+```
+[root@iZk1a0m08ukt0odm2i4vpnZ ~]# cd /opt/wrongbook-license/
+[root@iZk1a0m08ukt0odm2i4vpnZ wrongbook-license]# venv/bin/python license_admin.py revoke --code WB-T6HZ-FHF8-VQ9A
+[root@iZk1a0m08ukt0odm2i4vpnZ ~]# cd /opt/wrongbook-license/
+[root@iZk1a0m08ukt0odm2i4vpnZ wrongbook-license]# venv/bin/python license_admin.py enable --code WB-T6HZ-FHF8-VQ9A
+```
