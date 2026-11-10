@@ -32,6 +32,26 @@ VERIFY_PROMPT = """你是严格的数学审题专家。请独立解答下面的�
 只输出 JSON：{{"answer":"最终答案（选择题填字母，填空填文本）","ok":true,"issues":[]}}
 ok=false 表示题目矛盾/欠定/无解，此时 answer 填"无法确定"。"""
 
+# 分析 prompt 的章节受控词表：前置年级 → 该年级教材章（kbtree 按年级清单）；
+# 未知/其他/读不到 → 内置 CHAPTERS（八上五章，旧行为兜底）。进程内按年级缓存。
+_chapter_cache = {}
+
+
+def _grade_chapters(grade):
+    g = (grade or "").strip()
+    if g and g != "其他":
+        if g not in _chapter_cache:
+            chs = []
+            try:
+                import kbtree
+                kt = kbtree.knowledge_points_for_grade(g) or {}
+                chs = [c["title"] for c in kt.get("chapters", []) if c.get("title")]
+            except Exception:
+                chs = []
+            _chapter_cache[g] = (chs + ["其他"]) if chs else list(CHAPTERS)
+        return _chapter_cache[g]
+    return CHAPTERS
+
 
 def _ask_text_json(client, model, prompt, image_uri=None, max_tokens=16000):
     """文本问答：json_object → 纯文本 ×2 → 关思考（D12 老方子，v1.2 对齐 reviewflow）。
@@ -255,13 +275,14 @@ def ingest_selected(sheet, provider=None, progress=None):
             report.append("[验伪] 独立解题对账一致({0})".format(v_ans))
 
         # ③ 分析（错因驱动侧重）
+        grade = (q.get("grade") or "").strip()   # v1.4.1：录入页前置年级（小学/初中全集），缺省空
         reason = q.get("reason") or {}
         reason_note = "{0}（{1}）".format(
             {"careless": "马虎", "unknown": "不会", "other": "其他"}.get(reason.get("kind"), "未标注"),
             reason.get("note") or "无备注")
         an = _ask_text_json(client, model, ANALYSIS_PROMPT.format(
             question=text, answer=verified or v_ans, reason=reason_note,
-            chapters="、".join(CHAPTERS)))
+            chapters="、".join(_grade_chapters(grade))))
         report.append("[分析] {0} · 难度{1} · {2}".format(
             an.get("chapter"), an.get("difficulty"), "/".join(an.get("knowledge_points") or [])))
 
@@ -270,7 +291,6 @@ def ingest_selected(sheet, provider=None, progress=None):
         #    kp_sel 为旧草稿兼容，缺省回落 LLM 分析）
         #    v1.2k：细分知识点优先用转录期受控 kps（内置 KB 清单词表），LLM 自由分析仅作兜底
         kp_sel = q.get("kp_sel") or {}
-        grade = q.get("grade") or "八年级上册"
         kps_ctl = [k for k in (q.get("kps") or []) if k][:3]   # v1.2k：受控细分知识点（转录期归一化）
         # chapter 优先级：转录期受控 kp 反查的教材章 > 旧草稿 kp_sel > LLM 分析（CHAPTERS 词表）
         chapter = (q.get("chapter") or "").strip()   # v1.2o：教材章（转录期受控 kp 反查）

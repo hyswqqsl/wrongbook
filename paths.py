@@ -18,7 +18,7 @@ import os, sys, json, time, shutil
 
 APP_DIR_NAME = "WrongBook"   # 数据目录名（避免中文：跨平台路径/终端/脚本兼容性）
 DATA_SCHEMA_VERSION = 1   # data/meta.json 结构版本（未来迁移按 1→2→… 顺序挂钩子）
-APP_VERSION = "1.4.0"     # 应用版本号（唯一源：license 心跳上报/R4 打包命名/升级检查共用）
+APP_VERSION = "1.4.1"     # 应用版本号（唯一源：license 心跳上报/R4 打包命名/升级检查共用）
 
 
 def app_root():

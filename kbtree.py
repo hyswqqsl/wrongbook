@@ -16,8 +16,17 @@ KB_FILES = [
     "【浙教版】八年级上册(2025秋版)数学电子课本_101-201_kb.json",
 ]
 
-# 年级候选（录入页"年级"列表；八上知识树内的题默认八年级上册）
+# 年级候选（旧版初中候选，仅作 classify 兜底词表；新版录入页年级来自 grade_options()）
 GRADE_OPTIONS = ["八年级上册", "八年级下册", "九年级上册", "九年级下册", "其他"]
+
+# 年级全集数据源（前置年级选择 v1.4.1）：小学 primary_math_all（1~6 年级上下册）+
+# 初中 junior_math_7_9_all（7~9 年级上下册，含七年级）→ 合计 1~9 年级全支持；
+# 结构 {年级名: {grade, chapters:[{title, kps:[...]}]}}，key 序即年级序；
+# knowledge_points.json 为旧版八上清单（未选年级时的回落词表）
+GRADE_SOURCES = ["primary_math_all.json", "junior_math_7_9_all.json"]
+
+_CN_NUM = {"一": "1", "二": "2", "三": "3", "四": "4", "五": "5",
+           "六": "6", "七": "7", "八": "8", "九": "9"}
 
 # KB 里混入的非知识点标题（视觉转录噪声）
 _NOISE = {"章导语", "分析", "解", "答", "合作学习", "做一做", "探究", "思考",
@@ -35,13 +44,14 @@ _KB_DIR = None   # 测试钩子：覆盖 KB 所在目录
 
 def _kb_dir():
     """KB 目录解析（R1）：数据目录 data/kb，首次从随包种子（app_root/data/kb）播种。
-    开发态两者同目录（自拷自零操作）；打包态种子在安装包内、可写副本在用户数据目录
-    （升级覆盖安装不丢手编的 knowledge_points.json）。"""
+    开发态两者同目录（自拷自零操作）；打包态种子在安装包内、可写副本在用户数据目录。
+    播种按文件逐个补齐（已存在不覆盖）：升级覆盖安装能把新增的年级全集 json
+    （primary_math_all / junior_math_7_9_all）带给老用户，手编清单仍不丢。"""
     if _KB_DIR:
         return _KB_DIR
     d = os.path.join(paths.DATA_HOME, "kb")
     src = os.path.join(paths.app_root(), "data", "kb")
-    if os.path.isdir(src) and not os.path.exists(os.path.join(d, "knowledge_points.json")):
+    if os.path.isdir(src):
         os.makedirs(d, exist_ok=True)
         for f in os.listdir(src):
             dst = os.path.join(d, f)
@@ -52,8 +62,9 @@ def _kb_dir():
 
 def set_kb_dir(d=None):
     """测试钩子：从指定目录读 KB 文件（None=父项目根目录）"""
-    global _cache, _KB_DIR
+    global _cache, _KB_DIR, _grades_cache
     _cache = None
+    _grades_cache = None
     _KB_DIR = d
 
 
@@ -158,3 +169,67 @@ def knowledge_points(force=False):
             out["chapters"].append({"title": ch["title"], "kps": kps})
     paths.atomic_write_json(p, out)   # R1 收口：手编清单也走 fsync+.bak
     return out
+
+
+# ---------- 前置年级：按年级分文件的细分知识点清单（v1.4.1） ----------
+
+_grades_cache = None
+
+
+def grade_slug(grade):
+    """「四年级上册」→ "4_1"（kp_<slug>.json 文件名）；无法解析返回 None"""
+    m = _re.match(r"^([一二三四五六七八九])年级(上|下)册$", (grade or "").strip())
+    if not m:
+        return None
+    return "{0}_{1}".format(_CN_NUM.get(m.group(1), ""), "1" if m.group(2) == "上" else "2")
+
+
+def grade_options(force=False):
+    """全部年级候选（两个全集 json 的 key 序：小学一~六年级 + 初中八/九年级）"""
+    global _grades_cache
+    if _grades_cache and not force:
+        return _grades_cache
+    out = []
+    for name in GRADE_SOURCES:
+        data = _load_kb(name)
+        if not data:
+            continue
+        for k in data.keys():
+            if k not in out:
+                out.append(k)
+    _grades_cache = out
+    return out
+
+
+def knowledge_points_for_grade(grade, force=False):
+    """按年级取细分知识点清单 → {"grade","chapters":[{"title","kps":[...]}]}；未知/其他 → None
+
+    首次从年级全集 json（GRADE_SOURCES）提取落盘 data/kb/kp_<slug>.json
+    （四年级上册→kp_4_1.json、九年级下册→kp_9_2.json，与 knowledge_points.json 同构），
+    之后直读精简文件：转录 prompt 只塞该年级的清单 → 大模型在正确年级的章节与
+    知识点中受控匹配，不再盲猜年级。清单可直接手编对应 kp_*.json（立即生效），
+    force=True 从全集 json 重提取。"""
+    g = (grade or "").strip()
+    if not g or g == "其他":
+        return None
+    slug = grade_slug(g)
+    if not slug:
+        return None
+    p = os.path.join(_kb_dir(), "kp_{0}.json".format(slug))
+    if not force and os.path.exists(p):
+        try:
+            with open(p, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass   # 手编坏档 → 重提取自愈
+    for name in GRADE_SOURCES:
+        data = _load_kb(name) or {}
+        node = data.get(g)
+        if node and node.get("chapters"):
+            out = {"grade": g,
+                   "chapters": [{"title": c.get("title", ""),
+                                 "kps": [k for k in (c.get("kps") or []) if k]}
+                                for c in node["chapters"]]}
+            paths.atomic_write_json(p, out)   # 手编清单同款 fsync+.bak
+            return out
+    return None

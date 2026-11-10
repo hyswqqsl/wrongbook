@@ -480,7 +480,7 @@ def ask_json_vision(client, model, prompt, uri, max_tokens=16000):
     raise RuntimeError("转录失败（最后输出: {0!r}）".format(last[:60]))
 
 
-CLASSIFY_PROMPT = """你是初中数学教研专家。给下面每道数学题做三项归类：
+CLASSIFY_PROMPT = """你是数学教研专家。给下面每道数学题做三项归类：
 
 - cat：从「专题分类清单」中选最匹配的一个专题类别（必须逐字输出清单中的类别完整名称）；都不合适输出"其他"
 - kps：从「细分知识点清单」中选出该题涉及的知识点，**最多 3 个**（不足 3 个就只写实际的）。严格遵守：
@@ -489,7 +489,7 @@ CLASSIFY_PROMPT = """你是初中数学教研专家。给下面每道数学题�
      （如"证明两个三角形全等"→ 从第一章选"全等三角形的性质"，而不是写清单中没有的
        "全等三角形的判定"，也不是"等边三角形的判定定理"这类不相关条目）
   3) 只有清单确实完全没有覆盖时，才允许输出最多一个简短的知识点名称
-- grade：题目所属年级（八年级上册/八年级下册/九年级上册/九年级下册/其他）
+- grade：{grade_rule}
 
 专题分类清单：
 {cats}
@@ -501,17 +501,19 @@ CLASSIFY_PROMPT = """你是初中数学教研专家。给下面每道数学题�
 {questions}
 
 只输出 JSON（不要其他文字）：
-{{"questions":[{{"no":1,"grade":"八年级上册","cat":"第1类 三边关系","kps":["三角形的三边关系","不等关系"]}},…]}}"""
+{{"questions":[{{"no":1,"grade":"…","cat":"第1类 三边关系","kps":["三角形的三边关系","不等关系"]}},…]}}"""
 
 
-def classify_questions(client, model, questions, cats=None, kb_kps=None):
+def classify_questions(client, model, questions, cats=None, kb_kps=None, grade=None):
     """转录后批量归类：每题 → (年级, 专题类别, 细分知识点最多3个)。纯文本 LLM 一次调用，失败返回 []
 
-    v1.2k：kps 从内置教材 KB 细分知识点清单（kb_kps）中选，最多 3 个——受控词表，
-    LLM 每个输出 → 精确/包含匹配回清单名 → difflib 相似收敛（阈值 0.5）→
-    都不行丢弃（绝不保留清单外原文）；去重、超 3 个截断。
+    v1.4.1 前置年级：grade 传入用户在录入页选的年级 → prompt 固定 grade（不再盲猜），
+    kb_kps 由调用方给该年级的受控清单（kbtree.knowledge_points_for_grade）；
+    grade 缺省（旧调用/未选年级）→ 保留旧行为：初中候选词表让 LLM 猜，非法输出回落八年级上册。
+    v1.2k：kps 从内置清单中选（受控词表），LLM 每个输出 → 精确/包含匹配回清单名 →
+    difflib 相似收敛（阈值 0.5）→ 都不行丢弃（绝不保留清单外原文）；去重、超 3 个截断。
     cats = [{"set_id","set_name","cat_id","cat_label"}]（专题类别清单）；
-    kb_kps = [{"kp","chapter"}]（教材 KB 扁平化细分知识点）。"""
+    kb_kps = [{"kp","chapter"}]（细分知识点扁平化）。"""
     import difflib
     grade_opts = ["八年级上册", "八年级下册", "九年级上册", "九年级下册", "其他"]
     cats = cats or []
@@ -524,8 +526,12 @@ def classify_questions(client, model, questions, cats=None, kb_kps=None):
         by_ch.setdefault(it.get("chapter", ""), []).append(it["kp"])
     kb_block = "\n".join("【{0}】{1}".format(ch, "；".join(ks))
                           for ch, ks in by_ch.items()) or "（无）"
+    if grade:
+        grade_rule = "固定为「{0}」（用户录入时已前置选择，逐题原样输出即可，无需判断）".format(grade)
+    else:
+        grade_rule = "题目所属年级（八年级上册/八年级下册/九年级上册/九年级下册/其他）"
     prompt = CLASSIFY_PROMPT.format(cats="\n".join(c["cat_label"] for c in cats) or "（无）",
-                                    kb_kps=kb_block, questions=lines)
+                                    kb_kps=kb_block, questions=lines, grade_rule=grade_rule)
     try:
         data = ask_json_vision(client, model, prompt, None, max_tokens=4000)
     except Exception:
@@ -537,8 +543,8 @@ def classify_questions(client, model, questions, cats=None, kb_kps=None):
     for c in (data.get("questions") or []):
         if not isinstance(c, dict):
             continue
-        grade = c.get("grade") if c.get("grade") in grade_opts else "八年级上册"
-        item = {"no": c.get("no"), "grade": grade, "set": None, "cat": None,
+        g_out = c.get("grade") if c.get("grade") in grade_opts else "八年级上册"
+        item = {"no": c.get("no"), "grade": grade or g_out, "set": None, "cat": None,
                 "kps": [], "chapter": ""}
         m = by_label.get((c.get("cat") or "").strip())
         if m:
@@ -575,9 +581,11 @@ def converge_kps(raw_list, kb_kps, cap=3):
     return out
 
 
-def transcribe_photo(photo_bytes, source_note="", provider=None):
+def transcribe_photo(photo_bytes, source_note="", provider=None, grade=None):
     """照片 → 草稿单（多题转录 + 几何题矢量图形 + 落盘）。返回草稿单 dict。
-    视觉调用：provider 缺省用配置引擎；GLM 自动切视觉模型 glm-4.6v-flash。"""
+    视觉调用：provider 缺省用配置引擎；GLM 自动切视觉模型 glm-4.6v-flash。
+    grade：录入页前置选择的年级（v1.4.1）——知识点在该年级受控清单中匹配、
+    全单题目 grade 直接采用用户选择（不再盲猜）；缺省回落旧行为。"""
     import figureflow
     # ① EXIF 转正（v0.5.1）+ 拍摄方向自动扶正（v1.3：照片内容横躺，EXIF 管不到）
     #    扶正后的照片作为转录/抓图/存盘的唯一输入 → 坐标系全链路一致
@@ -671,13 +679,15 @@ def transcribe_photo(photo_bytes, source_note="", provider=None):
             for c in s["categories"]:
                 cats.append({"set_id": s["id"], "set_name": s["name"], "cat_id": c["id"],
                              "cat_label": "第{0}类 {1}".format(c["no"], c["name"])})
-        kpt = _kbtree.knowledge_points()   # v1.2i：读精简知识点 json（首次自动从 KB 提炼落盘，不再每次解析两个大 json）
+        kpt = (_kbtree.knowledge_points_for_grade(grade) if grade else None) \
+            or _kbtree.knowledge_points()   # 前置年级受控清单优先；未选/未知年级回落内置清单
         kb_kps = [{"kp": k, "chapter": ch["title"]}
                   for ch in kpt["chapters"] for k in ch["kps"]]
-        cls = {c.get("no"): c for c in classify_questions(client, model, sheet["questions"], cats, kb_kps)}
+        cls = {c.get("no"): c for c in classify_questions(client, model, sheet["questions"],
+                                                           cats, kb_kps, grade=grade or None)}
         for rec in sheet["questions"]:
             c = cls.get(rec.get("no"))
-            rec["grade"] = c.get("grade") if c else "八年级上册"
+            rec["grade"] = grade or (c.get("grade") if c else "") or "八年级上册"
             rec["tp_sel"] = ({"set": c["set"], "cat": c["cat"]}
                              if c and c.get("cat") else None)
             kps = [k for k in (c.get("kps") or []) if k][:3] if c else []   # v1.2k：最多3个（受控清单）
@@ -686,7 +696,8 @@ def transcribe_photo(photo_bytes, source_note="", provider=None):
             rec["chapter"] = (c.get("chapter") or "") if c else ""   # v1.2o：教材章（受控 kp 反查，工作台章节=knowledge_points.json 结构）
     except Exception:
         for rec in sheet["questions"]:
-            rec["grade"], rec["tp_sel"], rec["kps"], rec["kp"], rec["chapter"] = "八年级上册", None, [], "", ""
+            rec["grade"], rec["tp_sel"], rec["kps"], rec["kp"], rec["chapter"] = \
+                (grade or "八年级上册"), None, [], "", ""
 
     from store import load_sheets, save_sheets
     db = load_sheets()

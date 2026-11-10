@@ -36,3 +36,5 @@ static/vendor/geogebra/
 # Playwright 走查产物
 .playwright-cli/
 *.zip
+data/kb/kp_*.json
+

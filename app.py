@@ -87,6 +87,18 @@ def api_kb():
         return _err(e)
 
 
+@app.get("/api/grades")
+def api_grades():
+    """年级候选（v1.4.1 录入页前置年级下拉）：来自 data/kb 年级全集 json
+    （primary_math_all 1~6 年级 + junior_math_7_9_all 7~9 年级，均含上下学期，
+    合计 1~9 年级全支持）+「其他」兜底"""
+    try:
+        import kbtree
+        return jsonify({"grades": kbtree.grade_options() + ["其他"]})
+    except Exception as e:
+        return _err(e)
+
+
 @app.get("/api/stats")
 def api_stats():
     a = request.args
@@ -142,7 +154,9 @@ def api_sheet_create():
         if not f:
             return jsonify({"error": "缺少 photo 文件"}), 400
         import reviewflow
-        sheet = reviewflow.transcribe_photo(f.read(), request.form.get("source", ""))
+        grade = (request.form.get("grade") or "").strip()
+        sheet = reviewflow.transcribe_photo(f.read(), request.form.get("source", ""),
+                                            grade=grade or None)
         return jsonify(sheet)
     except Exception as e:
         return _err(e)

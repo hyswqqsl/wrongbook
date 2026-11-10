@@ -189,6 +189,8 @@ details.kptree[open] summary{color:var(--ink)}
       <button class="sec" onclick="pickFiles()">📁 选择文件</button>
       <button class="sec" onclick="pasteFromClipboard()">📋 从剪贴板粘贴</button>
       <input type="file" id="photos" accept="image/*" multiple class="hidden">
+      <select id="ing-grade" title="年级（决定知识点归类的受控清单；记住上次选择）" onchange="localStorage.setItem('wb_grade',this.value)"
+        style="padding:6px 10px;border:1px solid var(--line);border-radius:6px;font:inherit"><option value="">年级…</option></select>
       <input type="text" id="src-note" placeholder="来源（可选，如：期中卷/课本P53）" style="flex:1;min-width:180px;padding:6px 10px;border:1px solid var(--line);border-radius:6px">
       <button class="pri" id="btn-upload">转录</button>
     </div>
@@ -285,6 +287,20 @@ function tpIngest(sid,cid){   // 专题页各类别的录入入口：切录入 t
   window.scrollTo(0,0);
 }
 let imgVer=Date.now();   // 裁剪图缓存版本：重抓/重框后递增，强制浏览器刷新（文件名不变）
+/* ---------- 前置年级（v1.4.1）：录入页上传区选年级 → 服务端按年级加载受控知识点清单 ---------- */
+let GRADES=[];   // 全局年级候选（/api/grades：小学一~六 + 初中八/九 + 其他）；人审题卡年级下拉同源
+async function loadGrades(){
+  try{
+    const j=await (await fetchT('/api/grades')).json();
+    GRADES=j.grades||[];
+  }catch(e){GRADES=['八年级上册','八年级下册','九年级上册','九年级下册','其他'];}
+  const sel=$('#ing-grade');
+  if(sel){
+    sel.innerHTML='<option value="">年级…</option>'+GRADES.map(g=>`<option>${g}</option>`).join('');
+    const saved=localStorage.getItem('wb_grade');
+    if(saved&&GRADES.includes(saved))sel.value=saved;   // 记住上次选择
+  }
+}
 /* ---------- 全屏遮罩（转录/录入期间锁屏） ---------- */
 function showOv(t){$('#ov-text').textContent=t;$('#overlay').classList.remove('hidden');}
 function setOv(t){$('#ov-text').textContent=t;}
@@ -350,7 +366,9 @@ function renderThumbs(){
   const el=$('#thumbs');
   el.classList.toggle('hidden',!pendingFiles.length);
   $('#drop-hint').classList.toggle('hidden',!!pendingFiles.length);
-  el.innerHTML=pendingFiles.map((f,i)=>`<div class="thumb">
+  el.innerHTML=`<div class="small" style="flex-basis:100%;margin:0 0 4px">已选 ${pendingFiles.length} 张（转录后保留；再点「转录」= 清除本次分析、用这些照片重新分析）
+    <a href="javascript:void(0)" style="color:var(--red);margin-left:8px" onclick="clearFiles()">🗑 清空</a></div>`
+    +pendingFiles.map((f,i)=>`<div class="thumb">
     <img src="${URL.createObjectURL(f)}" alt="" onclick="viewImg(this.src)" class="zoomimg" title="点击放大">
     <button class="rm" title="移除" onclick="rmFile(${i})">✕</button>
     <div class="nm">${esc(f.name||'剪贴板图片')}</div>
@@ -358,6 +376,11 @@ function renderThumbs(){
   </div>`).join('');
 }
 function rmFile(i){pendingFiles.splice(i,1);joinFlags.splice(i,1);renderThumbs();}
+function clearFiles(){   // 清空已选照片（转录后照片保留，重新换一批时用）
+  if(!pendingFiles.length)return;
+  pendingFiles=[];joinFlags=[];renderThumbs();
+  $('#upload-status').textContent='';
+}
 /* 拼接一组照片为纵向长图（等宽缩放 + 页间白条 28px）→ File */
 async function stitchImages(files){
   const imgs=[];
@@ -405,7 +428,15 @@ async function pasteFromClipboard(){   // 按钮主动读剪贴板（Chrome/Edge
 $('#btn-upload').onclick=async()=>{
   const files=[...pendingFiles]; if(!files.length)return alert('先选择/拖拽/粘贴照片');
   const note=$('#src-note').value.trim();
-  sheets=[]; renderReview();                        // 清空上一单的试题
+  // v1.4.1a 年级必选：知识点/章节按所选年级的教材清单受控归类，不选不允许转录
+  const gradeEl=$('#ing-grade'), grade=(gradeEl||{}).value||'';
+  if(!grade){
+    alert('请先选择年级：知识点与章节将按所选年级的教材清单归类');
+    if(gradeEl){gradeEl.style.borderColor='var(--red)';gradeEl.focus();setTimeout(()=>gradeEl.style.borderColor='',2500);}
+    return;
+  }
+  sheets=[]; renderReview();                        // 再点转录=清除上次分析结果，用当前照片重新分析
+  $('#upload-status').textContent='';
   showOv('转录中…');                                 // 锁屏
   // v1.3.1 跨页题分组：joinFlags 标记的照片与上一组合并为一次转录（拼接长图）
   const groups=[];let cur=[files[0]];
@@ -419,14 +450,14 @@ $('#btn-upload').onclick=async()=>{
       const g=groups[i];
       setOv(`转录中（${i+1}/${groups.length}${g.length>1?`，跨页拼接 ${g.length} 张`:''}）… 约20-60秒，请勿关闭页面`);
       const photo=g.length>1?await stitchImages(g):g[0];
-      const fd=new FormData(); fd.append('photo',photo); if(note)fd.append('source',note);
+      const fd=new FormData(); fd.append('photo',photo); if(note)fd.append('source',note); if(grade)fd.append('grade',grade);
       try{const r=await fetchT('/api/sheets',{method:'POST',body:fd},300000); const j=await r.json();
         if(j.error){$('#upload-status').textContent='❌ '+j.error;}
         else{j.mode=INGEST_MODE;
-          sheets.unshift(j); $('#upload-status').textContent=`✅ 已转录 ${j.questions.length} 题（尚未提交入库，核对无误后点下方「提交」）`; renderReview();}
+          sheets.unshift(j); $('#upload-status').textContent=`✅ 已转录 ${j.questions.length} 题（尚未提交入库，核对无误后点下方「提交」）；照片已保留，再点「转录」可重新分析`; renderReview();}
       }catch(e){$('#upload-status').textContent='❌ '+e;}
     }
-  }finally{hideOv(); pendingFiles=[]; joinFlags=[]; renderThumbs();}
+  }finally{hideOv();}   // v1.4.1a：转录后照片保留在缩略图区（可再点转录重新分析 / 増删后重跑）
 };
 function renderReview(){
   // 双入口独立（v1.2b 反馈）：每个入口只看自己转录的照片
@@ -530,7 +561,7 @@ function qCard(sheet,q){
     ${q.choices?`<div class="choices">${q.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:''}
     <div class="cls-row">
       年级：<select onchange="patchQ('${sheet.id}',${q.no},{grade:this.value},this)">
-        ${['八年级上册','八年级下册','九年级上册','九年级下册','其他'].map(g=>`<option ${g===(q.grade||'八年级上册')?'selected':''}>${g}</option>`).join('')}
+        ${(GRADES.length?GRADES:['八年级上册','八年级下册','九年级上册','九年级下册','其他']).map(g=>`<option ${g===(q.grade||'八年级上册')?'selected':''}>${g}</option>`).join('')}
       </select>
       知识点：${kpHtml}
     </div>
@@ -1491,6 +1522,7 @@ async function boot(){   // R2：先查激活状态再决定渲染（未激活/�
   }
   loadUsers();
   loadAiConfig();
+  loadGrades();   // 前置年级下拉（记住上次选择）
   loadTopics();   // 专题数据预载（录入页「专题分类」与「同时存入专题」下拉都需要）
   if(sessionStorage.getItem('after-switch')==='dash'){   // 切换用户后：直达工作台（V1.0.3e）
     sessionStorage.removeItem('after-switch');
