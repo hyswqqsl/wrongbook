@@ -693,11 +693,7 @@ if __name__ == "__main__":
         import webbrowser
         if _is_port_in_use(port):
             if _port_owner_is_ours(port):
-                webbrowser.open(url)   # 直接拉起已有实例的页面
-                _native_alert(
-                    "AI错题本程序已开启，请勿重复运行！\n\n当前服务地址：%s\n"
-                    "（如需退出程序，请在浏览器页面右上角点击「⏻ 退出」）" % url,
-                    "AI错题本 - 程序已开启")
+                webbrowser.open(url)   # 已开启：静默拉起已有实例的页面（R4.0e 用户反馈：弹窗体验差）
                 sys.exit(0)
             _native_alert(
                 "端口 %d 已被其他程序占用，AI错题本无法启动。\n"

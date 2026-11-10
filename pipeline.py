@@ -171,6 +171,8 @@ def ingest_selected(sheet, provider=None, progress=None):
             text = q["edited"]["question"]
         choices = q.get("edited", {}).get("choices") if isinstance(q.get("edited"), dict) else None
         choices = choices or q.get("choices")
+        _tick(q.get("no"))   # R4.0e：开始处置即上报题号——质量链耗时 0.5~2 分钟/题，
+                             # 否则前端在首题完成前一直显示“第?题（0·0·0）”
 
         # ⓪-A 存入专题（零 LLM，v1.2）：排版机+人审已定稿，直接落库
         topic_id = None
