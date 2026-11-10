@@ -74,4 +74,15 @@ venv/bin/python license_admin.py reset-seats --code WB-2UFW-DP8R-8Q9W
 
 # 生成新的key
 venv/bin/python license_admin.py issue --owner 张同学家
+
+# 重置
+venv/bin/python license_admin.py reset-seats --code WB-XXXX-XXXX-XXXX
 ```
+
+场景	命令
+清掉某个码的绑定	reset-seats --code WB-…（如上）
+重新启用被吊销的码	enable --code WB-…
+把码改为限期/延期	extend --code WB-… --days 180
+吊销码（锁定家长端）	revoke --code WB-…
+重启服务	systemctl restart wrongbook-license
+看服务日志	journalctl -u wrongbook-license -n 50
