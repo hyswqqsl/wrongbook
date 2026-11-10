@@ -162,6 +162,7 @@ details.kptree[open] summary{color:var(--ink)}
     <button data-tab="topics">专题</button>
   </nav>
   <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+    <span class="small" id="app-ver" title="版本号" style="color:var(--sub);background:var(--line);border-radius:6px;padding:2px 8px"></span>
     <span class="small">用户</span>
     <select id="user-sel" onchange="switchUser(this.value)" style="padding:5px 8px;border:1px solid var(--line);border-radius:6px;font:inherit"></select>
     <button class="sec" style="font-size:13px;padding:5px 10px" onclick="addUser()">＋ 新用户</button>
@@ -1472,6 +1473,8 @@ async function addUser(){
 async function boot(){   // R2：先查激活状态再决定渲染（未激活/锁定→激活页；宽限→黄条；正常→全功能）
   let lic=null;
   try{ lic=await (await fetch('/api/license')).json(); }catch(e){}
+  const av=document.getElementById('app-ver');                       // 版本角标（激活页/正常态都显示，R4.0i）
+  if(av&&lic&&lic.app_version)av.textContent='v'+lic.app_version;
   if(lic && lic.enabled && (lic.state==='unactivated'||lic.state==='locked')){
     document.querySelectorAll('main > section').forEach(s=>{if(s.id!=='lic-view')s.classList.add('hidden')});
     document.querySelector('header nav').style.display='none';
@@ -1520,8 +1523,10 @@ window.addEventListener('hashchange',()=>{if(location.hash==='#quiz')enterQuizVi
 async function shutdownApp(){
   if(!confirm('确定要退出 AI错题本 后台服务吗？'))return;
   try{
-    await fetch('/api/shutdown',{method:'POST'});
-  }catch(e){}
+    const r=await fetch('/api/shutdown',{method:'POST',headers:{'X-WrongBook-Exit':'1'}});   // 必须带校验头（R4.0a），否则服务端 403 拒绝
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||j.ok!==true){alert('退出失败：'+(j.error||('HTTP '+r.status)));return;}
+  }catch(e){alert('退出请求失败：'+e);return;}
   document.body.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:80vh;color:#1b2430;font-family:system-ui,sans-serif"><div style="font-size:46px;margin-bottom:12px">✅</div><h2 style="margin:0 0 8px">AI错题本已安全退出</h2><p style="color:#667085;margin:0">后台服务已关闭、端口已释放，现在可以直接关闭此浏览器标签页。</p></div>';
   setTimeout(()=>{try{window.close();}catch(e){}},300);
 }

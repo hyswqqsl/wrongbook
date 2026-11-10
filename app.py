@@ -654,18 +654,22 @@ def _is_port_in_use(port):
 
 def _port_owner_is_ours(port):
     """探测占用者是否为本应用实例（/api/license 应答含 app_version 标识）。
-    强制绕过系统代理（ProxyHandler({})）：Windows 下 urllib 会读注册表代理设置，
-    127.0.0.1 被劫持到代理会导致误判“非自家实例”（R4.0g，用户 Windows 实测踩中）"""
+    强制绕过系统代理（ProxyHandler({})）：Windows/mac 系统代理都会劫持 127.0.0.1（R4.0g）。
+    多重尝试 + 只认“HTTP 明确成功且无标识”才判第三方；探测失败一律当作自家实例
+    （浏览器打开无副作用，而误报“无法启动”是严重体验问题，R4.0j）"""
     import urllib.request
     import json as _json
+    import time as _time
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    for host in ("127.0.0.1", "localhost"):
-        try:
-            with opener.open("http://%s:%d/api/license" % (host, port), timeout=2) as r:
-                return "app_version" in _json.loads(r.read().decode("utf-8") or "{}")
-        except Exception:
-            continue
-    return False
+    for attempt in range(3):
+        for host in ("127.0.0.1", "localhost"):
+            try:
+                with opener.open("http://%s:%d/api/license" % (host, port), timeout=3) as r:
+                    return "app_version" in _json.loads(r.read().decode("utf-8") or "{}")
+            except Exception:
+                continue
+        _time.sleep(0.3)
+    return True   # 探测失败：宁可当自家实例（开页面），不弹“无法启动”
 
 
 def _native_alert(msg, title="AI错题本"):
