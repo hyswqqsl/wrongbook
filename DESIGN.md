@@ -314,6 +314,22 @@
   [(1,0),(1,1),(2,1),(2,2)]，题号即时可见；② **已开启再双击的弹窗体验**：改为**静默
   webbrowser 拉起已有实例页面**后退出（不再弹"程序已开启"提示）；端口被第三方程序占用
   的分支保留弹窗（那种情况用户需要知道原因）；离线事件推演 ✓ 回归 218 项全绿
+- **V1.4.0g Windows 单实例探针误判修复（用户实测）**：Windows 打包后"已开启再双击"
+  仍提示"端口被占用"——根因：单实例探针 `_port_owner_is_ours` 用裸 urllib.urlopen，
+  **Windows 下 urllib 读注册表系统代理设置**，127.0.0.1 请求被劫持到代理 → 探测失败 →
+  误判为"第三方占用"（mac 本机 NO_PROXY 含 127.0.0.1 所以侥幸正常）。修复：探针
+  `ProxyHandler({})` 强制直连 + localhost 双尝试兜底（与 license_client._http_post 同款；
+  本次事故再次印证：所有本机回环 HTTP 一律强制直连，不信任系统代理）
+- **V1.4.0h mac 双击已运行实例无反应（机制性修复）**：与 Windows 不同，macOS 的
+  LaunchServices 对已运行 .app **只「激活」不重开进程**——单实例检测代码根本不会执行，
+  纯 Flask 应用又没人接 LS 的 reopen 事件 → 双击表现为"毫无反应"。修复（R4.0h）：
+  ① mac 打包态 **Flask 移后台线程，主线程跑 NSApplication runloop**，委托
+  `applicationShouldHandleReopen` → webbrowser 重开页面（Dock 图标点击同理）；
+  pyobjc 不可用时回退纯 Flask 主线程模式；② mac 打包依赖 `pyobjc-framework-Cocoa`
+  （build_mac.sh 安装 + requirements.txt darwin 环境标记 + spec darwin hiddenimports）；
+  ③ 顺带补**打包态文件日志** `_flog` → `data/logs/app.log`（windowed 无终端，
+  远程排障/诊断包用）；实测：`open` 二次触发 reopen 事件 → 浏览器重开页面 ✓
+  单实例进程数恒为 1 ✓，回归 218 项全绿
 
 ---
 

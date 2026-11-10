@@ -8,6 +8,8 @@ import sys
 import os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(SPEC)))   # 工程根（spec 在 packaging/ 下）
 
+import sys as _sys
+
 a = Analysis(
     [os.path.join(ROOT, 'app.py')],
     pathex=[ROOT, os.path.join(ROOT, 'engine')],
@@ -26,6 +28,8 @@ a = Analysis(
     excludes=['tkinter', 'pytest', 'pip', 'setuptools'],
     noarchive=False,
 )
+if _sys.platform == 'darwin':
+    a.hiddenimports += ['AppKit', 'Foundation']   # pyobjc：mac 双击已运行实例的 reopen 事件监听（R4.0h）
 
 pyz = PYZ(a.pure)
 

@@ -653,13 +653,19 @@ def _is_port_in_use(port):
 
 
 def _port_owner_is_ours(port):
-    """探测占用者是否为本应用实例（/api/license 应答含 app_version 标识）"""
+    """探测占用者是否为本应用实例（/api/license 应答含 app_version 标识）。
+    强制绕过系统代理（ProxyHandler({})）：Windows 下 urllib 会读注册表代理设置，
+    127.0.0.1 被劫持到代理会导致误判“非自家实例”（R4.0g，用户 Windows 实测踩中）"""
     import urllib.request
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:%d/api/license" % port, timeout=2) as r:
-            return "app_version" in json.loads(r.read().decode("utf-8") or "{}")
-    except Exception:
-        return False
+    import json as _json
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    for host in ("127.0.0.1", "localhost"):
+        try:
+            with opener.open("http://%s:%d/api/license" % (host, port), timeout=2) as r:
+                return "app_version" in _json.loads(r.read().decode("utf-8") or "{}")
+        except Exception:
+            continue
+    return False
 
 
 def _native_alert(msg, title="AI错题本"):
@@ -680,6 +686,18 @@ def _native_alert(msg, title="AI错题本"):
         pass
 
 
+def _flog(msg):
+    """打包态文件日志（windowed 无终端，print 不可见；远程排障/诊断包用，R4.0h）"""
+    try:
+        import time as _t
+        d = os.path.join(paths.DATA_HOME, "logs")
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "app.log"), "a", encoding="utf-8") as f:
+            f.write("%s %s\n" % (_t.strftime("%Y-%m-%d %H:%M:%S"), msg))
+    except Exception:
+        pass
+
+
 if __name__ == "__main__":
     # debug 模式：./run.sh --debug 或 FLASK_DEBUG=1 ./run.sh（改代码自动重载；仅开发用）
     port = 8899
@@ -689,24 +707,58 @@ if __name__ == "__main__":
     debug = "--debug" in sys.argv or os.environ.get("FLASK_DEBUG") == "1"
 
     if getattr(sys, "frozen", False):
-        # R4 打包态：固定端口单实例；已开启 → 拉起页面+弹窗提示后退出；端口被其他程序占用 → 明确报错
+        # R4 打包态：固定 8899 单实例 + _flog 文件日志（windowed 无终端）
         import webbrowser
+        _flog("启动：port=%s frozen=1" % port)
         if _is_port_in_use(port):
             if _port_owner_is_ours(port):
-                webbrowser.open(url)   # 已开启：静默拉起已有实例的页面（R4.0e 用户反馈：弹窗体验差）
+                _flog("单实例：自家实例已开启 → 静默拉起页面并退出")
+                webbrowser.open(url)   # 已开启：静默拉起已有实例的页面（R4.0e）
                 sys.exit(0)
+            _flog("单实例：端口被第三方占用 → 启动失败")
             _native_alert(
                 "端口 %d 已被其他程序占用，AI错题本无法启动。\n"
                 "请关闭占用该端口的程序后重试（或重启电脑）。" % port,
                 "AI错题本 - 启动失败")
             sys.exit(1)
-        license_client.maybe_heartbeat_async()   # 启动时若已到期，先补一跳
-        license_client.start_heartbeat_loop()    # 运行中周期心跳（定稿 24h）
-        _t = threading.Timer(1.5, lambda: webbrowser.open(url))
-        _t.daemon = True
-        _t.start()
-        print("AI错题本 →", url)
-        app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=False)
+        license_client.start_heartbeat_loop()    # 运行中周期检查补发（10 分钟）
+
+        if sys.platform == "darwin":
+            # mac 特有（R4.0h）：LS 双击已运行的 .app 只「激活」不重开进程（单实例检测不执行），
+            # 纯 Flask 应用无人接 LS 的 reopen 事件 → 双击表现为“毫无反应”。
+            # 正确姿势：Flask 放后台线程，主线程跑 NSApplication runloop，
+            # 委托 applicationShouldHandleReopen → 重开页面（Dock 图标点击同理）。
+            def _serve():
+                _t = threading.Timer(1.5, lambda: webbrowser.open(url))
+                _t.daemon = True
+                _t.start()
+                print("AI错题本 →", url)
+                app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=False)
+            threading.Thread(target=_serve, daemon=True).start()
+            try:
+                from AppKit import NSApplication, NSObject
+
+                class _ReopenDelegate(NSObject):
+                    def applicationShouldHandleReopen_hasVisibleWindows_(self, app, flag):
+                        import webbrowser as _wb
+                        _flog("reopen 事件 → 重开页面 %s" % url)
+                        _wb.open(url)
+                        return True
+
+                _dlg = _ReopenDelegate.alloc().init()
+                _na = NSApplication.sharedApplication()
+                _na.setDelegate_(_dlg)
+                print("macOS reopen 监听已装（双击/Dock 图标 = 重开页面）")
+                _na.run()
+            except Exception as e:
+                print("pyobjc 不可用，回退纯 Flask 主线程模式：", e)
+                app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=False)
+        else:
+            _t = threading.Timer(1.5, lambda: webbrowser.open(url))
+            _t.daemon = True
+            _t.start()
+            print("AI错题本 →", url)
+            app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=False)
     else:
         if not debug and _is_port_in_use(port):
             if _port_owner_is_ours(port):

@@ -13,6 +13,9 @@ VERSION=$($PY -c "import paths; print(paths.APP_VERSION)")
 echo "==> 版本：v$VERSION"
 
 echo "==> PyInstaller 构建"
+echo "==> 安装 mac 专属依赖（pyobjc：LS reopen 事件监听）"
+$PY -m pip install -q pyobjc-framework-Cocoa
+
 $PY -m PyInstaller packaging/wrongbook.spec --noconfirm --clean >/dev/null
 APP="dist/AI错题本.app"
 [ -d "$APP" ] || { echo "❌ 构建产物缺失：$APP"; exit 1; }
