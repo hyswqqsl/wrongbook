@@ -900,6 +900,11 @@ async function loadDash(){
       <b>错题列表</b> <span class="small">（连对3次→建议归档；公式已渲染，点「查看」看完整信息）</span>
       <span style="margin-left:auto;display:flex;gap:10px;align-items:center">
         <span class="small">已选 <b id="sel-count">0</b> 题</span>
+        <select id="paper-order" title="出题顺序（开始做题与导出PDF 通用）" onchange="localStorage.setItem('wb_paper_order',this.value)"
+          style="padding:6px 10px;border:1px solid var(--line);border-radius:6px;font:inherit">
+          <option value="seq" ${(localStorage.getItem('wb_paper_order')||'seq')!=='shuf'?'selected':''}>按列表顺序</option>
+          <option value="shuf" ${(localStorage.getItem('wb_paper_order')||'seq')==='shuf'?'selected':''}>打乱顺序</option>
+        </select>
         <button class="pri" onclick="startPaper()">📝 开始做题</button>
         <button class="sec" onclick="exportPaperPdf()">🖨 导出PDF（打印用）</button>
       </span>
@@ -936,14 +941,20 @@ function toggleAllRows(cb){
 function selRow(id,on){on?dashSelected.add(id):dashSelected.delete(id);saveSel();updateSelCount();}
 function updateSelCount(){const el=document.getElementById('sel-count');if(el)el.textContent=dashSelected.size;}
 function selectedRowIds(){return [...dashSelected];}
+function applyPaperOrder(ids){   // v1.4.1b 出题顺序：按列表顺序 / 乱序（Fisher-Yates，每次重挑）；开始做题与导出PDF 通用
+  if((localStorage.getItem('wb_paper_order')||'seq')!=='shuf')return ids;
+  const a=[...ids];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
 function startPaper(){
   const ids=selectedRowIds();
   if(!ids.length)return alert('先勾选要做的题（表头复选框可全选）');
-  localStorage.setItem('paper_session',JSON.stringify(ids));
+  localStorage.setItem('paper_session',JSON.stringify(applyPaperOrder(ids)));
   window.open(location.pathname+'#quiz','_blank');   // 新标签页：试卷式做题
 }
 async function exportPaperPdf(){
-  const ids=selectedRowIds();
+  const ids=applyPaperOrder(selectedRowIds());
   if(!ids.length)return alert('先勾选要导出的题（表头复选框可全选）');
   const btn=window.event&&window.event.target;
   if(btn){btn.disabled=true;btn.textContent='PDF 生成中…';}
