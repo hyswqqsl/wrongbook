@@ -366,7 +366,7 @@ function renderThumbs(){
   const el=$('#thumbs');
   el.classList.toggle('hidden',!pendingFiles.length);
   $('#drop-hint').classList.toggle('hidden',!!pendingFiles.length);
-  el.innerHTML=`<div class="small" style="flex-basis:100%;margin:0 0 4px">已选 ${pendingFiles.length} 张（转录后保留；再点「转录」= 清除本次分析、用这些照片重新分析）
+  el.innerHTML=`<div class="small" style="flex-basis:100%;margin:0 0 4px">已选 ${pendingFiles.length} 张（转录后保留，录入完成后自动清空；再点「转录」= 清除本次分析、用这些照片重新分析）
     <a href="javascript:void(0)" style="color:var(--red);margin-left:8px" onclick="clearFiles()">🗑 清空</a></div>`
     +pendingFiles.map((f,i)=>`<div class="thumb">
     <img src="${URL.createObjectURL(f)}" alt="" onclick="viewImg(this.src)" class="zoomimg" title="点击放大">
@@ -823,6 +823,9 @@ async function commitAll(btn){
     }
   }finally{hideOv();}
   // 不隐藏题目列表：保留显示直到下次点「转录」再清空
+  // v1.4.1c：录入完成（无失败）→ 清空照片缩略图，防同批照片再次转录造成重复录入；
+  // 有失败时保留照片，便于修正后重跑
+  if(!agg.errors.length)clearFiles();
   renderReview(); loadTopics();   // 刷新专题数据（新增例题同步到专题 Tab 与下拉）
   $('#upload-status').textContent='✅ 已入库 '+agg.ingested.length+' 题'+
     (agg.topics.length?`，存入专题 ${agg.topics.length} 题`:'')+
