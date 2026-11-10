@@ -71,4 +71,7 @@ venv/bin/python license_admin.py list --code WB-2UFW-DP8R-8Q9W
 
 # ② 清空该码的设备绑定
 venv/bin/python license_admin.py reset-seats --code WB-2UFW-DP8R-8Q9W
+
+# 生成新的key
+venv/bin/python license_admin.py issue --owner 张同学家
 ```

@@ -14,14 +14,17 @@ data/ai_config.json
 # 激活体系私钥（R2/R3）：绝对不入库；正式私钥随部署包上传 ECS 后本机留档
 data/license_dev_private.pem
 data/license_ecs_private.pem
-data/license_dev_private.pem
+# 激活体系本地状态：凭证/吊销提示/设备指纹/数据版本，均不入库
 data/license.json*
+data/license_revoked.json*
 data/device_id
 data/meta.json
 # 用户数据（题库/草稿单/照片/裁剪图/用户表）：本地个人数据，不入库（v1.1.0f）
 data/users/
 data/users.json
+# 各类备份轮转文件（.bak 及 .bak.1/.bak.2）
 data/*.bak
+data/*.bak.*
 # 专题数据（专题集/例题/图形）：同用户数据约定，不入库（v1.2）
 data/topics.json
 data/topic_crops/
