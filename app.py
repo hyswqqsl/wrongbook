@@ -55,6 +55,11 @@ def api_license_activate():
 
 def _err(e):
     traceback.print_exc()
+    try:   # v1.4.1d：冻结态 windowed exe 无终端，traceback 落文件日志供远程排障
+        if getattr(sys, "frozen", False):
+            _flog("API 错误: " + str(e)[:200] + "\n" + traceback.format_exc()[-800:])
+    except Exception:
+        pass
     return jsonify({"error": str(e)[:300]}), 500
 
 
@@ -94,9 +99,12 @@ def api_grades():
     合计 1~9 年级全支持）+「其他」兜底"""
     try:
         import kbtree
-        return jsonify({"grades": kbtree.grade_options() + ["其他"]})
-    except Exception as e:
-        return _err(e)
+        grades = kbtree.grade_options()
+    except Exception:
+        grades = []   # v1.4.1d：永不 500（曾因单个坏 json 500 致前端年级下拉全空）
+    if not grades:   # 全集 json 缺失（旧包/漏拷）或损坏 → 回落初中候选，年级下拉永远有可选值
+        grades = ["八年级上册", "八年级下册", "九年级上册", "九年级下册"]
+    return jsonify({"grades": grades + ["其他"]})
 
 
 @app.get("/api/stats")

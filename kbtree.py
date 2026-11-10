@@ -56,7 +56,10 @@ def _kb_dir():
         for f in os.listdir(src):
             dst = os.path.join(d, f)
             if not os.path.exists(dst) and os.path.isfile(os.path.join(src, f)):
-                shutil.copy2(os.path.join(src, f), dst)
+                try:
+                    shutil.copy2(os.path.join(src, f), dst)
+                except OSError:
+                    pass   # 单个文件拷贝失败不阻塞播种（v1.4.1d）
     return d
 
 
@@ -69,10 +72,16 @@ def set_kb_dir(d=None):
 
 
 def _load_kb(name):
+    """读 KB json；文件缺失/损坏（编码坏、截断、非法 json）→ None（跳过不阻塞，
+    v1.4.1d：单个坏文件曾致 grade_options 抛异常 → /api/grades 500 → 前端年级下拉全空）"""
     p = os.path.join(_kb_dir(), name)
     if not os.path.exists(p):
         return None
-    return json.load(open(p, encoding="utf-8"))
+    try:
+        with open(p, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 
 def _is_kp_title(t):

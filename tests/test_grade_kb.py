@@ -93,6 +93,22 @@ class TestGradeKb(unittest.TestCase):
         self.assertIsNone(kbtree.knowledge_points_for_grade("七年级上册"))   # 全集未收录
         self.assertIsNone(kbtree.knowledge_points_for_grade("乱写的年级"))
 
+    def test_corrupt_source_json_skipped(self):
+        """v1.4.1d：单个全集 json 损坏（编码坏/截断）→ 跳过不抛异常，另一份仍可用
+        （曾致 grade_options 抛 UnicodeDecodeError → /api/grades 500 → 前端年级下拉全空）"""
+        # 初中全集损坏 → 回落小学候选，不抛异常
+        with open(os.path.join(self.tmp, kbtree.GRADE_SOURCES[1]), "wb") as f:
+            f.write(b"\xff\xfe broken bytes")
+        kbtree.grade_options(force=True)
+        self.assertEqual(kbtree.grade_options(),
+                         ["四年级上册", "四年级下册"])
+        self.assertIsNone(kbtree.knowledge_points_for_grade("九年级下册"))
+        self.assertIsNotNone(kbtree.knowledge_points_for_grade("四年级上册"))
+        # 两份全坏 → 空列表（endpoint 会回落初中候选），仍不抛异常
+        with open(os.path.join(self.tmp, kbtree.GRADE_SOURCES[0]), "wb") as f:
+            f.write(b"{ truncated")
+        self.assertEqual(kbtree.grade_options(force=True), [])
+
 
 class TestClassifyWithGrade(unittest.TestCase):
     """classify_questions：前置年级固定（不再盲猜）；无 grade 保留旧行为"""

@@ -292,7 +292,7 @@ let GRADES=[];   // 全局年级候选（/api/grades：小学一~六 + 初中八
 async function loadGrades(){
   try{
     const j=await (await fetchT('/api/grades')).json();
-    GRADES=j.grades||[];
+    GRADES=(j.grades&&j.grades.length)?j.grades:['八年级上册','八年级下册','九年级上册','九年级下册','其他'];   // v1.4.1d：服务端异常/空列表也不留空下拉
   }catch(e){GRADES=['八年级上册','八年级下册','九年级上册','九年级下册','其他'];}
   const sel=$('#ing-grade');
   if(sel){

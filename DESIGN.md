@@ -366,6 +366,16 @@
   **录入完成后自动清空**——commitAll 无失败时 clearFiles()（防同批照片再点转录造成
   重复录入）；有失败时保留照片便于修正后重跑；缩略图头部行文案同步「转录后保留，
   录入完成后自动清空」；已入库题目列表仍保留展示（下次转录时清空，行为不变）
+- **V1.4.1d Windows 打包后年级列表空（用户反馈，根因修复）**：定位——Windows 机器上
+  年级全集 json（包内种子或 %APPDATA%\WrongBook\data\kb）至少一个**存在但损坏**
+  （拷贝截断/编码坏），grade_options 读它抛 UnicodeDecodeError → /api/grades 500
+  → 前端 j.grades 空 → 下拉只剩占位（文件缺失时会有「其他」，正是 500 的特征；
+  windowed exe 无终端，traceback 被吞）。四层加固：① _load_kb 容错——文件缺失/
+  损坏一律返 None 跳过，单个坏文件不再炸全局；② 种子播种逐文件 try/except；
+  ③ /api/grades **永不 500**——读取失败/空列表回落初中候选+其他（前端同级兑底）；
+  ④ _err 冻结态落 data/logs/app.log（远程排障可见 traceback）。
+  新增 test_corrupt_source_json_skipped；修复后 Windows 端需**删除 %APPDATA% 下损坏的
+  全集 json**（播种只补缺不覆盖，坏文件会一直留着），重啟程序自动重新补齐
 
 ---
 
