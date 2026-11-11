@@ -376,6 +376,9 @@
   ④ _err 冻结态落 data/logs/app.log（远程排障可见 traceback）。
   新增 test_corrupt_source_json_skipped；修复后 Windows 端需**删除 %APPDATA% 下损坏的
   全集 json**（播种只补缺不覆盖，坏文件会一直留着），重啟程序自动重新补齐
+- **V1.4.1f 设置页「测试连接」加遮罩（用户反馈）**：测试期间全屏遮罩（复用 #overlay，
+  z 层高于设置弹窗，挡住一切点击）+ 防重复触发；网络异常不再卡「测试中…」
+  （原实现无 try/finally，fetch 抛错会永久停在校验文案）；返回后遮罩消失、结果展示
 
 ---
 
