@@ -225,30 +225,7 @@ def _remove_example_file(e):
             os.remove(crop)
         except OSError:
             pass
-    v = e.get("video")
-    if v and not str(v).startswith("http") and os.path.exists(v) \
-            and not video_referenced(v, exclude_eid=e["id"]):
-        # v1.2p：链接视频（http…）无文件本体，跳过清理
-        # 视频可能同时被错题本/未处置草稿单引用（导入时同题双目的地），有引用不删
-        try:
-            used_by_book = any(q.get("video") == v for q in store.load()["questions"])
-            if not used_by_book and not store.video_draft_ref(v):
-                os.remove(v)
-        except OSError:
-            pass
-        except Exception:
-            pass   # 引用检查失败宁可不删
-
-
-def video_referenced(video, exclude_eid=None):
-    """video 路径是否仍被（其他）专题例题引用"""
-    db = load_topics()
-    for s in db["sets"]:
-        for c in s["categories"]:
-            for e in c.get("examples", []):
-                if e.get("video") == video and e.get("id") != exclude_eid:
-                    return True
-    return False
+    # video（v1.4.2 视频功能已删除）：历史残留字段/文件忽略不清洗
 
 
 def crop_referenced(crop, exclude_eid=None):
@@ -299,7 +276,7 @@ def _category_dup(cat, text, threshold=0.92):
 
 
 def add_example(sid, cid, text, choices=None, answer=None, ex_type="fill",
-                analysis="", crop_src=None, spec=None, source="", video=None,
+                analysis="", crop_src=None, spec=None, source="",
                 kps=None):
     """新增例题（pipeline 从草稿题组装；crop 文件复制进全局 topic_crops）"""
     db = load_topics()
@@ -317,7 +294,6 @@ def add_example(sid, cid, text, choices=None, answer=None, ex_type="fill",
           "text": text, "choices": choices or None, "answer": (answer or "").strip(),
           "analysis": analysis or "", "figure_crop": _copy_crop(crop_src, eid),
           "figure_spec": spec, "source": source or "",
-          "video": video,
           # v1.2q：与错题本详情同口径（转录期受控 kps；思路/易错由分析补全）
           "kps": [k for k in (kps or []) if k][:3],
           "key_idea": "", "pitfall": ""}
@@ -377,12 +353,12 @@ def analyze_example(eid):
 
 
 def patch_example(eid, fields):
-    """手编例题（video/analysis/answer/text 等）；返回更新后的例题"""
+    """手编例题（analysis/answer/text 等）；返回更新后的例题"""
     db = load_topics()
     s, c, e = _find_example_in(db, eid)
     if not e:
         raise ValueError("例题不存在")
-    for k in ("text", "answer", "analysis", "video", "choices",
+    for k in ("text", "answer", "analysis", "choices",
               "key_idea", "pitfall", "kps"):   # v1.2q：与错题本详情同口径
         if k in fields:
             e[k] = fields[k]

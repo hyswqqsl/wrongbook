@@ -141,6 +141,12 @@ class TestDashboardFilter(unittest.TestCase):
         self.assertEqual(row["reason"], "马虎")
         self.assertEqual(row["kp"], "三角形内角和")
 
+    def test_overview_sorted_by_created_desc(self):
+        """V1.4.2a：错题列表按录入时间倒序（新录的题在最上；旧设计“零练习优先”不再干预序）"""
+        d = stats.dashboard()
+        ids = [r["id"] for r in d["practice_overview"]]
+        self.assertEqual(ids, ["qb", "qa"])   # 11-15 在 11-01 前
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -393,8 +393,24 @@
   topics.json/*geogebra* 绝不入包）→ tar -a 压 dist\AI错题本-v<版本>-win64.zip；
   `bat run` 构建完自动启动 exe 冒烟；**免解压实测**：dist\AI错题本\ 即解压后最终目录，
   构建完直接双击 AI错题本.exe 测试。实现要点：chcp 65001 置顶（中文注释/echo 不乱码）、
-  echo 禁裸 >（会被解析为重定向建垃圾文件）、if 块内新设变量用延迟扩展 !VAR!、
+  echo 禁裸 >（会被解析为重定向建垃圾文件）、if 块内新设变量用延迟扩展 ！VAR!、
   每步 errorlevel 检查失败即停；BUILD_WINDOWS.md 保留手动步骤作排障对照
+- **V1.4.2 视频讲解全线删除（云端计划 B0，Plan B 前置）**：v1.2~v1.2r 打磨的视频讲解
+  （上传→v1.2p 改链接→B 站内嵌播放）随云端化拍板整体下线（小程序 iframe 限制 + 使用率低）；
+  做法对齐 V1.3.5 GeoGebra 移除先例——删功能与入口，**历史数据残留字段忽略不清洗**：
+  前端删人审卡/例题卡视频面板、videoBlockHtml 渲染、详情弹窗折叠块与全部编辑函数
+  （saveDraftVideo/removeDraftVideo/tpSetVideo 等，9.4KB）；后端删 PATCH 白名单 video 字段、
+  pipeline 双链透传、store/topics 的 video 交叉引用清理链（video_draft_ref/video_referenced）；
+  **figure_crop 交叉引用保护（v1.2q）保留不动**；测试 TestVideos 重写为「不透传/PATCH 忽略/
+  残留字段与本地文件忽略」语义；APP_VERSION 1.4.1→1.4.2；回归 226 项全绿
+- **V1.4.2a 验证反馈两修**：① 页面仍显示视频 UI——文件已删干净而浏览器缓存旧 HTML
+  （send_from_directory 无缓存策略，启发式缓存驻留）→ 首页加 `Cache-Control: no-cache`
+  （ETag 回源校验未变不重传，根治发版后旧页面驻留）；附带 MAX_CONTENT_LENGTH
+  512MB→64MB（512MB 是 v1.2 为视频上传设的，已无必要）；② 工作台错题列表按录入时间
+  **倒序**——真根源是 /api/stats 的 practice_rows 旧设计「零练习优先提醒」排序
+  `(times, -need)`（全 0 次时稳定在插入序 → 旧题在前），改按 created_at+id 双键倒序
+  （新录的题在最上，「按列表顺序」做题/导出 PDF 同此序；零练习提醒由数字卡承载）；
+  /api/questions 同步倒序保持一致；新增 test_overview_sorted_by_created_desc 回归
 
 ---
 

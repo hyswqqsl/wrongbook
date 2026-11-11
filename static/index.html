@@ -570,18 +570,6 @@ function qCard(sheet,q){
     ${q.has_figure&&!q.figure_svg&&!(q.figure_crops||[]).length?`<div class="small" style="color:var(--red)">⚠ 未获得图形：入库后保留题干，可手动补图</div>`:''}
     ${q.figure_note?`<div class="small" style="color:var(--sub)">${esc(q.figure_note)}</div>`:''}
     ${q.printed_answer?`<div class="answer-line">照片答案：${esc(q.printed_answer)}</div>`:''}
-    <div class="cls-row">
-      🎥 视频讲解（可选）：
-      <input type="text" id="vid-${sheet.id}-${q.no}" style="flex:1;min-width:220px;max-width:420px" placeholder="${q._vedit||!q.video?'粘贴B站等链接后点右侧按钮保存；t=340 自动从该秒播放':'点「✎ 编辑」修改链接'}"
-        value="${esc(q.video||'')}" ${q._vedit||!q.video?'':'disabled'}
-        onchange="saveDraftVideo('${sheet.id}',${q.no},this.value)">
-      ${q._vedit?`<button class="sec" style="font-size:13px;padding:5px 11px" onclick="saveDraftVideo('${sheet.id}',${q.no},document.getElementById('vid-${sheet.id}-${q.no}').value)">✅ 保存</button>
-        <button class="sec" style="font-size:13px;padding:5px 11px" onclick="q._vedit=false;renderReview()">取消</button>`
-      :q.video?`<span class="tag t-pass">已附</span>
-        <button class="sec" style="font-size:13px;padding:5px 11px" onclick="q._vedit=true;renderReview()">✎ 编辑</button>
-        <button class="sec" style="font-size:13px;padding:5px 11px" onclick="removeDraftVideo('${sheet.id}',${q.no})">移除</button>`
-      :`<button class="sec" style="font-size:13px;padding:5px 11px" onclick="saveDraftVideo('${sheet.id}',${q.no},document.getElementById('vid-${sheet.id}-${q.no}').value)">➕ 添加</button>`}
-    </div>
     <div class="reason-row ${q.selected?'':'hidden'}" id="reason-${sheet.id}-${q.no}">
       错因：<label><input type="radio" name="r-${sheet.id}-${q.no}" value="careless" ${q.reason&&q.reason.kind==='careless'?'checked':''} onchange="setReason('${sheet.id}',${q.no},'careless')">马虎</label>
       <label><input type="radio" name="r-${sheet.id}-${q.no}" value="unknown" ${q.reason&&q.reason.kind==='unknown'?'checked':''} onchange="setReason('${sheet.id}',${q.no},'unknown')">不会</label>
@@ -589,29 +577,6 @@ function qCard(sheet,q){
       <input type="text" placeholder="备注（如：看错条件）" value="${esc(q.reason&&q.reason.note||'')}" onchange="setReasonNote('${sheet.id}',${q.no},this.value)">
     </div>
   </div>`;
-}
-/* 视频讲解渲染（v1.2p）：链接 → B站内嵌播放器（自动带 t= 从该秒播放）/ 其他平台新标签打开；
-   历史本地文件（v1.2 上传）仍用 <video> 原样播放 */
-function videoBlockHtml(v){
-  if(!v)return '';
-  v=String(v);
-  if(/^https?:\/\//i.test(v)){
-    let t='',pg='';
-    try{const n=new URL(v);t=(n.searchParams.get('t')||'').replace(/^\D+|\D+$/g,'');pg=n.searchParams.get('p')||'';}catch(e){}
-    const bv=v.match(/bilibili\.com\/video\/(BV[0-9A-Za-z]+)/);
-    const av=v.match(/bilibili\.com\/video\/av(\d+)/i);
-    if(bv||av){
-      const q=new URLSearchParams();
-      if(bv)q.set('bvid',bv[1]);else q.set('aid',av[1]);
-      if(t)q.set('t',t);
-      q.set('page',pg||'1');q.set('autoplay','0');q.set('danmaku','0');q.set('high_quality','1');
-      return `<iframe src="https://player.bilibili.com/player.html?${q.toString()}" scrolling="no" frameborder="no" allowfullscreen style="width:100%;max-width:560px;height:315px;margin-top:6px;border-radius:8px;border:1px solid var(--line)"></iframe>`;
-    }
-    const yt=v.match(/(?:youtu\.be\/|[?&]v=)([\w-]{6,})/);
-    if(yt)return `<iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}${t?`?start=${t}`:''}" allowfullscreen style="width:100%;max-width:560px;height:315px;margin-top:6px;border-radius:8px;border:1px solid var(--line)"></iframe>`;
-    return `<div style="margin-top:6px"><a href="${esc(v)}" target="_blank" rel="noopener">🔗 打开视频链接</a></div>`;
-  }
-  return `<video controls preload="metadata" src="${relDataUrl(v)}" style="width:100%;max-width:560px;margin-top:6px;border-radius:8px"></video>`;
 }
 function hlQ(box,qid){}
 /* ---------- 左侧原图手动框选 ---------- */
@@ -716,14 +681,6 @@ function setTopicMain(sid,no,on){   // 「存专题」勾选（主或附加侧�
   patchQ(sid,no,{dest_topic:q.dest_topic,tp_sel:q.tp_sel},null);
   renderReview();
 }
-function saveDraftVideo(sid,no,v){   // v1.2q：➕添加 / ✎编辑保存——显式点击才写入（不自动提交）
-  const s=sheets.find(x=>x.id===sid),q=s&&s.questions.find(x=>x.no===no); if(!q)return;
-  v=(v||'').trim();
-  if(!v){q._vedit=true;renderReview();return alert('链接为空：请先粘贴视频链接');}
-  q._vedit=false;
-  patchQ(sid,no,{video:v},null);
-  renderReview();
-}
 async function rotateSheet(sid){   // v1.3 人审兜底：照片方向不对时人工旋转90°（图形框同步变换+整单重裁）
   const s=sheets.find(x=>x.id===sid); if(!s)return;
   try{
@@ -735,12 +692,6 @@ async function rotateSheet(sid){   // v1.3 人审兜底：照片方向不对时�
     imgVer=Date.now();   // 强制照片/裁剪图刷新缓存
     renderReview();
   }catch(e){alert('❌ '+e);}
-}
-function removeDraftVideo(sid,no){   // 移除：弹确认
-  if(!confirm('移除该题的视频讲解链接？'))return;
-  const s=sheets.find(x=>x.id===sid),q=s&&s.questions.find(x=>x.no===no); if(q)q._vedit=false;
-  patchQ(sid,no,{video:null},null);
-  renderReview();
 }
 function editQ(sid,no){
   const s=sheets.find(x=>x.id===sid),q=s.questions.find(x=>x.no===no);
@@ -1056,8 +1007,6 @@ async function showQModal(qid){
     <div class="qtext">${esc((q.question||{}).text||'')}</div>
     ${(q.question||{}).choices?`<div class="choices">${q.question.choices.map(c=>`<div>${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div>`:''}
     ${fig}
-    ${q.video?`<details class="tp-ana-wrap"><summary class="small" style="cursor:pointer;color:var(--blue)">🎥 视频讲解</summary>
-      ${videoBlockHtml(q.video)}</details>`:''}
     <div class="qm-sec"><b>答案</b>：${esc(q.verified_answer||'（无）')}
       ${q.verify_status==='conflict'?'<span class="tag t-conflict">与照片答案冲突</span>':q.verify_status==='pass'?'<span class="tag t-pass">已验伪</span>':''}
       ${q.printed_answer&&q.printed_answer!==q.verified_answer?`<span class="small">（照片印刷答案：${esc(q.printed_answer)}）</span>`:''}</div>
@@ -1294,7 +1243,6 @@ function exCardHtml(set,cat,e){
   const p=e.practice||{};
   const fig=e.figure_svg?`<figure style="margin:8px 0;text-align:center"><div class="figsvg">${e.figure_svg}</div></figure>`
     :(e.figure_crop?`<figure style="margin:8px 0;text-align:center"><img src="${relDataUrl(e.figure_crop)}" onclick="viewImg(this.src)" class="zoomimg" style="max-width:260px;border:1px solid var(--line);border-radius:6px"></figure>`:'');
-  const ve=e.video||'', vEdit=(TP_VEDIT===e.id);
   const hasAna=e.key_idea||e.pitfall;
   return `<div class="qcard" id="tpex-${e.id}">
     <div class="qhead"><b>例题</b>
@@ -1314,20 +1262,6 @@ function exCardHtml(set,cat,e){
       <div class="tp-ana small" style="margin-top:6px">${e.key_idea?`<div><b>💡 思路</b>：${esc(e.key_idea)}</div>`:''}${e.pitfall?`<div style="margin-top:4px"><b>⚠️ 易错</b>：${esc(e.pitfall)}</div>`:''}</div>
       <button class="sec" style="font-size:12px;padding:3px 9px;margin-top:6px" onclick="tpAnalyze('${e.id}',this)">🤖 重新分析</button></details>`
     :`<div style="margin-top:8px"><button class="sec" style="font-size:13px;padding:5px 11px" onclick="tpAnalyze('${e.id}',this)">🤖 AI 分析（思路 / 易错点 / 知识点）</button></div>`}
-    <div class="cls-row">
-      🎥 视频讲解（可选）：
-      <input type="text" style="flex:1;min-width:220px;max-width:420px" placeholder="${vEdit||!ve?'粘贴B站等链接后点右侧按钮保存；t=340 自动从该秒播放':'点「✎ 编辑」修改链接'}"
-        value="${esc(ve)}" ${vEdit||!ve?'':'disabled'}
-        onchange="tpSaveVideoInput('${e.id}',this.value)">
-      ${vEdit?`<button class="sec" style="font-size:13px;padding:5px 11px" onclick="tpSaveVideoInput('${e.id}',document.querySelector('#tpex-${e.id} input[type=text]').value)">✅ 保存</button>
-        <button class="sec" style="font-size:13px;padding:5px 11px" onclick="TP_VEDIT=null;renderTopics()">取消</button>`
-      :ve?`<span class="tag t-pass">已附</span>
-        <button class="sec" style="font-size:13px;padding:5px 11px" onclick="TP_VEDIT='${e.id}';renderTopics()">✎ 编辑</button>
-        <button class="sec" style="font-size:13px;padding:5px 11px" onclick="tpClearVideo('${e.id}')">移除</button>`
-      :`<button class="sec" style="font-size:13px;padding:5px 11px" onclick="tpSaveVideoInput('${e.id}',document.querySelector('#tpex-${e.id} input[type=text]').value)">➕ 添加</button>`}
-    </div>
-    ${ve?`<details class="tp-ana-wrap"><summary class="small" style="cursor:pointer;color:var(--blue)">🎥 视频讲解</summary>
-      ${videoBlockHtml(ve)}</details>`:''}
   </div>`;
 }
 function renderCatDetail(area,set,cat){
@@ -1365,21 +1299,6 @@ function tpNewCat(sid){
 function tpDelExample(eid){
   if(!confirm('删除该例题？\n（图形文件若仍被错题本题目引用则保留，否则一并删除）'))return;
   fetch('/api/topics/examples/'+eid,{method:'DELETE'}).then(()=>tpReload());
-}
-let TP_VEDIT=null;   // v1.2q：例题卡视频链接编辑态（eid）
-async function tpSetVideo(eid,v){   // 保存链接（添加/编辑保存共用）；空值由调用方拦截
-  const r=await (await fetchT(`/api/topics/examples/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({video:(v||'').trim()||null})})).json();
-  if(r.error)return alert('❌ '+r.error);
-  TP_VEDIT=null;tpReload();
-}
-function tpSaveVideoInput(eid,v){   // ➕添加 / ✎编辑保存：显式点击才写入（不自动提交）
-  v=(v||'').trim();
-  if(!v)return alert('链接为空：请先粘贴视频链接');
-  tpSetVideo(eid,v);
-}
-async function tpClearVideo(eid){   // 移除：弹确认
-  if(!confirm('移除该例题的视频讲解链接？'))return;
-  tpSetVideo(eid,'');
 }
 async function tpAnalyze(eid,btn){   // 🤖 例题按需分析（思路/易错点/受控知识点）
   if(btn){btn.disabled=true;btn.textContent='🤖 分析中…（约 10~30 秒）';}

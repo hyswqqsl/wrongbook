@@ -19,7 +19,7 @@ import license_client
 
 app = Flask(__name__, static_folder=os.path.join(BASE, "static"), static_url_path="/static")
 app.json.sort_keys = False   # v1.2o：保留 dict 插入序（工作台 kp_by_chapter 按 KB 章序下发，Flask 默认字典序会得「一三二五四」错序）
-app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024   # 视频讲解上传可达数百 MB（v1.2）
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024   # 照片转录上传（V1.4.2 视频删除后不再需要数百 MB 大上传）
 
 
 # ---------- 激活门禁（R2）：未激活/锁定时仅放行首页与激活相关，其余 API 全 403 ----------
@@ -79,7 +79,11 @@ def _enrich(q):
 
 @app.get("/")
 def index():
-    return send_from_directory(os.path.join(BASE, "static"), "index.html")
+    # no-cache：浏览器每次回源校验（ETag/304，未变不重传）——杜绝发版后旧 HTML 驻留缓存
+    # （V1.4.2 用户实测踩坑：改了 index.html 后页面仍显示旧 UI，强刷才消失）
+    resp = send_from_directory(os.path.join(BASE, "static"), "index.html")
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 @app.get("/api/kb")
@@ -195,7 +199,7 @@ def api_sheet_patch(sid, no):
     allowed = {k: fields[k] for k in
                ("selected", "reason", "edited", "question", "choices", "printed_answer",
                 "figure_mode", "figure_spec", "figure_svg", "figure_crops", "figure_note",
-                "grade", "kp_sel", "tp_sel", "dest_topic", "video", "skip")
+                "grade", "kp_sel", "tp_sel", "dest_topic", "skip")
                if k in fields}
     s = store.patch_sheet_question(sid, no, allowed)
     if not s:
@@ -417,6 +421,8 @@ def api_questions():
         qs = [q for q in qs if q.get("mastered_at")]
     elif flt == "needs_review":
         qs = [q for q in qs if q.get("flags", {}).get("needs_review")]
+    # V1.4.2：按录入时间倒序（新录的题在最上；「按列表顺序」做题/导出 PDF 同此序）
+    qs.sort(key=lambda q: (q.get("created_at") or "", q["id"]), reverse=True)
     return jsonify({"questions": [_brief(q) for q in qs]})
 
 
@@ -585,7 +591,7 @@ def api_topics_example_analyze(eid):
 
 @app.patch("/api/topics/examples/<eid>")
 def api_topics_example_patch(eid):
-    """手编例题：video（视频讲解路径）/answer/analysis/text/choices"""
+    """手编例题：answer/analysis/text/choices"""
     try:
         import topics
         b = request.get_json(force=True)

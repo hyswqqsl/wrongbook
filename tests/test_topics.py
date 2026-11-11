@@ -599,7 +599,8 @@ class TestCropSharedProtection(unittest.TestCase):
 
 
 class TestVideos(unittest.TestCase):
-    """v1.2p 视频讲解改链接：端点移除 / 链接双链透传 / 历史文件清理链保留"""
+    """v1.4.2（B0）视频功能全线删除：上传端点 404 / video 字段不再透传 / PATCH video 被忽略 /
+    历史残留字段与本地文件忽略不清洗（对齐 V1.3.5 GeoGebra 移除先例）"""
 
     def setUp(self):
         self.tmp = _temp_all()
@@ -609,13 +610,13 @@ class TestVideos(unittest.TestCase):
         self.c = app.test_client()
 
     def test_upload_endpoint_removed(self):
-        """v1.2p：视频上传端点已移除（改存链接，不再上传文件）"""
+        """视频上传端点不存在（v1.2p 移除；v1.4.2 全线删除后仍 404）"""
         r = self.c.post("/api/videos", data={"file": (io.BytesIO(b"fakevideo"), "a.mp4")},
                         content_type="multipart/form-data")
         self.assertEqual(r.status_code, 404)
 
-    def test_video_flows_to_topic_and_book(self):
-        """v1.2p：视频改存链接（B站 URL 含 t= 定位）——双链透传不变"""
+    def test_video_not_flowed_to_topic_and_book(self):
+        """v1.4.2：草稿题残留 video 字段不再透传——专题例题/错题记录均无该字段"""
         vpath = "https://www.bilibili.com/video/BV1N9Jt6zE67/?spm_id_from=333.337&t=340"
         _stub_llm()
         sheet = _mk_sheet([{"no": 1, "type": "single", "question": Q1,
@@ -627,37 +628,29 @@ class TestVideos(unittest.TestCase):
         out = pipeline.ingest_selected(sheet)
         r = out["results"][0]
         self.assertTrue(r["topic_id"])
-        self.assertEqual(topics.find_example(r["topic_id"])[2]["video"], vpath)  # 专题例题带视频
+        self.assertNotIn("video", topics.find_example(r["topic_id"])[2])  # 例题不带 video
         rec = store.load()["questions"][0]
-        self.assertEqual(rec["video"], vpath)   # 错题记录带视频
-        # 详情视图返回 video 字段
-        rec_view = store.get(rec["id"])
-        self.assertEqual(rec_view["video"], vpath)
+        self.assertNotIn("video", rec)   # 错题记录不带 video
 
-    def test_example_video_patch(self):
-        """v1.2p：PATCH 例题视频链接；删除例题无文件清理（链接无本体）也不报错"""
+    def test_example_video_patch_ignored(self):
+        """v1.4.2：PATCH video 字段被白名单忽略（不落库、不报错）"""
         ex = topics.add_example(self.sid, self.cat["id"], Q1, answer="B")
-        self.assertIsNone(ex["video"])
+        self.assertNotIn("video", ex)
         vurl = "https://www.bilibili.com/video/BV1N9Jt6zE67/?t=340"
         r = self.c.patch(f"/api/topics/examples/{ex['id']}", json={"video": vurl})
-        self.assertEqual(r.get_json()["video"], vurl)
-        self.assertTrue(topics.delete_example(ex["id"]))   # 链接视频：无文件可删，不异常
-        # 清空链接 = 移除
-        ex2 = topics.add_example(self.sid, self.cat["id"], Q2, answer="8")
-        r2 = self.c.patch(f"/api/topics/examples/{ex2['id']}", json={"video": None})
-        self.assertIsNone(r2.get_json()["video"])
+        self.assertNotIn("video", r.get_json())
+        self.assertTrue(topics.delete_example(ex["id"]))   # 删除链无视频处理，不异常
 
     def test_video_url_in_wrongbook_delete_no_crash(self):
-        """错题带链接视频：删除错题不做文件清理、不异常"""
+        """历史残留（错题带链接视频字段）：删除错题不做任何视频处理、不异常"""
         vurl = "https://www.bilibili.com/video/BV1N9Jt6zE67/?t=340"
         rec = store.add({"type": "fill", "question": {"text": Q1, "choices": None},
                          "analysis": {"chapter": "", "kp_path": [], "knowledge_points": [],
                                       "difficulty": 2}, "video": vurl})
         self.assertTrue(store.remove(rec["id"]))
 
-    def test_video_shared_between_book_and_topic(self):
-        """历史本地文件视频（v1.2 上传）：双目的地删错题 → 例题仍引用，文件保留；
-        再删例题 → 才删文件（v1.2p 起仅存量文件走此清理链，链接视频不涉及）"""
+    def test_video_legacy_file_left_alone(self):
+        """历史本地视频文件（v1.2 存量）：字段忽略不清洗——删错题/删例题均不触碰文件、不异常"""
         vpath = os.path.join(self.tmp, "videos", "shared.mp4")
         os.makedirs(os.path.dirname(vpath), exist_ok=True)
         open(vpath, "wb").write(b"v")
@@ -669,10 +662,10 @@ class TestVideos(unittest.TestCase):
         out = pipeline.ingest_selected(sheet)
         qid = out["results"][0]["id"]
         eid = out["results"][0]["topic_id"]
-        store.remove(qid)                       # 删错题
-        self.assertTrue(os.path.exists(vpath))  # 专题例题仍引用 → 保留
-        topics.delete_example(eid)              # 删例题（无引用）→ 删除
-        self.assertFalse(os.path.exists(vpath))
+        store.remove(qid)
+        self.assertTrue(os.path.exists(vpath))   # 忽略不清洗：文件保留
+        topics.delete_example(eid)
+        self.assertTrue(os.path.exists(vpath))   # 忽略不清洗：文件保留
 
 
 if __name__ == "__main__":

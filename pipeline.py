@@ -202,7 +202,7 @@ def ingest_selected(sheet, provider=None, progress=None):
                     ex_type=q.get("type") or "fill",
                     crop_src=(crops or [None])[0],
                     spec=q.get("figure_spec"),
-                    source=sheet.get("source") or "", video=q.get("video"),
+                    source=sheet.get("source") or "",
                     kps=q.get("kps"))   # v1.2q：转录期受控知识点随例题存档
                 topic_id = ex["id"]
                 report.append("[专题] 已存入（图形随例题存档）")
@@ -319,7 +319,6 @@ def ingest_selected(sheet, provider=None, progress=None):
                          "difficulty": max(1, min(3, int(an.get("difficulty") or 2))),
                          "key_idea": an.get("key_idea") or ""},
             "photo": sheet.get("photo"),
-            "video": q.get("video"),   # v1.2：可选视频讲解（人审卡上传），详情页可播放
             "flags": {"needs_review": status == "bad_question"},
         })
         # v1.2q：双目的地时把错题本链的分析结果回写专题例题（思路/易错/受控kps），0 额外 token

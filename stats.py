@@ -79,7 +79,9 @@ def dashboard(chapter=None, difficulty=None, kp=None, reason=None,
             "streak": streak(q),
             "need": max(0, 3 - streak(q)),  # 距离"连对3次可归档"还差几次
         })
-    practice_rows.sort(key=lambda r: (r["times"], -r["need"]))
+    practice_rows.sort(key=lambda r: (r.get("created") or "", r["id"]), reverse=True)
+    # V1.4.2a：按录入时间倒序（新录的题在最上；created 仅到天，同日题用 id 内时间戳决胜；
+    # 旧设计“零练习优先提醒”改由数字卡“零练习”承载，不再干预列表序）
     # 筛选项候选：全量题（含已归档，与筛选池同口径；不受当前筛选影响）。
     # 知识点候选必须与列表展示同源（题库标注的 kp_path 叶子/knowledge_points），
     # 否则下拉选了教材名却搜不到题（列表显示的是题库标注名）。
