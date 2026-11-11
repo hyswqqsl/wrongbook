@@ -3,6 +3,23 @@
 spec 与代码跨平台通用，在一台 Windows 机器上执行以下步骤即可产出 Windows 安装包。
 （本机是 mac，Windows 构建需要一台 Windows 实机/虚拟机；这是唯一无法在本机代劳的部分。）
 
+## ⚡ 一键打包（推荐）
+
+拷贝工程到 Windows 机器后（不要带 `data/users/`、`data/ai_config.json`、`key.env`、`data/license*`），
+双击或在 cmd/PowerShell 里执行：
+
+```bat
+packaging\build_windows.bat
+```
+
+脚本自动完成：首次自动建 venv 装依赖 → 全量回归门禁 → PyInstaller → 复制静态资源 →
+白名单校验（敏感文件绝不入包）→ 压 `dist\AI错题本-v<版本>-win64.zip`。
+
+**免解压实测**：`dist\AI错题本\` 就是解压后的最终目录，构建完直接运行
+`dist\AI错题本\AI错题本.exe` 冒烟（也可 `packaging\build_windows.bat run` 构建完自动启动）。
+
+以下手动步骤与脚本等价（排障时用）。
+
 ## 1. 准备环境
 
 1. 装 Python 3.11+（官网安装包，勾选 **Add python.exe to PATH**）
@@ -26,9 +43,6 @@ py -m venv .venv
 产物在 `dist\AI错题本\`（exe + _internal\）。把静态资源复制进去：
 
 ```bat
-xcopy /E /I static  dist\AI错题本\static\
-xcopy /E /I engine  dist\AI错题本\engine\
-xcopy /E /I data\kb dist\AI错题本\data\kb\
 xcopy /E /I /Y static dist\AI错题本\static\; xcopy /E /I /Y engine dist\AI错题本\engine\; xcopy /E /I /Y data\kb dist\AI错题本\data\kb\
 ```
 
@@ -79,9 +93,6 @@ venv/bin/python license_admin.py issue --owner 张同学家
 venv/bin/python license_admin.py reset-seats --code WB-XXXX-XXXX-XXXX
 ```
 
-场景	命令
-清掉某个码的绑定	reset-seats --code WB-…（如上）
-重新启用被吊销的码	enable --code WB-…
 把码改为限期/延期	extend --code WB-… --days 180
 吊销码（锁定家长端）	revoke --code WB-…
 重启服务	systemctl restart wrongbook-license

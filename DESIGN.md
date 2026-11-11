@@ -379,6 +379,15 @@
 - **V1.4.1f 设置页「测试连接」加遮罩（用户反馈）**：测试期间全屏遮罩（复用 #overlay，
   z 层高于设置弹窗，挡住一切点击）+ 防重复触发；网络异常不再卡「测试中…」
   （原实现无 try/finally，fetch 抛错会永久停在校验文案）；返回后遮罩消失、结果展示
+- **V1.4.1h Windows 一键打包脚本（用户需求）**：新增 packaging/build_windows.bat（对齐
+  build_mac.sh）——首次自动建 venv 装依赖（py/python 启动器双回退）→ 全量回归门禁 →
+  PyInstaller（先清旧产物防 stale 白名单漏报）→ xcopy 复制 static/engine/data\kb 种子 →
+  白名单校验（ai_config.json/key.env/license*.pem/wrongbook.json/drafts.json/users.json/
+  topics.json/*geogebra* 绝不入包）→ tar -a 压 dist\AI错题本-v<版本>-win64.zip；
+  `bat run` 构建完自动启动 exe 冒烟；**免解压实测**：dist\AI错题本\ 即解压后最终目录，
+  构建完直接双击 AI错题本.exe 测试。实现要点：chcp 65001 置顶（中文注释/echo 不乱码）、
+  echo 禁裸 >（会被解析为重定向建垃圾文件）、if 块内新设变量用延迟扩展 !VAR!、
+  每步 errorlevel 检查失败即停；BUILD_WINDOWS.md 保留手动步骤作排障对照
 
 ---
 
