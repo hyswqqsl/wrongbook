@@ -778,7 +778,7 @@ async function commitAll(btn){
   if(!jobs.length)return alert('先勾选错题本 或 选择「存入专题」目标');
   const noReason=jobs.flatMap(s=>s.questions.filter(q=>q.selected&&(!q.reason||!q.reason.kind)));
   if(noReason.length&&!confirm(`有 ${noReason.length} 题未标错因（存错题本需要），确定继续？`))return;
-  showOv('录入中…（存错题本需走质量链：LLM 验伪+分析，约 0.5~2 分钟/题；仅存专题秒过）');
+  showOv('录入中…（存错题本需走质量链：LLM 验伪+分析一次调用，约 0.5~1 分钟/题；仅存专题秒过）');
   const agg={ingested:[],skipped:[],topics:[],errors:[]};
   const applyResults=(sheet,j)=>{
     (j.results||[]).forEach(x=>{

@@ -379,6 +379,13 @@
 - **V1.4.1f 设置页「测试连接」加遮罩（用户反馈）**：测试期间全屏遮罩（复用 #overlay，
   z 层高于设置弹窗，挡住一切点击）+ 防重复触发；网络异常不再卡「测试中…」
   （原实现无 try/finally，fetch 抛错会永久停在校验文案）；返回后遮罩消失、结果展示
+- **V1.4.1i 提交提速：验伪+分析合并一次调用（用户问"为什么慢"）**：定位——转录图早已压缩
+  （preprocess 最长边 1600px/q85，实测发图仅 71~291KB，非原图），慢在提交阶段每题
+  **2 次串行 LLM 调用**（验伪独立解题开思考 0.5~2min + 分析数十秒）× N 题串行。
+  合并 VERIFY_PROMPT+ANALYSIS_PROMPT → **VERIFY_ANALYZE_PROMPT**（一次调用同轮输出
+  answer/ok/issues + chapter/knowledge_points/pitfall/difficulty/key_idea，分析本就基于
+  验伪解答），每题 2 次 LLM → **1 次，提交耗时约减半**；前端提交遮罩文案同步
+  "约 0.5~1 分钟/题"。回归 226 项全绿（tests stub 本就返回合并 JSON，无缝兼容）
 - **V1.4.1h Windows 一键打包脚本（用户需求）**：新增 packaging/build_windows.bat（对齐
   build_mac.sh）——首次自动建 venv 装依赖（py/python 启动器双回退）→ 全量回归门禁 →
   PyInstaller（先清旧产物防 stale 白名单漏报）→ xcopy 复制 static/engine/data\kb 种子 →

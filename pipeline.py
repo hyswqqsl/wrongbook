@@ -10,27 +10,24 @@ import figureflow
 import reviewflow
 from reviewflow import ask_json_vision  # 复用降级问答（文本模式同构）
 
-ANALYSIS_PROMPT = """你是初中数学教研专家。分析下面这道错题并输出 JSON。
-
-错题：{question}
-标准答案：{answer}
-学生错因：{reason}
-
-输出字段：
-- chapter: 从 {chapters} 中选一个
-- knowledge_points: 2~4 个知识点（具体到定理/模型名）
-- pitfall: 易错点描述。错因为"马虎"时聚焦"容易算错/看错的环节"；错因为"不会"时聚焦"思路卡点与突破口"；其他则写实际陷阱
-- difficulty: 1|2|3（1=简单基础 2=中等综合 3=困难压轴）
-- key_idea: 一句话解题关键（供复习提示）
-只输出 JSON。"""
-
-VERIFY_PROMPT = """你是严格的数学审题专家。请独立解答下面的题目（不要轻信题目给出的任何答案）。
+VERIFY_ANALYZE_PROMPT = """你是严格的数学审题专家兼教研专家。请独立解答下面的题目（不要轻信题目给出的任何答案），并基于你的独立解答完成教研分析。
 
 题目：{question}
 {choices_block}
-任务：独立完整解答（写关键步骤），并检查题目是否条件自洽、答案唯一。
-只输出 JSON：{{"answer":"最终答案（选择题填字母，填空填文本）","ok":true,"issues":[]}}
-ok=false 表示题目矛盾/欠定/无解，此时 answer 填"无法确定"。"""
+学生错因：{reason_note}
+
+任务一（独立解题）：完整解答（写关键步骤），检查题目是否条件自洽、答案唯一
+任务二（教研分析）：基于你的独立解答输出分析
+
+只输出 JSON：
+{{"answer":"最终答案（选择题填字母，填空填文本）","ok":true,"issues":[],
+ "chapter":"从 {chapters} 中选一个",
+ "knowledge_points":["2~4 个知识点，具体到定理/模型名"],
+ "pitfall":"易错点描述。错因为“马虎”时聚焦“容易算错/看错的环节”；错因为“不会”时聚焦“思路卡点与突破口”；其他则写实际陷阱",
+ "difficulty":2,
+ "key_idea":"一句话解题关键（供复习提示）"}}
+difficulty 取 1|2|3（1=简单基础 2=中等综合 3=困难压轴）；
+ok=false 表示题目矛盾/欠定/无解，此时 answer 填“无法确定”，分析字段仍尽量输出。"""
 
 # 分析 prompt 的章节受控词表：前置年级 → 该年级教材章（kbtree 按年级清单）；
 # 未知/其他/读不到 → 内置 CHAPTERS（八上五章，旧行为兜底）。进程内按年级缓存。
@@ -257,11 +254,19 @@ def ingest_selected(sheet, provider=None, progress=None):
         else:
             report.append("[图形] 未获得图形，保留题干待手动补图")
 
-        # ② 答案验伪（独立解题，不看照片答案）
+        # ②③ 验伪+分析合并为一次调用（v1.4.1i：每题 2 次 LLM → 1 次，提交提速约一半）
+        #    独立解题（开思考，不看照片答案）+ 基于解答的教研分析同一轮完成
         ch_block = ""
         if choices:
             ch_block = "选项：\n" + "\n".join("{0}. {1}".format(c.get("key"), c.get("text")) for c in choices)
-        v = _ask_text_json(client, model, VERIFY_PROMPT.format(question=text, choices_block=ch_block))
+        reason = q.get("reason") or {}
+        grade = (q.get("grade") or "").strip()   # v1.4.1：录入页前置年级（小学/初中全集），缺省空
+        reason_note = "{0}（{1}）".format(
+            {"careless": "马虎", "unknown": "不会", "other": "其他"}.get(reason.get("kind"), "未标注"),
+            reason.get("note") or "无备注")
+        v = _ask_text_json(client, model, VERIFY_ANALYZE_PROMPT.format(
+            question=text, choices_block=ch_block, reason_note=reason_note,
+            chapters="、".join(_grade_chapters(grade))))
         printed = q.get("printed_answer")
         v_ans = str(v.get("answer") or "").strip()
         if not v.get("ok"):
@@ -273,16 +278,7 @@ def ingest_selected(sheet, provider=None, progress=None):
         else:
             status, verified = "pass", v_ans
             report.append("[验伪] 独立解题对账一致({0})".format(v_ans))
-
-        # ③ 分析（错因驱动侧重）
-        grade = (q.get("grade") or "").strip()   # v1.4.1：录入页前置年级（小学/初中全集），缺省空
-        reason = q.get("reason") or {}
-        reason_note = "{0}（{1}）".format(
-            {"careless": "马虎", "unknown": "不会", "other": "其他"}.get(reason.get("kind"), "未标注"),
-            reason.get("note") or "无备注")
-        an = _ask_text_json(client, model, ANALYSIS_PROMPT.format(
-            question=text, answer=verified or v_ans, reason=reason_note,
-            chapters="、".join(_grade_chapters(grade))))
+        an = v   # 分析字段与验伪同轮返回
         report.append("[分析] {0} · 难度{1} · {2}".format(
             an.get("chapter"), an.get("difficulty"), "/".join(an.get("knowledge_points") or [])))
 
