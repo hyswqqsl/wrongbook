@@ -18,6 +18,27 @@ packaging\build_windows.bat
 **免解压实测**：`dist\AI错题本\` 就是解压后的最终目录，构建完直接运行
 `dist\AI错题本\AI错题本.exe` 冒烟（也可 `packaging\build_windows.bat run` 构建完自动启动）。
 
+### ⚠️ 编码坑（改脚本前务必看）
+
+`cmd.exe` 解释 `.bat` 时**只认当前控制台代码页**，且**完全不支持 BOM**。
+UTF-8 编码的 `.bat` 里只要出现非 ASCII 行（哪怕只是 `echo` 文案），叠加 `chcp 65001`
+就会让 cmd 的字节偏移与字符偏移错位，整行被从中间截断当成命令执行，报：
+
+```
+'I' is not recognized as an internal or external command,
+operable program or batch file.
+```
+
+因此本仓库的约定：
+
+| 文件 | 编码约束 | 原因 |
+|---|---|---|
+| `packaging/build_windows.bat` | **纯 ASCII**（无 BOM） | cmd 解析安全；只做 venv 引导 + 调 `build_win.py` |
+| `packaging/build_win.py` | UTF-8 | 中文文案与中文目录名「AI错题本」全在这里；Python 走宽字符 API，任何代码页都不乱码 |
+
+改 `build_windows.bat` 时**不要写中文**，也不要加 `chcp 65001`。
+中文提示统一写在 `build_win.py` 的 `log()` 里。
+
 以下手动步骤与脚本等价（排障时用）。
 
 ## 1. 准备环境
@@ -45,6 +66,10 @@ py -m venv .venv
 ```bat
 xcopy /E /I /Y static dist\AI错题本\static\; xcopy /E /I /Y engine dist\AI错题本\engine\; xcopy /E /I /Y data\kb dist\AI错题本\data\kb\
 ```
+
+> 手动复制时若控制台代码页不是中文（GBK/936），`xcopy` 的中文路径会被转义坏，
+> 直接用脚本里的 Python 版（`packaging/build_win.py`，走宽字符 API）更稳：
+> `.venv\Scripts\python packaging\build_win.py`
 
 检查包内**不得出现**：`ai_config.json`、`key.env`、`license*.pem`、`wrongbook.json`、`users` 目录（与 mac 构建脚本的白名单一致）。
 
