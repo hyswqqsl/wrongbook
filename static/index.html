@@ -1472,15 +1472,19 @@ function renderAiModal(notice){
     </div>
   </div>`;
 }
-async function testAiConfig(pid){   // 文本+视觉各一次最小真实调用；测试值不落盘
-  const box=$('#ai-test-'+pid); if(!box)return;
+async function testAiConfig(pid){   // 文本+视觉各一次最小真实调用；测试值不落盘；测试期间全屏遮罩禁止任何操作
+  const box=$('#ai-test-'+pid); if(!box||box.dataset.busy)return;   // 防重复触发
+  box.dataset.busy='1';
   const key=($('#ai-key-'+pid).value||'').trim(), tm=($('#ai-tm-'+pid).value||'').trim(), vm=($('#ai-vm-'+pid).value||'').trim();
-  box.textContent='测试中…（文本 + 视觉各一次最小调用，约 2~5 秒）';
+  showOv('测试中…（文本 + 视觉各一次最小真实调用，约 2~5 秒，请稍候）');   // v1.4.1f：全屏遮罩（z 高于设置弹窗，挡住一切点击）
   const post=b=>fetch('/api/ai-config/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json());
-  const r1=await post({provider:pid,key:key||null,model:tm||null});
-  const r2=await post({provider:pid,key:key||null,model:vm||null,vision:true});
-  box.innerHTML=(r1.ok?'✅ 文本模型 '+esc(r1.model):'❌ 文本：'+esc(r1.error))+'<br>'
-               +(r2.ok?'✅ 视觉模型 '+esc(r2.model):'❌ 视觉：'+esc(r2.error));
+  try{
+    const r1=await post({provider:pid,key:key||null,model:tm||null});
+    const r2=await post({provider:pid,key:key||null,model:vm||null,vision:true});
+    box.innerHTML=(r1.ok?'✅ 文本模型 '+esc(r1.model):'❌ 文本：'+esc(r1.error))+'<br>'
+                 +(r2.ok?'✅ 视觉模型 '+esc(r2.model):'❌ 视觉：'+esc(r2.error));
+  }catch(e){box.textContent='❌ 测试失败：'+e;}
+  finally{hideOv(); box.dataset.busy='';}
 }
 async function saveAiConfig(){
   const pid=AI_SEL, keys={}, models={};
