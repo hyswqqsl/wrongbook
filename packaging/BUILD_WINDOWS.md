@@ -86,3 +86,7 @@ venv/bin/python license_admin.py reset-seats --code WB-XXXX-XXXX-XXXX
 吊销码（锁定家长端）	revoke --code WB-…
 重启服务	systemctl restart wrongbook-license
 看服务日志	journalctl -u wrongbook-license -n 50
+
+# 发布
+- 1.4.1：
+增加1-9年级上下册数学知识点收集，在录入时先要明确选择年纪（下次进入会记忆），出题增加乱序排序（是阿郑呀 网友），明确了智普api key接入方式。
