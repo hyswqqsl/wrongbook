@@ -70,7 +70,11 @@ def _defaults():
 
 
 def load(force=False):
-    """读取配置（mtime 缓存；文件不存在/损坏返回默认值）"""
+    """读取配置（桌面：文件 mtime 缓存；云端租户：accounts.ai_config，无平台兑底）"""
+    import tenant_ctx
+    if tenant_ctx.get_tenant() is not None:
+        import cloud_store
+        return cloud_store.load_ai_config()
     global _CACHE
     with _LOCK:
         try:
@@ -85,21 +89,13 @@ def load(force=False):
         except Exception:
             return _defaults()
         d = _defaults()
-        d.update({k: cfg[k] for k in ("provider",) if k in cfg})
-        for p in PROVIDER_META:
-            if isinstance(cfg.get("keys", {}).get(p), str):
-                d["keys"][p] = cfg["keys"][p].strip()
-            m = cfg.get("models", {}).get(p)
-            if isinstance(m, dict):
-                d["models"][p] = {"text": str(m.get("text") or "").strip(),
-                                  "vision": str(m.get("vision") or "").strip()}
+        _apply_patch(d, cfg)
         _CACHE = (mt, d)
         return d
 
 
-def save_patch(patch):
-    """增量保存（provider / keys / models）；key 传空串 = 清除。原子写 .bak"""
-    cfg = load(force=True)
+def _apply_patch(cfg, patch):
+    """把 patch（provider/keys/models，值可为任意来源）合并进 cfg（就地修改）"""
     if isinstance(patch.get("provider"), str):
         if patch["provider"] and patch["provider"] not in PROVIDER_META:
             raise ValueError("未知引擎：{0}".format(patch["provider"]))
@@ -115,6 +111,18 @@ def save_patch(patch):
             if p in PROVIDER_META and isinstance(m, dict):
                 cfg["models"][p] = {"text": str(m.get("text") or "").strip(),
                                     "vision": str(m.get("vision") or "").strip()}
+    return cfg
+
+
+def save_patch(patch):
+    """增量保存（provider / keys / models）；key 传空串 = 清除。
+    云端租户 → accounts.ai_config（每户隔离）；桌面 → 原子写 .bak"""
+    import tenant_ctx
+    if tenant_ctx.get_tenant() is not None:
+        import cloud_store
+        return cloud_store.save_ai_config_patch(patch)
+    cfg = load(force=True)
+    _apply_patch(cfg, patch)
     paths.atomic_write_json(_CONFIG_PATH, cfg, indent=2)   # R1 收口：fsync+.bak 三代轮换
     global _CACHE
     with _LOCK:
@@ -125,10 +133,16 @@ def save_patch(patch):
 # ---------- 解析（供 common.make_client 使用） ----------
 
 def resolve_key(provider):
-    """key 解析：ai_config.json > 环境变量"""
+    """key 解析：配置 > 环境变量；云端租户不兑底环境变量（模式 B：家长自配，平台零垫资）"""
     if provider not in PROVIDER_META:
         return ""
-    return load()["keys"][provider] or os.environ.get(PROVIDER_META[provider]["key_env"], "")
+    k = load()["keys"][provider]
+    if k:
+        return k
+    import tenant_ctx
+    if tenant_ctx.get_tenant() is not None:
+        return ""
+    return os.environ.get(PROVIDER_META[provider]["key_env"], "")
 
 
 def resolve_model(provider, vision=False):

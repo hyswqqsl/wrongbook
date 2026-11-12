@@ -18,6 +18,16 @@ _TEST_DATA_DIR = None
 _INIT = False
 
 
+def _cloud():
+    """云端租户上下文 → cloud_store 后端（Plan B D-B1/D-B2）；桌面返回 None（走 JSON 文件）。
+    所有数据读写在入口处分支：上层 pipeline/stats/reviewflow/topics 零改动。"""
+    import tenant_ctx
+    if tenant_ctx.get_tenant() is None:
+        return None
+    import cloud_store
+    return cloud_store
+
+
 def set_test_mode():
     """测试钩子：跳过用户表初始化/迁移/路径重绑（测试自行 patch 路径全局量）"""
     global _INIT
@@ -129,11 +139,20 @@ def _init_once():
 
 
 def list_users():
+    b = _cloud()
+    if b:
+        import tenant_ctx
+        code, uid = tenant_ctx.get_tenant()
+        return b.list_users(code, uid)
     _init_once()
     return _ensure_users()
 
 
 def current_uid():
+    import tenant_ctx
+    t = tenant_ctx.get_tenant()
+    if t:
+        return t[1]   # 云端：请求级/线程级成员（X-Wrongbook-Uid 头或会话默认）
     u = _ensure_users()
     return u["current"]
 
@@ -143,8 +162,13 @@ def user_dir(uid=None):
 
 
 def add_user(name):
-    """新建用户（题库为空）并切换为当前用户；返回用户表"""
+    """新建用户（题库为空）；云端不切换当前（成员切换由请求头/会话决定），返回用户表"""
     name = (name or "").strip() or "未命名"
+    b = _cloud()
+    if b:
+        import tenant_ctx
+        code, _uid = tenant_ctx.get_tenant()
+        return b.add_user(code, name)
     _init_once()
     u = _ensure_users()
     uid = "u" + time.strftime("%Y%m%d%H%M%S") + uuid.uuid4().hex[:4]
@@ -161,7 +185,10 @@ def add_user(name):
 
 
 def switch_user(uid):
-    """切换当前用户；uid 不存在抛 ValueError"""
+    """切换当前用户；uid 不存在抛 ValueError（云端改走会话：auth.set_session_uid）"""
+    import tenant_ctx
+    if tenant_ctx.get_tenant() is not None:
+        raise RuntimeError("云端形态不支持全局切换用户（用 X-Wrongbook-Uid 头 / 会话 current_uid）")
     _init_once()
     u = _ensure_users()
     if uid not in {x["id"] for x in u["users"]}:
@@ -176,7 +203,42 @@ def _new_id():
     return time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:6]
 
 
+def photo_dir():
+    """照片目录：云端租户 → 该成员 users/<uid>/photos；桌面 → 全局量（测试可 patch）"""
+    import tenant_ctx
+    t = tenant_ctx.get_tenant()
+    if t:
+        return os.path.join(_data_dir(), "users", t[1], "photos")
+    _init_once()
+    return PHOTO_DIR
+
+
+def crop_dir():
+    """裁剪图目录：云端租户 → 该成员 users/<uid>/crops；桌面 → 全局量（测试可 patch）"""
+    import tenant_ctx
+    t = tenant_ctx.get_tenant()
+    if t:
+        return os.path.join(_data_dir(), "users", t[1], "crops")
+    _init_once()
+    return CROP_DIR
+
+
+def out_dir():
+    """导出产物目录：云端按激活码隔离（out/<code>/），桌面全局 out/"""
+    import tenant_ctx
+    t = tenant_ctx.get_tenant()
+    if t:
+        d = os.path.join(_data_dir(), "out", t[0])
+    else:
+        d = os.path.join(_data_dir(), "out")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
 def load():
+    b = _cloud()
+    if b:
+        return b.load_questions()
     _init_once()
     if not os.path.exists(DB_PATH):
         return {"version": 1, "questions": []}
@@ -185,6 +247,9 @@ def load():
 
 
 def save(db):
+    b = _cloud()
+    if b:
+        return b.save_questions(db)
     _init_once()
     with LOCK:
         paths.atomic_write_json(DB_PATH, db)
@@ -329,6 +394,9 @@ def _new_sheet_id():
 
 
 def load_sheets():
+    b = _cloud()
+    if b:
+        return b.load_sheets()
     _init_once()
     if not os.path.exists(DRAFT_PATH):
         return {"version": 1, "sheets": []}
@@ -337,6 +405,9 @@ def load_sheets():
 
 
 def save_sheets(db):
+    b = _cloud()
+    if b:
+        return b.save_sheets(db)
     _init_once()
     with LOCK:
         paths.atomic_write_json(DRAFT_PATH, db)

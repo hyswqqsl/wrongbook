@@ -49,6 +49,11 @@ def _topics_path():
 
 
 def _crops_dir():
+    """例题图形目录：云端按激活码隔离（topic_crops/<code>/，媒体路由租户校验用）；桌面全局共享"""
+    import tenant_ctx
+    t = tenant_ctx.get_tenant()
+    if t:
+        return os.path.join(store._data_dir(), "topic_crops", t[0])
     return os.path.join(store._data_dir(), "topic_crops")
 
 
@@ -70,23 +75,43 @@ def _atomic_write(path, data):
 
 # ---------- 全局专题库 ----------
 
+def build_seed():
+    """内置种子专题树（每户克隆一份：新 ts/tc id，例题空）——桌面首种与云端首跑共用"""
+    seed_set = dict(SEED_SET)
+    seed_set["id"] = _new_id("ts")
+    seed_set["created_at"] = _now()
+    seed_set["categories"] = [dict(c, id=_new_id("tc"), examples=[])
+                              for c in SEED_SET["categories"]]
+    return {"version": 1, "sets": [seed_set]}
+
+
+def _cloud_topics():
+    """云端租户 → cloud_store 专题存储；桌面返回 None（走全局 JSON，原行为）"""
+    import tenant_ctx
+    if tenant_ctx.get_tenant() is None:
+        return None
+    import cloud_store
+    return cloud_store
+
+
 def load_topics():
-    """读全局专题库；文件缺失时种入「初二中考必考专题」（幂等：文件存在即不重种）"""
+    """读专题库：云端=每户一份（首跑种子克隆）；桌面=全局文件（缺失时种入，幂等）"""
+    b = _cloud_topics()
+    if b:
+        return b.load_topics()
     p = _topics_path()
     if not os.path.exists(p):
         with LOCK:
             if not os.path.exists(p):   # 双检：并发首调只种一次
-                seed_set = dict(SEED_SET)
-                seed_set["id"] = _new_id("ts")
-                seed_set["created_at"] = _now()
-                seed_set["categories"] = [dict(c, id=_new_id("tc"), examples=[])
-                                          for c in SEED_SET["categories"]]
-                _atomic_write(p, {"version": 1, "sets": [seed_set]})
+                _atomic_write(p, build_seed())
     with LOCK:
         return json.load(open(p, encoding="utf-8"))
 
 
 def save_topics(db):
+    b = _cloud_topics()
+    if b:
+        return b.save_topics(db)
     with LOCK:
         _atomic_write(_topics_path(), db)
 
@@ -380,6 +405,9 @@ def delete_example(eid):
 # ---------- 每用户练习记录 ----------
 
 def _load_practice():
+    b = _cloud_topics()
+    if b:
+        return b.load_practice()
     p = _practice_path()
     if not os.path.exists(p):
         return {"version": 1, "practice": {}}
@@ -388,6 +416,9 @@ def _load_practice():
 
 
 def _save_practice(db):
+    b = _cloud_topics()
+    if b:
+        return b.save_practice(db)
     with LOCK:
         _atomic_write(_practice_path(), db)
 

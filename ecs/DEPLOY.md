@@ -51,7 +51,8 @@ WRONGBOOK_LICENSE=on .venv/bin/python app.py
 | 操作 | 命令 |
 |---|---|
 | 查码/绑定设备 | `venv/bin/python license_admin.py list` |
-| 家长重装系统占位 | `venv/bin/python license_admin.py reset-seats --code WB-…` |
+| 重置设备绑定 | `venv/bin/python license_admin.py reset-seats --code WB-…` |
+| 删除多余码 | `venv/bin/python license_admin.py delete --code WB-…`（物理删除，需输 YES 确认；脚本化加 --yes） |
 | 续费 | `venv/bin/python license_admin.py extend --code WB-… --days 365`（家长端下次心跳即生效） |
 | 吊销（退款/异常） | `venv/bin/python license_admin.py revoke --code WB-…`（客户端心跳 401 即锁） |
 | 追踪异常尝试 | `venv/bin/python license_admin.py audit` |

@@ -225,7 +225,7 @@ def classify_figure(question, has_figure):
 
 
 def crop_figures(photo_bytes, sheet_id, boxes):
-    """按归一化 bbox 裁剪原图 → data/crops/<sheet_id>_q<no>_<k>.png；返回 [{no,k,path,w,h}]
+    """按归一化 bbox 裁剪原图 → <crops>/<sheet_id>_q<no>_<k>.png；返回 [{no,k,path,w,h}]
 
     k 由调用方决定：自动抓图用序号 0/1/2…，手动框选用 "m"（不覆盖自动图，保留原始证据）。
 
@@ -246,12 +246,13 @@ def crop_figures(photo_bytes, sheet_id, boxes):
         return []
     img = upright_image(Image.open(io.BytesIO(photo_bytes))).convert("RGB")
     W, H = img.size
-    os.makedirs(store.CROP_DIR, exist_ok=True)
+    crop_dir = store.crop_dir()   # 云端租户 → users/<uid>/crops；桌面 → 全局量（测试可 patch）
+    os.makedirs(crop_dir, exist_ok=True)
     out = []
     for no, k, (l, t, r, b) in valid:
         crop = img.crop((int(l * W), int(t * H), int(r * W), int(b * H)))
         crop = ImageOps.autocontrast(crop, cutoff=1)   # 偏暗纸张照片自动拉对比（v1.1.0g；展示/视觉输入都受益）
-        path = os.path.join(store.CROP_DIR, "{0}_q{1}_{2}.png".format(sheet_id, no, k))
+        path = os.path.join(crop_dir, "{0}_q{1}_{2}.png".format(sheet_id, no, k))
         crop.save(path)
         out.append({"no": no, "k": k, "path": path, "w": crop.size[0], "h": crop.size[1]})
     return out
@@ -581,11 +582,13 @@ def converge_kps(raw_list, kb_kps, cap=3):
     return out
 
 
-def transcribe_photo(photo_bytes, source_note="", provider=None, grade=None):
+def transcribe_photo(photo_bytes, source_note="", provider=None, grade=None, sheet_id=None):
     """照片 → 草稿单（多题转录 + 几何题矢量图形 + 落盘）。返回草稿单 dict。
     视觉调用：provider 缺省用配置引擎；GLM 自动切视觉模型 glm-4.6v-flash。
     grade：录入页前置选择的年级（v1.4.1）——知识点在该年级受控清单中匹配、
-    全单题目 grade 直接采用用户选择（不再盲猜）；缺省回落旧行为。"""
+    全单题目 grade 直接采用用户选择（不再盲猜）；缺省回落旧行为。
+    sheet_id：异步转录（Plan B D-B3）占位草稿单 id——传入时回填该单而非新建
+    （前端先收到 {id, status:transcribing}，轮询本单直至 status 变化）。"""
     import figureflow
     # ① EXIF 转正（v0.5.1）+ 拍摄方向自动扶正（v1.3：照片内容横躺，EXIF 管不到）
     #    扶正后的照片作为转录/抓图/存盘的唯一输入 → 坐标系全链路一致
@@ -607,15 +610,24 @@ def transcribe_photo(photo_bytes, source_note="", provider=None, grade=None):
     if not questions_raw:
         raise RuntimeError("照片中未识别到题目（可能太模糊或不是试卷照片）")
 
-    sheet = add_sheet({
-        "source": source_note or (data.get("source_guess") or "").strip(),
-        "photo_size": [W, H],
-        "provider_note": model,
-        "questions": [],
-    })
+    _src = source_note or (data.get("source_guess") or "").strip()
+    sheet = None
+    if sheet_id:   # 异步占位单回填（Plan B D-B3）
+        sheet = store.get_sheet(sheet_id)
+        if sheet:
+            sheet.update({"source": _src, "photo_size": [W, H],
+                          "provider_note": model, "questions": []})
+    if sheet is None:
+        sheet = add_sheet({
+            "source": _src,
+            "photo_size": [W, H],
+            "provider_note": model,
+            "questions": [],
+        })
 
-    os.makedirs(store.PHOTO_DIR, exist_ok=True)
-    photo_path = os.path.join(store.PHOTO_DIR, sheet["id"] + ".jpg")
+    photo_dir = store.photo_dir()   # 云端租户 → users/<uid>/photos；桌面 → 全局量（测试可 patch）
+    os.makedirs(photo_dir, exist_ok=True)
+    photo_path = os.path.join(photo_dir, sheet["id"] + ".jpg")
     # 存【转正+拍摄扶正】的照片：浏览器显示方向 = 服务端像素坐标，
     # 用户手动框选的坐标才能和 crop_figures 对得上（photo_bytes 已完全扶正）。
     with Image.open(io.BytesIO(photo_bytes)) as _im:

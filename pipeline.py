@@ -450,7 +450,7 @@ def export_selected_pdf(ids, with_answer=True):
             "figure_image": (qq.get("figure_crop") if not qq.get("figure_spec") else None),
         })
     bank = normalize_bank({"chapter": "错题练习卷", "questions": bank_qs})
-    out_dir = os.path.join(paths.DATA_HOME, "out")
+    out_dir = store.out_dir()   # 云端按激活码隔离（out/<code>/）；桌面全局 out/（Plan B）
     os.makedirs(out_dir, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     jpath = os.path.join(out_dir, "错题练习卷_{0}.json".format(stamp))
@@ -505,7 +505,7 @@ def export_selected_pdf(ids, with_answer=True):
         bank["questions"].pop(i)
 
     # 落盘 + export_paper（父项目矢量导出）
-    out_dir = out_dir or os.path.join(paths.DATA_HOME, "out")
+    out_dir = out_dir or store.out_dir()   # 云端按激活码隔离；桌面全局 out/（Plan B）
     os.makedirs(out_dir, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     jpath = os.path.join(out_dir, "错题针对卷_{0}.json".format(stamp))

@@ -72,6 +72,10 @@ def main():
     p.add_argument("--code", required=True)
     p.add_argument("--days", type=int, required=True)
 
+    p = sub.add_parser("delete", help="物理删除码（含全部设备绑定；审计记录保留）")
+    p.add_argument("--code", required=True)
+    p.add_argument("--yes", action="store_true", help="跳过确认（脚本化用）")
+
     p = sub.add_parser("audit", help="最近事件")
     p.add_argument("--limit", type=int, default=30)
 
@@ -147,6 +151,24 @@ def main():
             conn.execute("UPDATE codes SET expires_at=? WHERE code=?",
                          (base + args.days * 86400, args.code))
         print("📅 已延期至：", fmt_ts(base + args.days * 86400), "（", args.code, "）")
+        return
+
+    if args.cmd == "delete":
+        with db() as conn:
+            row = conn.execute("SELECT code,owner FROM codes WHERE code=?", (args.code,)).fetchone()
+        if not row:
+            print("码不存在：", args.code)
+            return
+        if not args.yes:
+            print("将物理删除 {}（{}）及其全部设备绑定，不可恢复（审计记录保留）".format(
+                args.code, row["owner"] or "—"))
+            if input("确认请输入 YES：").strip() != "YES":
+                print("已取消")
+                return
+        with db() as conn:
+            n_act = conn.execute("DELETE FROM activations WHERE code=?", (args.code,)).rowcount
+            conn.execute("DELETE FROM codes WHERE code=?", (args.code,))
+        print("🗑 已删除 {}（解除 {} 台设备绑定；审计记录保留）".format(args.code, n_act))
         return
 
     if args.cmd == "audit":

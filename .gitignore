@@ -38,3 +38,4 @@ static/vendor/geogebra/
 *.zip
 data/kb/kp_*.json
 
+data/wrongbook.db*

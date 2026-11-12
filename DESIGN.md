@@ -411,6 +411,23 @@
   `(times, -need)`（全 0 次时稳定在插入序 → 旧题在前），改按 created_at+id 双键倒序
   （新录的题在最上，「按列表顺序」做题/导出 PDF 同此序；零练习提醒由数字卡承载）；
   /api/questions 同步倒序保持一致；新增 test_overview_sorted_by_created_desc 回归
+- **V1.4.3 ECS 云端多租户 + 异步化（云端计划 B1，Plan B 主体）**：手机 H5 云端的地基。
+  ① 新增 `tenant_ctx.py`（ContextVar 租户上下文，后台线程 bind_tenant 显式绑定）+
+  `cloud_store.py`（SQLite WAL 七表：accounts/sessions/users/sheets/questions/topic_sets/
+  topic_practice；data_json 与桌面 JSON 完全同构，store/topics/ai_config 读写原语按
+  租户委托，pipeline/stats/reviewflow 零改动）+ `auth.py`（激活码→会话→成员解析）+
+  `wrongbook_admin.py`（sync-accounts 单向同步 license 账本，绝不覆盖 ai_config）；
+  ② 单应用双形态：`WRONGBOOK_CLOUD=off`（默认）桌面行为完全不变，`on` 时 before_request
+  会话门禁（Bearer 头 > HttpOnly Cookie 双轨，img/下载自动鉴权）+ X-Wrongbook-Uid 成员头
+  （大宝/二宝多设备并行不覆盖）+ 吊销/过期每请求即查即断；③ 媒体租户隔离：/data/ 与
+  /out/ 按本人 photos/crops + 本户 topic_crops/<code>/ + out/<code>/ 校验，越权 404；
+  ④ 转录异步化（D-B3，桌面/云端同一协议）：POST /api/sheets 立即返回占位单
+  {id,status:transcribing} → 后台线程 transcribe_photo(sheet_id=…) 回填 → 前端 1.5s
+  轮询；转录/提交两个进程内 job 表统一 2h TTL 防内存驻留；⑤ 租户级 AI Key（模式 B）：
+  accounts.ai_config 按户隔离读写，云端不用平台环境变量兑底（零垫资）；
+  ⑥ 云端禁用 /api/shutdown、/api/license 返回 cloud 态；前端极简 401 激活码登录
+  （B2 换正式视图）；新增云测试 37 项（隔离/鉴权/异步/TTL/CLI），全量 **264 项全绿**；
+  APP_VERSION 1.4.2→1.4.3
 
 ---
 

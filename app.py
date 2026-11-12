@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """app —— AI错题本 Flask 服务（本地单用户）"""
-import os, sys, threading, traceback
+import os, sys, threading, time, traceback, contextlib
 
 import paths
 
@@ -16,6 +16,9 @@ import store, stats
 import figureflow
 import ai_config
 import license_client
+import tenant_ctx
+import auth as _auth
+import cloud_store
 
 app = Flask(__name__, static_folder=os.path.join(BASE, "static"), static_url_path="/static")
 app.json.sort_keys = False   # v1.2o：保留 dict 插入序（工作台 kp_by_chapter 按 KB 章序下发，Flask 默认字典序会得「一三二五四」错序）
@@ -26,6 +29,8 @@ app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024   # 照片转录上传（V1.
 
 @app.before_request
 def _license_gate():
+    if tenant_ctx.CLOUD:
+        return None   # 云端形态走 _cloud_gate（激活码会话），桌面激活门禁不生效
     if not license_client.ENABLED:
         return None
     p = request.path
@@ -37,11 +42,78 @@ def _license_gate():
     return jsonify({"error": "license_" + st}), 403
 
 
+# ---------- 云端形态（WRONGBOOK_CLOUD=on，Plan B D-B2/D-B4）：会话门禁 + 租户上下文绑定 ----------
+
+@app.before_request
+def _cloud_gate():
+    """校验会话/账户 → 解析成员 → set_tenant（teardown 配对 reset）。
+    401=未登录/会话失效；403=停用/过期（前端可区分文案，见 auth.AuthError）。"""
+    if not tenant_ctx.CLOUD:
+        return None
+    p = request.path
+    if p == "/" or p.startswith("/static") or p.startswith("/api/auth/") or p == "/api/license":
+        return None   # 登录/静态/状态查询放行；心跳端点自行校验 token
+    from flask import g
+    try:
+        code, uid = _auth.gate(request)
+    except _auth.AuthError as e:
+        return jsonify({"error": e.msg}), e.status
+    g.wb_code, g.wb_uid = code, uid
+    g.wb_tenant_token = tenant_ctx.set_tenant(code, uid)
+    return None
+
+
+@app.teardown_request
+def _cloud_teardown(exc=None):
+    """配对还原租户上下文（异常/提前返回也必执行）"""
+    from flask import g
+    tok = g.pop("wb_tenant_token", None)
+    if tok is not None:
+        tenant_ctx.reset_tenant(tok)
+
+
 @app.get("/api/license")
 def api_license_status():
-    """激活状态视图（前端启动首查；顺带触发到期后台心跳）"""
+    """激活状态视图（前端启动首查；顺带触发到期后台心跳）。云端形态返回 cloud 态。"""
+    if tenant_ctx.CLOUD:
+        return jsonify({"state": "cloud", "app_version": paths.APP_VERSION})
     license_client.maybe_heartbeat_async()
     return jsonify(license_client.status())
+
+
+# ---------- 云端登录（Plan B D-B4/D-B7：激活码 → token + Cookie 双轨） ----------
+
+@app.post("/api/auth/activate")
+def api_auth_activate():
+    if not tenant_ctx.CLOUD:
+        return jsonify({"error": "仅云端形态提供"}), 404
+    b = request.get_json(force=True, silent=True) or {}
+    try:
+        out = _auth.activate(b.get("code"), b.get("device_name")
+                             or (request.headers.get("User-Agent") or "")[:80])
+    except _auth.AuthError as e:
+        return jsonify({"error": e.msg}), e.status
+    resp = jsonify({"ok": True, **out})
+    return _auth.set_cookies(resp, out["token"], out["current_uid"])
+
+
+@app.post("/api/auth/heartbeat")
+def api_auth_heartbeat():
+    """token 续活（冷启动/定期调用）；后端门禁每请求已校验吊销/过期，这里仅刷新 last_seen"""
+    sess = _auth.resolve_session(request)
+    if not sess:
+        return jsonify({"error": "未登录或会话已失效"}), 401
+    cloud_store.touch_session(sess["token"])
+    return jsonify({"ok": True})
+
+
+@app.post("/api/auth/logout")
+def api_auth_logout():
+    sess = _auth.resolve_session(request)
+    if sess:
+        cloud_store.drop_session(sess["token"])
+    resp = jsonify({"ok": True})
+    return _auth.clear_cookies(resp)
 
 
 @app.post("/api/license/activate")
@@ -159,19 +231,57 @@ def api_ai_config_test():
 
 # ---------- 排版机（草稿单） ----------
 
+# ---- 异步转录（Plan B D-B3）：视觉转录 20s~3min，同步 HTTP 手机网络必超时——
+# 与 v1.2s 异步提交同协议：先建占位草稿单立即返回 → 后台线程转录 → 前端轮询详情
+_transcribe_jobs = {}                        # {sid: job}（进程内；服务重启丢失 → 轮询兑底）
+_transcribe_lock = threading.Lock()
+_JOB_TTL = 2 * 3600                          # 已结束 job 保留窗：防 2G 内存服务器长期驻留膨胀
+
+
+def _jobs_gc(jobs, lock):
+    """清理超过 TTL 的已结束 job（自带加锁；TTL 从 finished 起算）"""
+    now = time.time()
+    with lock:
+        for k in [k for k, j in jobs.items()
+                  if j.get("state") in ("done", "error")
+                  and j.get("finished", 0) and now - j["finished"] > _JOB_TTL]:
+            jobs.pop(k, None)
+
+
 @app.post("/api/sheets")
 def api_sheet_create():
-    try:
-        f = request.files.get("photo")
-        if not f:
-            return jsonify({"error": "缺少 photo 文件"}), 400
-        import reviewflow
-        grade = (request.form.get("grade") or "").strip()
-        sheet = reviewflow.transcribe_photo(f.read(), request.form.get("source", ""),
-                                            grade=grade or None)
-        return jsonify(sheet)
-    except Exception as e:
-        return _err(e)
+    f = request.files.get("photo")
+    if not f:
+        return jsonify({"error": "缺少 photo 文件"}), 400
+    import reviewflow
+    grade = (request.form.get("grade") or "").strip()
+    source = request.form.get("source", "")
+    photo_bytes = f.read()
+    sheet = store.add_sheet({"source": source, "status": "transcribing",
+                             "grade": grade or "", "questions": []})   # 占位单（立即返回）
+    t = tenant_ctx.get_tenant()
+    job = {"state": "running", "started": time.time(), "finished": 0, "error": None}
+    with _transcribe_lock:
+        _transcribe_jobs[sheet["id"]] = job
+    _jobs_gc(_transcribe_jobs, _transcribe_lock)   # 锁外调用（_jobs_gc 自持锁）
+
+    def _run():
+        ctx = tenant_ctx.bind_tenant(*t) if t else contextlib.nullcontext()
+        with ctx:
+            try:
+                reviewflow.transcribe_photo(photo_bytes, source, grade=grade or None,
+                                            sheet_id=sheet["id"])
+                job["state"] = "done"
+            except Exception as e:
+                job["error"] = str(e)[:300]
+                job["state"] = "error"
+                store.set_sheet_status(sheet["id"], "error", {"error": str(e)[:300]})
+            finally:
+                job["finished"] = time.time()
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"id": sheet["id"], "status": "transcribing",
+                    "created_at": sheet.get("created_at"), "source": sheet.get("source")})
 
 
 @app.get("/api/sheets")
@@ -343,11 +453,16 @@ _COMMIT_KEEP = 30          # 保留最近 N 个已完成 job（供前端读取�
 
 
 def _commit_job_gc():
-    """清理多余已完成 job（调用方必须已持有 _commit_lock；Lock 不可重入）"""
+    """清理已完成 job：数量上限（旧行为）+ TTL（Plan B D-B3；调用方必须已持锁，Lock 不可重入）"""
+    now = time.time()
     dones = [k for k, v in _commit_jobs.items() if v.get("state") in ("done", "error")]
     if len(dones) > _COMMIT_KEEP:
         for k in sorted(dones, key=lambda k: _commit_jobs[k].get("started", 0))[:-_COMMIT_KEEP]:
             _commit_jobs.pop(k, None)
+    for k in [k for k, v in _commit_jobs.items()
+              if v.get("state") in ("done", "error") and v.get("finished", 0)
+              and now - v["finished"] > _JOB_TTL]:
+        _commit_jobs.pop(k, None)
 
 
 @app.post("/api/sheets/<sid>/commit")
@@ -362,23 +477,30 @@ def api_sheet_commit(sid):
         job = _commit_jobs.get(sid)
         if job and job.get("state") == "running":
             return jsonify({"error": "该照片正在录入中，请勿重复提交", "running": True}), 409
-        job = {"state": "running", "started": __import__("time").time(),
+        job = {"state": "running", "started": time.time(), "finished": 0,
                "ingested": 0, "topics": 0, "skipped": 0, "cur_no": None,
                "results": None, "error": None}
         _commit_jobs[sid] = job
         _commit_job_gc()
+    _jobs_gc(_commit_jobs, _commit_lock)   # 锁外调用（_jobs_gc 自持锁；_commit_lock 不可重入）
+
+    t = tenant_ctx.get_tenant()   # 云端：提交线程显式绑定租户（D-B2；桌面 None 走原行为）
 
     def _run():
-        try:
-            def _progress(d):
-                job["ingested"], job["topics"], job["skipped"] = d.get("ingested", 0), d.get("topics", 0), d.get("skipped", 0)
-                job["cur_no"] = d.get("no")
-            res = pipeline.ingest_selected(sheet, progress=_progress)
-            job["results"] = res.get("results")
-            job["state"] = "done"
-        except Exception as e:
-            job["error"] = str(e)[:300]
-            job["state"] = "error"
+        ctx = tenant_ctx.bind_tenant(*t) if t else contextlib.nullcontext()
+        with ctx:
+            try:
+                def _progress(d):
+                    job["ingested"], job["topics"], job["skipped"] = d.get("ingested", 0), d.get("topics", 0), d.get("skipped", 0)
+                    job["cur_no"] = d.get("no")
+                res = pipeline.ingest_selected(sheet, progress=_progress)
+                job["results"] = res.get("results")
+                job["state"] = "done"
+            except Exception as e:
+                job["error"] = str(e)[:300]
+                job["state"] = "error"
+            finally:
+                job["finished"] = time.time()
 
     __import__("threading").Thread(target=_run, daemon=True).start()
     return jsonify({"job": sid, "state": "running"})
@@ -401,7 +523,7 @@ def api_sheet_docx(sid):
         sheet = store.get_sheet(sid)
         if not sheet:
             return jsonify({"error": "不存在"}), 404
-        out = os.path.join(paths.DATA_HOME, "out", "排版稿_{0}.docx".format(sid))
+        out = os.path.join(store.out_dir(), "排版稿_{0}.docx".format(sid))
         os.makedirs(os.path.dirname(out), exist_ok=True)
         wordexport.export_sheet_docx(sheet, out)
         return send_file(out, as_attachment=True, download_name=os.path.basename(out))
@@ -617,14 +739,20 @@ def api_topics_example_practice(eid):
 
 @app.get("/api/users")
 def api_users():
+    if tenant_ctx.CLOUD:
+        from flask import g
+        return jsonify(cloud_store.list_users(g.wb_code, g.wb_uid))
     return jsonify(store.list_users())
 
 
 @app.post("/api/users")
 def api_user_create():
-    """新建用户（题库为空）并切换为当前用户"""
+    """新建用户（题库为空）；云端不切换当前（成员由请求头/会话决定）"""
     try:
         body = request.get_json(force=True)
+        if tenant_ctx.CLOUD:
+            from flask import g
+            return jsonify(cloud_store.add_user(g.wb_code, body.get("name", "")))
         return jsonify(store.add_user(body.get("name", "")))
     except Exception as e:
         return _err(e)
@@ -634,6 +762,18 @@ def api_user_create():
 def api_user_switch():
     try:
         body = request.get_json(force=True)
+        if tenant_ctx.CLOUD:
+            from flask import g
+            uid = body.get("id", "")
+            if not cloud_store.uid_belongs(g.wb_code, uid):
+                return jsonify({"error": "成员不存在"}), 400
+            sess = _auth.resolve_session(request)
+            if sess:
+                cloud_store.set_session_uid(sess["token"], uid)
+            resp = jsonify(cloud_store.list_users(g.wb_code, uid))
+            resp.set_cookie(_auth.UID_COOKIE, uid, max_age=_auth.TOKEN_TTL,
+                            httponly=False, samesite="Lax", path="/")
+            return resp
         return jsonify(store.switch_user(body.get("id", "")))
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -645,18 +785,29 @@ def api_user_switch():
 
 @app.get("/data/<path:p>")
 def api_data(p):
-    return send_from_directory(paths.DATA_HOME, p)
+    if tenant_ctx.CLOUD:   # Plan B D-B4：跨户路径/伪装路径一律 404（穿透由 send_from_directory 兜底）
+        from flask import g
+        if not _auth.tenant_media_allowed(p, g.get("wb_code", ""), g.get("wb_uid", "")):
+            return jsonify({"error": "不存在"}), 404
+    return send_from_directory(store._data_dir(), p)   # 与存储层同一数据根（测试重定向一并生效）
 
 
 @app.get("/out/<path:p>")
 def api_out(p):
-    return send_from_directory(os.path.join(paths.DATA_HOME, "out"), p)
+    if tenant_ctx.CLOUD:   # G10：导出产物同样按激活码隔离（out/<code>/…）
+        from flask import g
+        if not _auth.tenant_out_allowed(p, g.get("wb_code", "")):
+            return jsonify({"error": "不存在"}), 404
+    return send_from_directory(os.path.join(store._data_dir(), "out"), p)
 
 
 @app.post("/api/shutdown")
 def api_shutdown():
     """关闭后台服务（前端右上角「退出」按钮调用）
-    需自定义头 X-WrongBook-Exit: 1（跨站表单无法携带 → 阻断恶意网页静默关停本机服务）"""
+    需自定义头 X-WrongBook-Exit: 1（跨站表单无法携带 → 阻断恶意网页静默关停本机服务）；
+    云端形态禁用（远程服务不允许网页关停）"""
+    if tenant_ctx.CLOUD:
+        return jsonify({"error": "云端模式不支持远程关停"}), 404
     if request.headers.get("X-WrongBook-Exit") != "1":
         return jsonify({"error": "missing exit token"}), 403
     if request.remote_addr not in ("127.0.0.1", "::1", None):

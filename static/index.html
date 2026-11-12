@@ -323,19 +323,35 @@ function hideOv(){$('#overlay').classList.add('hidden');}
     else if(u.startsWith('/api/sheets')) data={error:'当前为静态预览模式，请通过本地 AI错题本.exe 启动后使用照片转录'};
     return Promise.resolve(new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json'}}));
   }
-  function intercept403(res) {
+  let _cloudLoggingIn=false;
+  async function cloudLogin(){   // 云端未登录：极简激活码登录（B2 换正式视图）
+    if(_cloudLoggingIn)return;_cloudLoggingIn=true;
+    const code=prompt('云端未登录：请输入激活码');
+    _cloudLoggingIn=false;
+    if(!code)return;
+    try{
+      const r=await rawFetch('/api/auth/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+      const j=await r.json();
+      if(j.error)return alert('❌ '+j.error);
+      location.reload();
+    }catch(e){alert('❌ '+e);}
+  }
+  function intercept403(res,input) {
     if(res.status===403) {
       res.clone().json().then(j=>{
         if(j&&j.error&&j.error.startsWith('license_')) location.reload();
       }).catch(()=>{});
+    }
+    if(res.status===401&&typeof input==='string'&&input.startsWith('/api/')&&!input.startsWith('/api/auth/')) {
+      cloudLogin();   // 云端会话失效：唤起登录（不再弹 license 激活）
     }
     return res;
   }
   window.fetch=function(input,init){
     if(isPreview&&typeof input==='string'&&input.startsWith('/')) return mockApiResponse(input);
     if(typeof input==='string'&&input.startsWith('/'))
-      return rawFetch(location.origin+input,init).then(intercept403);
-    return rawFetch(input,init).then(intercept403);
+      return rawFetch(location.origin+input,init).then(res=>intercept403(res,input));
+    return rawFetch(input,init).then(res=>intercept403(res,input));
   };
 })();
 
@@ -451,14 +467,32 @@ $('#btn-upload').onclick=async()=>{
       setOv(`转录中（${i+1}/${groups.length}${g.length>1?`，跨页拼接 ${g.length} 张`:''}）… 约20-60秒，请勿关闭页面`);
       const photo=g.length>1?await stitchImages(g):g[0];
       const fd=new FormData(); fd.append('photo',photo); if(note)fd.append('source',note); if(grade)fd.append('grade',grade);
-      try{const r=await fetchT('/api/sheets',{method:'POST',body:fd},300000); const j=await r.json();
+      try{const r=await fetchT('/api/sheets',{method:'POST',body:fd},60000); let j=await r.json();
         if(j.error){$('#upload-status').textContent='❌ '+j.error;}
+        else if(j.status==='transcribing'){   // Plan B D-B3：异步转录——轮询直至 status 变化（可切后台）
+          const sj=await pollSheet(j.id);
+          if(sj.error_){$('#upload-status').textContent='❌ '+sj.error_;}
+          else if(sj.status==='error'){$('#upload-status').textContent='❌ 转录失败：'+(sj.error||'未知错误');}
+          else{sj.mode=INGEST_MODE;
+            sheets.unshift(sj); $('#upload-status').textContent=`✅ 已转录 ${sj.questions.length} 题（尚未提交入库，核对无误后点下方「提交」）；照片已保留，再点「转录」可重新分析`; renderReview();}
+        }
         else{j.mode=INGEST_MODE;
           sheets.unshift(j); $('#upload-status').textContent=`✅ 已转录 ${j.questions.length} 题（尚未提交入库，核对无误后点下方「提交」）；照片已保留，再点「转录」可重新分析`; renderReview();}
       }catch(e){$('#upload-status').textContent='❌ '+e;}
     }
   }finally{hideOv();}   // v1.4.1a：转录后照片保留在缩略图区（可再点转录重新分析 / 増删后重跑）
 };
+async function pollSheet(sid){   // Plan B D-B3：转录轮询（1.5s 间隔，上限 20 分钟；断网重连续轮）
+  for(let i=0;i<800;i++){
+    await new Promise(r=>setTimeout(r,1500));
+    try{
+      const j=await (await fetchT(`/api/sheets/${sid}`,{},30000)).json();
+      if(!j.status||j.status!=='transcribing')return j;
+      if(i%10===0)setOv(`转录中… 已等待 ${Math.round((i+1)*1.5)} 秒`);
+    }catch(e){/* 网络抖动：继续轮 */}
+  }
+  return {error_:'转录超时（20 分钟）：请确认服务在线后重试'};
+}
 function renderReview(){
   // 双入口独立（v1.2b 反馈）：每个入口只看自己转录的照片
   const visible=sheets.filter(s=>(s.mode||'book')===INGEST_MODE);
